@@ -1,0 +1,3846 @@
+{
+    "testbed": {
+        "name": "3-site-ipv6",
+        "type": "virtual",
+        "description": "5-site topology",
+        "segment_vlans": [
+            {
+                "name": "Global Segment",
+                "vlan_id": 1,
+                "type": "regular"
+            },
+            {
+                "name": "segment1",
+                "vlan_id": 100,
+                "type": "regular"
+            },
+            {
+                "name": "segment2",
+                "vlan_id": 101,
+                "type": "regular"
+            }
+        ]
+    },
+    "topology": {
+        "bastion_hosts": "[[ bastion_hosts ]]",
+        "hypervisors": "[[ hypervisors ]]",
+        "prod_vco": {
+            "connections": {
+                "ip": "[[ pvt_vco_host ]]",
+                "port": "[[ pvt_vco_ssh_port ]]",
+                "api_port": "[[ pvt_vco_api_port ]]"
+            },
+            "credentials": {
+                "username": "[[ pvt_vco_ssh_username ]]",
+                "password": "[[ pvt_vco_ssh_password ]]",
+                "private_key": "[[ pvt_vco_ssh_key ]]"
+            },
+            "interfaces": [
+                {
+                    "link": "bastion-host",
+                    "name": "eth0",
+                    "ip": "192.168.0.253",
+                    "addressing_type": "STATIC",
+                    "netmask": "255.255.255.0",
+                    "default_gateway": "192.168.0.100"
+                },
+                {
+                    "link": "cmpvco",
+                    "name": "eth1",
+                    "ip": "169.254.11.2",
+                    "addressing_type": "STATIC",
+                    "netmask": "255.255.255.248",
+                    "mtu": 1320,
+                    "default_gateway": "169.254.11.1",
+                    "routes": [
+                        "0.0.0.0/0"
+                    ]
+                }
+            ]
+        },
+        "vco": {
+            "connections": {
+                "ip": "[[ vco_host ]]",
+                "port": "[[ vco_ssh_port ]]"
+            },
+            "credentials": {
+                "username": "[[ vco_ssh_username ]]",
+                "password": "[[ vco_ssh_password ]]",
+                "private_key": "[[ vco_ssh_key ]]"
+            },
+            "interfaces": [
+                {
+                    "link": "bastion-host",
+                    "name": "eth0",
+                    "ip": "192.168.0.99",
+                    "addressing_type": "STATIC",
+                    "netmask": "255.255.255.0",
+                    "default_gateway": "192.168.0.100"
+                },
+                {
+                    "link": "crivco",
+                    "name": "eth1",
+                    "ip": "169.254.8.2",
+                    "addressing_type": "STATIC",
+                    "netmask": "255.255.255.248",
+                    "mtu": 1320,
+                    "default_gateway": "169.254.8.1",
+                    "routes": [
+                        "0.0.0.0/0"
+                    ],
+                    "ipv6": "fd00:aaaa:1:1::2/64",
+                    "ipv6_gateway": "fd00:aaaa:1:1::1"
+                }
+            ]
+        },
+        "branches": [
+            {
+                "name": "branch1",
+                "type": "bronze",
+                "edges": [
+                    {
+                        "name": "b1-edge1",
+                        "model": "virtual",
+                        "management_ip": "10.0.1.2",
+                        "ha_enabled": false,
+                        "connections": {
+                            "ip": "[[ host ]]",
+                            "port": 1001
+                        },
+                        "credentials": {
+                            "username": "root",
+                            "password": "velocloud"
+                        },
+                        "vlans": [
+                            {
+                                "vlan": 1,
+                                "segment_name": "Global Segment",
+                                "ip": "10.0.1.1",
+                                "netmask": "255.255.255.0",
+                                "ipv6": "fd00:1:1:0::1/64"
+                            },
+                            {
+                                "vlan": 100,
+                                "segment_name": "segment1",
+                                "ip": "10.100.1.1",
+                                "netmask": "255.255.255.0",
+                                "ipv6": "fd00:1:2:0::1/64"
+                            },
+                            {
+                                "vlan": 101,
+                                "segment_name": "segment2",
+                                "ip": "10.101.1.1",
+                                "netmask": "255.255.255.0",
+                                "ipv6": "fd00:1:3:0::1/64"
+                            }
+                        ],
+                        "interfaces": [
+                            {
+                                "name": "eth0",
+                                "logical_name": "LAN1",
+                                "logical_interface": "GE1",
+                                "link": "B1E1_HA",
+                                "mode": "routed",
+                                "vlans": [
+                                    1
+                                ],
+                                "wan_overlay": "disabled"
+                            },
+                            {
+                                "name": "eth1",
+                                "logical_name": "LAN2",
+                                "logical_interface": "GE2",
+                                "link": "E11C1",
+                                "mode": "routed",
+                                "vlans": [
+                                    1
+                                ],
+                                "wan_overlay": "disabled",
+                                "addressing_type": "static",
+                                "v6_addressing_type": "static",
+                                "ip": "10.0.1.1",
+                                "netmask": "255.255.255.0",
+                                "default_gateway": "10.0.1.25",
+                                "properties": {
+                                    "advertise": true,
+                                    "ipv6_advertise": true,
+                                    "nat_direct": false,
+                                    "underlay_accounting": false,
+                                    "enable_dhcp_server": true,
+                                    "ipv6_nat_direct": false
+                                },
+                                "ipv6": "fd00:1:1:0::1/64",
+                                "ipv6_gateway": "fd00:1:1:0::2",
+                                "subinterfaces": [
+                                    {
+                                        "name": "GE2.100",
+                                        "subinterface_type": "SUB_INTERFACE",
+                                        "vlan": 100,
+                                        "segment_name": "segment1",
+                                        "addressing_type": "static",
+                                        "v6_addressing_type": "static",
+                                        "ip": "10.100.1.1",
+                                        "default_gateway": "10.100.1.100",
+                                        "netmask": "255.255.255.0",
+                                        "ipv6": "fd00:1:2:0::1/64",
+                                        "ipv6_gateway": "fd00:1:2:0::2",
+                                        "properties": {
+                                            "advertise": true,
+                                            "ipv6_advertise": true,
+                                            "nat_direct": false,
+                                            "enable_dhcp_server": true,
+                                            "ipv6_nat_direct": false
+                                        }
+                                    },
+                                    {
+                                        "name": "GE2.101",
+                                        "subinterface_type": "SUB_INTERFACE",
+                                        "vlan": 101,
+                                        "segment_name": "segment2",
+                                        "addressing_type": "static",
+                                        "v6_addressing_type": "static",
+                                        "ip": "10.101.1.1",
+                                        "default_gateway": "10.101.1.100",
+                                        "netmask": "255.255.255.0",
+                                        "ipv6": "fd00:1:3:0::1/64",
+                                        "ipv6_gateway": "fd00:1:3:0::2",
+                                        "properties": {
+                                            "advertise": true,
+                                            "ipv6_advertise": true,
+                                            "nat_direct": false,
+                                            "enable_dhcp_server": true,
+                                            "ipv6_nat_direct": false
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "eth2",
+                                "logical_name": "INTERNET1",
+                                "logical_interface": "GE3",
+                                "link": "cr1e1",
+                                "mode": "routed",
+                                "nexthop": "cr1-internet",
+                                "addressing_type": "static",
+                                "ip": "169.254.9.3",
+                                "netmask": "255.255.255.248",
+                                "default_gateway": "169.254.9.2",
+                                "type": "public",
+                                "wan_overlay": "auto_detect",
+                                "dhcp_capable": true,
+                                "ipv6": "fd00:1:1:1::2/64",
+                                "ipv6_gateway": "fd00:1:1:1::1"
+                            },
+                            {
+                                "name": "eth3",
+                                "logical_name": "INTERNET2",
+                                "logical_interface": "GE4",
+                                "link": "cr2e1",
+                                "mode": "routed",
+                                "nexthop": "cr2-internet",
+                                "addressing_type": "static",
+                                "ip": "169.254.7.10",
+                                "netmask": "255.255.255.248",
+                                "default_gateway": "169.254.7.9",
+                                "type": "public",
+                                "wan_overlay": "auto_detect",
+                                "pppoe": {
+                                    "username": "root",
+                                    "password": "velocloud"
+                                },
+                                "ipv6": "fd00:1:1:2::2/64",
+                                "ipv6_gateway": "fd00:1:1:2::1"
+                            },
+                            {
+                                "name": "eth4",
+                                "logical_name": "INTERNET3",
+                                "logical_interface": "GE5",
+                                "link": "l3b1e",
+                                "mode": "routed",
+                                "addressing_type": "static",
+                                "ip": "172.16.1.10",
+                                "netmask": "255.255.255.248",
+                                "default_gateway": "172.16.1.9",
+                                "nexthop": "b1-l3switch1",
+                                "type": "private",
+                                "wan_overlay": "disabled",
+                                "vlans": [
+                                    1
+                                ],
+                                "ipv6": "fd00:1:1:3::2/64",
+                                "ipv6_gateway": "fd00:1:1:3::1",
+                                "subinterfaces": [
+                                    {
+                                        "name": "GE5.100",
+                                        "subinterface_type": "SUB_INTERFACE",
+                                        "vlan": 100,
+                                        "segment_name": "segment1",
+                                        "addressing_type": "static",
+                                        "ip": "172.17.1.10",
+                                        "netmask": "255.255.255.248",
+                                        "default_gateway": "172.17.1.9",
+                                        "ipv6": "fd00:1:2:3::2/64",
+                                        "ipv6_gateway": "fd00:1:2:3::1"
+                                    },
+                                    {
+                                        "name": "GE5.101",
+                                        "subinterface_type": "SUB_INTERFACE",
+                                        "vlan": 101,
+                                        "segment_name": "segment2",
+                                        "addressing_type": "static",
+                                        "ip": "172.18.1.10",
+                                        "netmask": "255.255.255.248",
+                                        "default_gateway": "172.18.1.9",
+                                        "ipv6": "fd00:1:3:3::2/64",
+                                        "ipv6_gateway": "fd00:1:3:3::1"
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "eth5",
+                                "logical_name": "INTERNET4",
+                                "logical_interface": "GE6",
+                                "link": "b1ce1",
+                                "mode": "routed",
+                                "addressing_type": "static",
+                                "nexthop": "b1-customer-edge1",
+                                "ip": "172.16.1.2",
+                                "netmask": "255.255.255.248",
+                                "default_gateway": "172.16.1.1",
+                                "type": "private",
+                                "wan_overlay": "user_defined",
+                                "wanlink": {
+                                    "name": "GE6_Private",
+                                    "link_type": "private"
+                                },
+                                "ipv6": "fd00:1:1:4::2/64",
+                                "ipv6_gateway": "fd00:1:1:4::1",
+                                "subinterfaces": [
+                                    {
+                                        "name": "GE6.100",
+                                        "subinterface_type": "SUB_INTERFACE",
+                                        "vlan": 100,
+                                        "segment_name": "segment1",
+                                        "addressing_type": "static",
+                                        "ip": "172.17.1.2",
+                                        "netmask": "255.255.255.248",
+                                        "default_gateway": "172.17.1.1",
+                                        "ipv6": "fd00:1:2:4::2/64",
+                                        "ipv6_gateway": "fd00:1:2:4::1"
+                                    },
+                                    {
+                                        "name": "GE6.101",
+                                        "subinterface_type": "SUB_INTERFACE",
+                                        "vlan": 101,
+                                        "segment_name": "segment2",
+                                        "addressing_type": "static",
+                                        "ip": "172.18.1.2",
+                                        "netmask": "255.255.255.248",
+                                        "default_gateway": "172.18.1.1",
+                                        "ipv6": "fd00:1:3:4::2/64",
+                                        "ipv6_gateway": "fd00:1:3:4::1"
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "eth6",
+                                "logical_name": "INTERNET5",
+                                "logical_interface": "GE7",
+                                "link": "b1ecmp",
+                                "mode": "routed",
+                                "addressing_type": "static",
+                                "nexthop": "cr-mpls",
+                                "ip": "172.16.1.33",
+                                "netmask": "255.255.255.248",
+                                "default_gateway": "172.16.1.34",
+                                "type": "private",
+                                "wan_overlay": "user_defined",
+                                "wanlink": {
+                                    "name": "GE7_Private",
+                                    "link_type": "private"
+                                },
+                                "ipv6": "fd00:1:1:5::2/64",
+                                "ipv6_gateway": "fd00:1:1:5::1",
+                                "subinterfaces": [
+                                    {
+                                        "name": "GE7.100",
+                                        "subinterface_type": "SUB_INTERFACE",
+                                        "vlan": 100,
+                                        "segment_name": "segment1",
+                                        "addressing_type": "static",
+                                        "ip": "172.17.1.33",
+                                        "netmask": "255.255.255.248",
+                                        "default_gateway": "172.17.1.34",
+                                        "ipv6": "fd00:1:2:5::2/64",
+                                        "ipv6_gateway": "fd00:1:2:5::1"
+                                    },
+                                    {
+                                        "name": "GE7.101",
+                                        "subinterface_type": "SUB_INTERFACE",
+                                        "vlan": 101,
+                                        "segment_name": "segment2",
+                                        "addressing_type": "static",
+                                        "ip": "172.18.1.33",
+                                        "netmask": "255.255.255.248",
+                                        "default_gateway": "172.18.1.34",
+                                        "ipv6": "fd00:1:3:5::2/64",
+                                        "ipv6_gateway": "fd00:1:3:5::1"
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "eth7",
+                                "logical_name": "INTERNET6",
+                                "logical_interface": "GE8",
+                                "link": "e1pub3",
+                                "mode": "routed",
+                                "nexthop": "cr3-internet",
+                                "addressing_type": "static",
+                                "ip": "169.254.12.2",
+                                "netmask": "255.255.255.248",
+                                "default_gateway": "169.254.12.1",
+                                "type": "public",
+                                "wan_overlay": "auto_detect",
+                                "pppoe": {
+                                    "username": "root",
+                                    "password": "velocloud"
+                                },
+                                "ipv6": "fd00:1:1:6::2/64",
+                                "ipv6_gateway": "fd00:1:1:6::1"
+                            },
+                            {
+                                "name": "lo",
+                                "ip": "1.1.0.1",
+                                "netmask": "255.255.255.255",
+                                "type": "loopback",
+                                "addressing_type": "static",
+                                "link": "e1_lo",
+                                "logical_interface": "lo",
+                                "ipv6": "fd00:ffff:ffff:1::1/128",
+                                "segments": [
+                                    {
+                                        "name": "segment1",
+                                        "ip": "1.1.100.1",
+                                        "netmask": "255.255.255.255",
+                                        "vlan": "100",
+                                        "ipv6": "fd00:ffff:ffff:1::2/128"
+                                    },
+                                    {
+                                        "name": "segment2",
+                                        "ip": "1.1.101.1",
+                                        "netmask": "255.255.255.255",
+                                        "vlan": "101",
+                                        "ipv6": "fd00:ffff:ffff:1::3/128"
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "lo1",
+                                "ip": "1.1.0.2",
+                                "netmask": "255.255.255.255",
+                                "type": "loopback",
+                                "addressing_type": "static",
+                                "link": "e1_lo1",
+                                "logical_interface": "lo",
+                                "ipv6": "fd00:ffff:ffff:2::1/128",
+                                "segments": [
+                                    {
+                                        "name": "segment1",
+                                        "ip": "1.1.100.2",
+                                        "netmask": "255.255.255.255",
+                                        "vlan": "100",
+                                        "ipv6": "fd00:ffff:ffff:2::2/128"
+                                    },
+                                    {
+                                        "name": "segment2",
+                                        "ip": "1.1.101.2",
+                                        "netmask": "255.255.255.255",
+                                        "vlan": "101",
+                                        "ipv6": "fd00:ffff:ffff:2::3/128"
+                                    }
+                                ]
+                            }
+                        ],
+                        "direct_clients": [
+                            {
+                                "name": "b1e1-client1",
+                                "connections": {
+                                    "ip": "[[ host ]]",
+                                    "port": 1101
+                                },
+                                "credentials": {
+                                    "username": "root",
+                                    "password": "velocloud"
+                                },
+                                "interfaces": [
+                                    {
+                                        "name": "eth0",
+                                        "link": "bastion-host",
+                                        "default_gateway": "192.168.0.100",
+                                        "mode": "switched",
+                                        "ip": "192.168.0.101",
+                                        "netmask": "255.255.255.0"
+                                    },
+                                    {
+                                        "name": "eth1",
+                                        "link": "E11C1",
+                                        "mode": "switched",
+                                        "ip": "10.0.1.25",
+                                        "default_gateway": "10.0.1.1",
+                                        "unactivated_ip": "192.168.3.10",
+                                        "unactivated_gateway_ip": "192.168.3.1",
+                                        "docker_unactivated_ip": "192.168.3.10",
+                                        "docker_unactivated_gateway_ip": "192.168.3.1",
+                                        "netmask": "255.255.255.0",
+                                        "addressing_type": "DHCP",
+                                        "v6_addressing_type": "static",
+                                        "ipv6": "fd00:1:1:0::2/64",
+                                        "ipv6_gateway": "fd00:1:1:0::1",
+                                        "routes": [
+                                            "0.0.0.0/0"
+                                        ],
+                                        "segments": [
+                                            {
+                                                "name": "segment1",
+                                                "ip": "10.100.1.100",
+                                                "netmask": "255.255.255.0",
+                                                "default_gateway": "10.100.1.1",
+                                                "vlan": 100,
+                                                "namespace": "segment1",
+                                                "ipv6": "fd00:1:2:0::2/64",
+                                                "ipv6_gateway": "fd00:1:2:0::1"
+                                            },
+                                            {
+                                                "name": "segment2",
+                                                "ip": "10.101.1.100",
+                                                "netmask": "255.255.255.0",
+                                                "default_gateway": "10.101.1.1",
+                                                "vlan": 101,
+                                                "namespace": "segment2",
+                                                "ipv6": "fd00:1:3:0::2/64",
+                                                "ipv6_gateway": "fd00:1:3:0::1"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "name": "lo",
+                                        "ip": "2.1.0.1",
+                                        "netmask": "255.255.255.255",
+                                        "type": "loopback",
+                                        "addressing_type": "static",
+                                        "link": "c1_lo",
+                                        "ipv6": "fd00:ffff:ffff:3::1/128",
+                                        "segments": [
+                                            {
+                                                "name": "segment1",
+                                                "ip": "2.1.100.1",
+                                                "netmask": "255.255.255.255",
+                                                "vlan": "100",
+                                                "namespace": "segment1",
+                                                "ipv6": "fd00:ffff:ffff:3::2/128"
+                                            },
+                                            {
+                                                "name": "segment2",
+                                                "ip": "2.1.101.1",
+                                                "netmask": "255.255.255.255",
+                                                "vlan": "101",
+                                                "namespace": "segment2",
+                                                "ipv6": "fd00:ffff:ffff:3::3/128"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ],
+                "hopaway_clients": [
+                    {
+                        "name": "b1-routedclient1",
+                        "device_type": "HOPAWAY_CLIENT",
+                        "model": "LINUX",
+                        "connections": {
+                            "ip": "[[ host ]]",
+                            "port": 1201
+                        },
+                        "credentials": {
+                            "username": "root",
+                            "password": "velocloud"
+                        },
+                        "interfaces": [
+                            {
+                                "name": "eth0",
+                                "link": "bastion-host",
+                                "mode": "switched",
+                                "ip": "192.168.0.106",
+                                "default_gateway": "192.168.0.100",
+                                "netmask": "255.255.255.0"
+                            },
+                            {
+                                "link": "l3b1c",
+                                "ip": "172.16.1.18",
+                                "netmask": "255.255.255.248",
+                                "mode": "switched",
+                                "name": "eth1",
+                                "default_gateway": "172.16.1.17",
+                                "routes": [
+                                    "0.0.0.0/0"
+                                ],
+                                "addressing_type": "static",
+                                "ipv6": "fd00:1:1:a003::2/64",
+                                "ipv6_gateway": "fd00:1:1:a003::1",
+                                "segments": [
+                                    {
+                                        "name": "segment1",
+                                        "ip": "172.17.1.18",
+                                        "netmask": "255.255.255.248",
+                                        "default_gateway": "172.17.1.17",
+                                        "vlan": 100,
+                                        "namespace": "segment1",
+                                        "ipv6": "fd00:1:2:a003::2/64",
+                                        "ipv6_gateway": "fd00:1:2:a003::1"
+                                    },
+                                    {
+                                        "name": "segment2",
+                                        "ip": "172.18.1.18",
+                                        "netmask": "255.255.255.248",
+                                        "default_gateway": "172.18.1.17",
+                                        "vlan": 101,
+                                        "namespace": "segment2",
+                                        "ipv6": "fd00:1:3:a003::2/64",
+                                        "ipv6_gateway": "fd00:1:3:a003::1"
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "lo",
+                                "ip": "3.1.0.1",
+                                "netmask": "255.255.255.255",
+                                "type": "loopback",
+                                "addressing_type": "static",
+                                "link": "rc1_lo",
+                                "ipv6": "fd00:ffff:ffff:4::1/128",
+                                "segments": [
+                                    {
+                                        "name": "segment1",
+                                        "ip": "3.1.100.1",
+                                        "netmask": "255.255.255.255",
+                                        "vlan": "100",
+                                        "namespace": "segment1",
+                                        "ipv6": "fd00:ffff:ffff:4::2/128"
+                                    },
+                                    {
+                                        "name": "segment2",
+                                        "ip": "3.1.101.1",
+                                        "netmask": "255.255.255.255",
+                                        "vlan": "101",
+                                        "namespace": "segment2",
+                                        "ipv6": "fd00:ffff:ffff:4::3/128"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "name": "b1-routedclient2",
+                        "device_type": "HOPAWAY_CLIENT",
+                        "model": "LINUX",
+                        "connections": {
+                            "ip": "[[ host ]]",
+                            "port": 1203
+                        },
+                        "credentials": {
+                            "username": "root",
+                            "password": "velocloud"
+                        },
+                        "interfaces": [
+                            {
+                                "name": "eth0",
+                                "link": "bastion-host",
+                                "mode": "switched",
+                                "ip": "192.168.0.108",
+                                "default_gateway": "192.168.0.100",
+                                "netmask": "255.255.255.0"
+                            },
+                            {
+                                "link": "l3b2c",
+                                "ip": "172.16.11.18",
+                                "netmask": "255.255.255.248",
+                                "mode": "switched",
+                                "name": "eth1",
+                                "default_gateway": "172.16.11.17",
+                                "addressing_type": "static",
+                                "ipv6": "fd00:1:1:a003::2/64",
+                                "ipv6_gateway": "fd00:1:1:a003::1",
+                                "routes": [
+                                    "0.0.0.0/0"
+                                ],
+                                "segments": [
+                                    {
+                                        "name": "segment1",
+                                        "ip": "172.17.11.18",
+                                        "netmask": "255.255.255.248",
+                                        "default_gateway": "172.17.11.17",
+                                        "vlan": 100,
+                                        "namespace": "segment1",
+                                        "ipv6": "fd00:1:2:a003::2/64",
+                                        "ipv6_gateway": "fd00:1:2:a003::1"
+                                    },
+                                    {
+                                        "name": "segment2",
+                                        "ip": "172.18.11.18",
+                                        "netmask": "255.255.255.248",
+                                        "default_gateway": "172.18.11.17",
+                                        "vlan": 101,
+                                        "namespace": "segment2",
+                                        "ipv6": "fd00:1:3:a003::2/64",
+                                        "ipv6_gateway": "fd00:1:3:a003::1"
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "lo",
+                                "ip": "3.1.0.2",
+                                "netmask": "255.255.255.255",
+                                "type": "loopback",
+                                "addressing_type": "static",
+                                "link": "rc3lo",
+                                "ipv6": "fd00:ffff:ffff:5::1/128",
+                                "segments": [
+                                    {
+                                        "name": "segment1",
+                                        "ip": "3.1.100.2",
+                                        "netmask": "255.255.255.255",
+                                        "vlan": "100",
+                                        "namespace": "segment1",
+                                        "ipv6": "fd00:ffff:ffff:5::2/128"
+                                    },
+                                    {
+                                        "name": "segment2",
+                                        "ip": "3.1.101.2",
+                                        "netmask": "255.255.255.255",
+                                        "vlan": "101",
+                                        "namespace": "segment2",
+                                        "ipv6": "fd00:ffff:ffff:5::3/128"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ],
+                "l3switches": [
+                    {
+                        "name": "b1-l3switch1",
+                        "device_type": "L3_SWITCH",
+                        "connections": {
+                            "ip": "[[ host ]]",
+                            "port": 1301
+                        },
+                        "credentials": {
+                            "username": "root",
+                            "password": "velocloud"
+                        },
+                        "interfaces": [
+                            {
+                                "name": "eth0",
+                                "link": "bastion-host",
+                                "mode": "switched",
+                                "ip": "192.168.0.130",
+                                "default_gateway": "192.168.0.100",
+                                "netmask": "255.255.255.0"
+                            },
+                            {
+                                "link": "l3b1e",
+                                "ip": "172.16.1.9",
+                                "default_gateway": "172.16.1.10",
+                                "netmask": "255.255.255.248",
+                                "name": "eth1",
+                                "addressing_type": "static",
+                                "namespace": "global",
+                                "ipv6": "fd00:1:1:3::1/64",
+                                "ipv6_gateway": "fd00:1:1:3::2",
+                                "segments": [
+                                    {
+                                        "name": "segment1",
+                                        "ip": "172.17.1.9",
+                                        "netmask": "255.255.255.248",
+                                        "default_gateway": "172.17.1.10",
+                                        "vlan": 100,
+                                        "namespace": "segment1",
+                                        "ipv6": "fd00:1:2:3::1/64",
+                                        "ipv6_gateway": "fd00:1:2:3::2"
+                                    },
+                                    {
+                                        "name": "segment2",
+                                        "ip": "172.18.1.9",
+                                        "netmask": "255.255.255.248",
+                                        "default_gateway": "172.18.1.10",
+                                        "vlan": 101,
+                                        "namespace": "segment2",
+                                        "ipv6": "fd00:1:3:3::1/64",
+                                        "ipv6_gateway": "fd00:1:3:3::2"
+                                    }
+                                ]
+                            },
+                            {
+                                "link": "l3b1c",
+                                "ip": "172.16.1.17",
+                                "netmask": "255.255.255.248",
+                                "name": "eth2",
+                                "default_gateway": "172.16.1.18",
+                                "addressing_type": "static",
+                                "namespace": "global",
+                                "ipv6": "fd00:1:1:a003::1/64",
+                                "ipv6_gateway": "fd00:1:1:a003::2",
+                                "segments": [
+                                    {
+                                        "name": "segment1",
+                                        "ip": "172.17.1.17",
+                                        "default_gateway": "172.17.1.18",
+                                        "netmask": "255.255.255.248",
+                                        "vlan": 100,
+                                        "namespace": "segment1",
+                                        "ipv6": "fd00:1:2:a003::1/64",
+                                        "ipv6_gateway": "fd00:1:2:a003::2"
+                                    },
+                                    {
+                                        "name": "segment2",
+                                        "ip": "172.18.1.17",
+                                        "default_gateway": "172.18.1.18",
+                                        "netmask": "255.255.255.248",
+                                        "vlan": 101,
+                                        "namespace": "segment2",
+                                        "ipv6": "fd00:1:3:a003::1/64",
+                                        "ipv6_gateway": "fd00:1:3:a003::2"
+                                    }
+                                ]
+                            },
+                            {
+                                "link": "b1b5l3",
+                                "ip": "172.16.254.26",
+                                "netmask": "255.255.255.248",
+                                "default_gateway": "172.16.254.27",
+                                "name": "eth3",
+                                "addressing_type": "static",
+                                "namespace": "global",
+                                "ipv6": "fd00:ffff:1:ffff::2/64",
+                                "ipv6_gateway": "fd00:ffff:1:ffff::1",
+                                "segments": [
+                                    {
+                                        "name": "segment1",
+                                        "ip": "172.17.254.26",
+                                        "default_gateway": "172.17.254.27",
+                                        "netmask": "255.255.255.248",
+                                        "vlan": 100,
+                                        "namespace": "segment1",
+                                        "ipv6": "fd00:ffff:2:ffff::2/64",
+                                        "ipv6_gateway": "fd00:ffff:2:ffff::1"
+                                    },
+                                    {
+                                        "name": "segment2",
+                                        "ip": "172.18.254.26",
+                                        "default_gateway": "172.18.254.27",
+                                        "netmask": "255.255.255.248",
+                                        "vlan": 101,
+                                        "namespace": "segment2",
+                                        "ipv6": "fd00:ffff:3:ffff::2/64",
+                                        "ipv6_gateway": "fd00:ffff:3:ffff::1"
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "lo",
+                                "ip": "4.1.0.1",
+                                "netmask": "255.255.255.255",
+                                "type": "loopback",
+                                "addressing_type": "static",
+                                "link": "l31lo",
+                                "ipv6": "fd00:ffff:ffff:6::1/128",
+                                "segments": [
+                                    {
+                                        "name": "segment1",
+                                        "ip": "4.1.100.1",
+                                        "netmask": "255.255.255.255",
+                                        "vlan": "100",
+                                        "namespace": "segment1",
+                                        "ipv6": "fd00:ffff:ffff:6::2/128"
+                                    },
+                                    {
+                                        "name": "segment2",
+                                        "ip": "4.1.101.1",
+                                        "netmask": "255.255.255.255",
+                                        "vlan": "101",
+                                        "namespace": "segment2",
+                                        "ipv6": "fd00:ffff:ffff:6::3/128"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "name": "b1-l3switch2",
+                        "device_type": "L3_SWITCH",
+                        "connections": {
+                            "ip": "[[ host ]]",
+                            "port": 1303
+                        },
+                        "credentials": {
+                            "username": "root",
+                            "password": "velocloud"
+                        },
+                        "interfaces": [
+                            {
+                                "name": "eth0",
+                                "link": "bastion-host",
+                                "mode": "switched",
+                                "ip": "192.168.0.132",
+                                "default_gateway": "192.168.0.100",
+                                "netmask": "255.255.255.0"
+                            },
+                            {
+                                "link": "l3b1e",
+                                "ip": "172.16.1.11",
+                                "default_gateway": "172.16.1.10",
+                                "netmask": "255.255.255.248",
+                                "name": "eth1",
+                                "addressing_type": "static",
+                                "namespace": "global",
+                                "ipv6": "fd00:1:1:3::3/64",
+                                "ipv6_gateway": "fd00:1:1:3::2",
+                                "segments": [
+                                    {
+                                        "name": "segment1",
+                                        "ip": "172.17.1.11",
+                                        "netmask": "255.255.255.248",
+                                        "default_gateway": "172.17.1.10",
+                                        "vlan": 100,
+                                        "namespace": "segment1",
+                                        "ipv6": "fd00:1:2:3::3/64",
+                                        "ipv6_gateway": "fd00:1:2:3::2"
+                                    },
+                                    {
+                                        "name": "segment2",
+                                        "ip": "172.18.1.11",
+                                        "netmask": "255.255.255.248",
+                                        "default_gateway": "172.18.1.10",
+                                        "vlan": 101,
+                                        "namespace": "segment2",
+                                        "ipv6": "fd00:1:3:3::3/64",
+                                        "ipv6_gateway": "fd00:1:3:3::2"
+                                    }
+                                ]
+                            },
+                            {
+                                "link": "l3b2c",
+                                "ip": "172.16.11.17",
+                                "netmask": "255.255.255.248",
+                                "name": "eth2",
+                                "default_gateway": "172.16.11.18",
+                                "addressing_type": "static",
+                                "namespace": "global",
+                                "ipv6": "fd00:1:1:a003::1/64",
+                                "ipv6_gateway": "fd00:1:1:a003::2",
+                                "segments": [
+                                    {
+                                        "name": "segment1",
+                                        "ip": "172.17.11.17",
+                                        "default_gateway": "172.17.11.18",
+                                        "netmask": "255.255.255.248",
+                                        "vlan": 100,
+                                        "namespace": "segment1",
+                                        "ipv6": "fd00:1:2:a003::1/64",
+                                        "ipv6_gateway": "fd00:1:2:a003::2"
+                                    },
+                                    {
+                                        "name": "segment2",
+                                        "ip": "172.18.11.17",
+                                        "default_gateway": "172.18.11.18",
+                                        "netmask": "255.255.255.248",
+                                        "vlan": 101,
+                                        "namespace": "segment2",
+                                        "ipv6": "fd00:1:3:a003::1/64",
+                                        "ipv6_gateway": "fd00:1:3:a003::2"
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "lo",
+                                "ip": "4.1.0.2",
+                                "netmask": "255.255.255.255",
+                                "type": "loopback",
+                                "addressing_type": "static",
+                                "link": "l33lo",
+                                "ipv6": "fd00:ffff:ffff:7::1/128",
+                                "segments": [
+                                    {
+                                        "name": "segment1",
+                                        "ip": "4.1.100.2",
+                                        "netmask": "255.255.255.255",
+                                        "vlan": "100",
+                                        "namespace": "segment1",
+                                        "ipv6": "fd00:ffff:ffff:7::2/128"
+                                    },
+                                    {
+                                        "name": "segment2",
+                                        "ip": "4.1.101.2",
+                                        "netmask": "255.255.255.255",
+                                        "vlan": "101",
+                                        "namespace": "segment2",
+                                        "ipv6": "fd00:ffff:ffff:7::3/128"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ],
+                "CEs": [
+                    {
+                        "name": "b1-customer-edge1",
+                        "device_type": "CUSTOMER_EDGE",
+                        "connections": {
+                            "ip": "[[ host ]]",
+                            "port": 1401
+                        },
+                        "credentials": {
+                            "username": "root",
+                            "password": "velocloud"
+                        },
+                        "interfaces": [
+                            {
+                                "name": "eth0",
+                                "link": "bastion-host",
+                                "mode": "switched",
+                                "ip": "192.168.0.156",
+                                "default_gateway": "192.168.0.100",
+                                "netmask": "255.255.255.0"
+                            },
+                            {
+                                "name": "eth1",
+                                "link": "b1ccmp",
+                                "ip": "172.16.1.25",
+                                "netmask": "255.255.255.248",
+                                "default_gateway": "172.16.1.26",
+                                "addressing_type": "static",
+                                "ipv6": "fd00:1:1:b004::1/64",
+                                "ipv6_gateway": "fd00:1:1:b004::2",
+                                "segments": [
+                                    {
+                                        "name": "segment1",
+                                        "ip": "172.17.1.25",
+                                        "default_gateway": "172.17.1.26",
+                                        "netmask": "255.255.255.248",
+                                        "namespace": "segment1",
+                                        "ipv6": "fd00:1:2:b004::1/64",
+                                        "ipv6_gateway": "fd00:1:2:b004::2"
+                                    },
+                                    {
+                                        "name": "segment2",
+                                        "ip": "172.18.1.25",
+                                        "default_gateway": "172.18.1.26",
+                                        "netmask": "255.255.255.248",
+                                        "namespace": "segment2",
+                                        "ipv6": "fd00:1:3:b004::1/64",
+                                        "ipv6_gateway": "fd00:1:3:b004::2"
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "eth2",
+                                "link": "b1ce1",
+                                "ip": "172.16.1.1",
+                                "netmask": "255.255.255.248",
+                                "default_gateway": "172.16.1.2",
+                                "addressing_type": "static",
+                                "namespace": "global",
+                                "ipv6": "fd00:1:1:4::1/64",
+                                "ipv6_gateway": "fd00:1:1:4::2",
+                                "segments": [
+                                    {
+                                        "name": "segment1",
+                                        "ip": "172.17.1.1",
+                                        "default_gateway": "172.17.1.2",
+                                        "netmask": "255.255.255.248",
+                                        "namespace": "segment1",
+                                        "ipv6": "fd00:1:2:4::1/64",
+                                        "ipv6_gateway": "fd00:1:2:4::2"
+                                    },
+                                    {
+                                        "name": "segment2",
+                                        "ip": "172.18.1.1",
+                                        "default_gateway": "172.18.1.2",
+                                        "netmask": "255.255.255.248",
+                                        "namespace": "segment2",
+                                        "ipv6": "fd00:1:3:4::1/64",
+                                        "ipv6_gateway": "fd00:1:3:4::2"
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "lo",
+                                "ip": "5.1.0.1",
+                                "netmask": "255.255.255.255",
+                                "type": "loopback",
+                                "addressing_type": "static",
+                                "link": "ce1lo",
+                                "ipv6": "fd00:ffff:ffff:8::1/128",
+                                "segments": [
+                                    {
+                                        "name": "segment1",
+                                        "ip": "5.1.100.1",
+                                        "netmask": "255.255.255.255",
+                                        "vlan": "100",
+                                        "namespace": "segment1",
+                                        "ipv6": "fd00:ffff:ffff:8::2/128"
+                                    },
+                                    {
+                                        "name": "segment2",
+                                        "ip": "5.1.101.1",
+                                        "netmask": "255.255.255.255",
+                                        "vlan": "101",
+                                        "namespace": "segment2",
+                                        "ipv6": "fd00:ffff:ffff:8::3/128"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "name": "b1-customer-edge2",
+                        "device_type": "CUSTOMER_EDGE",
+                        "connections": {
+                            "ip": "[[ host ]]",
+                            "port": 1403
+                        },
+                        "credentials": {
+                            "username": "root",
+                            "password": "velocloud"
+                        },
+                        "interfaces": [
+                            {
+                                "name": "eth0",
+                                "link": "bastion-host",
+                                "mode": "switched",
+                                "ip": "192.168.0.158",
+                                "default_gateway": "192.168.0.100",
+                                "netmask": "255.255.255.0"
+                            },
+                            {
+                                "name": "eth1",
+                                "link": "b1ce2c",
+                                "ip": "172.16.11.27",
+                                "netmask": "255.255.255.248",
+                                "default_gateway": "172.16.11.28",
+                                "addressing_type": "static",
+                                "ipv6": "fd00:1:4:b004::1/64",
+                                "ipv6_gateway": "fd00:1:4:b004::2",
+                                "segments": [
+                                    {
+                                        "name": "segment1",
+                                        "ip": "172.17.11.27",
+                                        "default_gateway": "172.17.11.28",
+                                        "netmask": "255.255.255.248",
+                                        "namespace": "segment1",
+                                        "ipv6": "fd00:1:5:b004::1/64",
+                                        "ipv6_gateway": "fd00:1:5:b004::2"
+                                    },
+                                    {
+                                        "name": "segment2",
+                                        "ip": "172.18.11.27",
+                                        "default_gateway": "172.18.11.28",
+                                        "netmask": "255.255.255.248",
+                                        "namespace": "segment2",
+                                        "ipv6": "fd00:1:6:b004::1/64",
+                                        "ipv6_gateway": "fd00:1:6:b004::2"
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "eth2",
+                                "link": "b1ce1",
+                                "ip": "172.16.1.3",
+                                "netmask": "255.255.255.248",
+                                "default_gateway": "172.16.1.2",
+                                "addressing_type": "static",
+                                "namespace": "global",
+                                "ipv6": "fd00:1:1:4::3/64",
+                                "ipv6_gateway": "fd00:1:1:4::2",
+                                "segments": [
+                                    {
+                                        "name": "segment1",
+                                        "ip": "172.17.1.3",
+                                        "default_gateway": "172.17.1.2",
+                                        "netmask": "255.255.255.248",
+                                        "namespace": "segment1",
+                                        "ipv6": "fd00:1:2:4::3/64",
+                                        "ipv6_gateway": "fd00:1:2:4::2"
+                                    },
+                                    {
+                                        "name": "segment2",
+                                        "ip": "172.18.1.3",
+                                        "default_gateway": "172.18.1.2",
+                                        "netmask": "255.255.255.248",
+                                        "namespace": "segment2",
+                                        "ipv6": "fd00:1:3:4::3/64",
+                                        "ipv6_gateway": "fd00:1:3:4::2"
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "lo",
+                                "ip": "5.1.0.2",
+                                "netmask": "255.255.255.255",
+                                "type": "loopback",
+                                "addressing_type": "static",
+                                "link": "ce2lo",
+                                "ipv6": "fd00:ffff:ffff:9::1/128",
+                                "segments": [
+                                    {
+                                        "name": "segment1",
+                                        "ip": "5.1.100.2",
+                                        "netmask": "255.255.255.255",
+                                        "vlan": "100",
+                                        "namespace": "segment1",
+                                        "ipv6": "fd00:ffff:ffff:9::2/128"
+                                    },
+                                    {
+                                        "name": "segment2",
+                                        "ip": "5.1.101.2",
+                                        "netmask": "255.255.255.255",
+                                        "vlan": "101",
+                                        "namespace": "segment2",
+                                        "ipv6": "fd00:ffff:ffff:9::3/128"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "name": "branch2",
+                "type": "silver",
+                "edges": [
+                    {
+                        "name": "b2-edge1",
+                        "model": "virtual",
+                        "management_ip": "10.0.2.2",
+                        "ha_enabled": true,
+                        "connections": {
+                            "ip": "[[ host ]]",
+                            "port": 1002
+                        },
+                        "credentials": {
+                            "username": "root",
+                            "password": "velocloud"
+                        },
+                        "vlans": [
+                            {
+                                "vlan": 1,
+                                "segment_name": "Global Segment",
+                                "ip": "10.200.2.1",
+                                "netmask": "255.255.255.0",
+                                "ipv6": "fd00:200:1:0::1/64"
+                            },
+                            {
+                                "vlan": 100,
+                                "segment_name": "segment1",
+                                "ip": "10.201.2.1",
+                                "netmask": "255.255.255.0",
+                                "ipv6": "fd00:200:2:0::1/64"
+                            },
+                            {
+                                "vlan": 101,
+                                "segment_name": "segment2",
+                                "ip": "10.202.2.1",
+                                "netmask": "255.255.255.0",
+                                "ipv6": "fd00:200:3:0::1/64"
+                            }
+                        ],
+                        "interfaces": [
+                            {
+                                "name": "eth0",
+                                "logical_name": "LAN1",
+                                "logical_interface": "GE1",
+                                "link": "B2E1_HA",
+                                "mode": "switched",
+                                "vlans": [
+                                    1
+                                ],
+                                "wan_overlay": "disabled"
+                            },
+                            {
+                                "name": "eth1",
+                                "logical_name": "LAN2",
+                                "logical_interface": "GE2",
+                                "link": "E21C1",
+                                "mode": "routed",
+                                "vlans": [
+                                    1
+                                ],
+                                "wan_overlay": "disabled",
+                                "addressing_type": "static",
+                                "v6_addressing_type": "static",
+                                "ip": "10.0.2.1",
+                                "netmask": "255.255.255.0",
+                                "default_gateway": "10.0.2.25",
+                                "properties": {
+                                    "advertise": true,
+                                    "ipv6_advertise": true,
+                                    "nat_direct": false,
+                                    "underlay_accounting": false,
+                                    "enable_dhcp_server": true,
+                                    "ipv6_nat_direct": false
+                                },
+                                "ipv6": "fd00:2:1:0::1/64",
+                                "ipv6_gateway": "fd00:2:1:0::2",
+                                "subinterfaces": [
+                                    {
+                                        "name": "GE2.100",
+                                        "subinterface_type": "SUB_INTERFACE",
+                                        "vlan": 100,
+                                        "segment_name": "segment1",
+                                        "addressing_type": "static",
+                                        "v6_addressing_type": "static",
+                                        "ip": "10.100.2.1",
+                                        "default_gateway": "10.100.2.100",
+                                        "netmask": "255.255.255.0",
+                                        "ipv6": "fd00:2:2:0::1/64",
+                                        "ipv6_gateway": "fd00:2:2:0::2",
+                                        "properties": {
+                                            "advertise": true,
+                                            "ipv6_advertise": true,
+                                            "nat_direct": false,
+                                            "enable_dhcp_server": true,
+                                            "ipv6_nat_direct": false
+                                        }
+                                    },
+                                    {
+                                        "name": "GE2.101",
+                                        "subinterface_type": "SUB_INTERFACE",
+                                        "vlan": 101,
+                                        "segment_name": "segment2",
+                                        "addressing_type": "static",
+                                        "v6_addressing_type": "static",
+                                        "ip": "10.101.2.1",
+                                        "default_gateway": "10.101.2.100",
+                                        "netmask": "255.255.255.0",
+                                        "ipv6": "fd00:2:3:0::1/64",
+                                        "ipv6_gateway": "fd00:2:3:0::2",
+                                        "properties": {
+                                            "advertise": true,
+                                            "ipv6_advertise": true,
+                                            "nat_direct": false,
+                                            "enable_dhcp_server": true,
+                                            "ipv6_nat_direct": false
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "eth2",
+                                "logical_name": "INTERNET1",
+                                "logical_interface": "GE3",
+                                "link": "cri2w1",
+                                "mode": "routed",
+                                "addressing_type": "static",
+                                "ip": "169.254.7.4",
+                                "netmask": "255.255.255.248",
+                                "default_gateway": "169.254.7.1",
+                                "nexthop": "cr2-internet",
+                                "wan_overlay": "auto_detect",
+                                "type": "public",
+                                "dhcp_capable": "true",
+                                "ipv6": "fd00:2:1:1::2/64",
+                                "ipv6_gateway": "fd00:2:1:1::1"
+                            },
+                            {
+                                "name": "eth3",
+                                "logical_name": "INTERNET2",
+                                "logical_interface": "GE4",
+                                "link": "cr1e2",
+                                "mode": "routed",
+                                "addressing_type": "static",
+                                "ip": "169.254.9.9",
+                                "netmask": "255.255.255.248",
+                                "default_gateway": "169.254.9.10",
+                                "nexthop": "cr1-internet",
+                                "wan_overlay": "auto_detect",
+                                "type": "public",
+                                "pppoe": {
+                                    "username": "root",
+                                    "password": "velocloud"
+                                },
+                                "ipv6": "fd00:2:1:2::2/64",
+                                "ipv6_gateway": "fd00:2:1:2::1"
+                            },
+                            {
+                                "name": "eth4",
+                                "logical_name": "INTERNET3",
+                                "logical_interface": "GE5",
+                                "link": "l3b2e",
+                                "mode": "routed",
+                                "vlans": [
+                                    1
+                                ],
+                                "addressing_type": "static",
+                                "ip": "172.16.2.10",
+                                "netmask": "255.255.255.248",
+                                "default_gateway": "172.16.2.9",
+                                "nexthop": "b2-l3switch1",
+                                "type": "private",
+                                "wan_overlay": "disabled",
+                                "ipv6": "fd00:2:1:3::2/64",
+                                "ipv6_gateway": "fd00:2:1:3::1",
+                                "subinterfaces": [
+                                    {
+                                        "name": "GE5.100",
+                                        "subinterface_type": "SUB_INTERFACE",
+                                        "vlan": 100,
+                                        "segment_name": "segment1",
+                                        "addressing_type": "static",
+                                        "ip": "172.17.2.10",
+                                        "netmask": "255.255.255.248",
+                                        "default_gateway": "172.17.2.9",
+                                        "ipv6": "fd00:2:2:3::2/64",
+                                        "ipv6_gateway": "fd00:2:2:3::1"
+                                    },
+                                    {
+                                        "name": "GE5.101",
+                                        "subinterface_type": "SUB_INTERFACE",
+                                        "vlan": 101,
+                                        "segment_name": "segment2",
+                                        "addressing_type": "static",
+                                        "ip": "172.18.2.10",
+                                        "netmask": "255.255.255.248",
+                                        "default_gateway": "172.18.2.9",
+                                        "ipv6": "fd00:2:3:3::2/64",
+                                        "ipv6_gateway": "fd00:2:3:3::1"
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "eth5",
+                                "logical_name": "INTERNET4",
+                                "logical_interface": "GE6",
+                                "link": "b2ce1",
+                                "mode": "routed",
+                                "addressing_type": "static",
+                                "ip": "172.16.2.2",
+                                "netmask": "255.255.255.248",
+                                "default_gateway": "172.16.2.1",
+                                "nexthop": "b2-customer-edge1",
+                                "wan_overlay": "user_defined",
+                                "wanlink": {
+                                    "name": "GE6_Private",
+                                    "link_type": "private"
+                                },
+                                "type": "private",
+                                "ipv6": "fd00:2:1:4::2/64",
+                                "ipv6_gateway": "fd00:2:1:4::1",
+                                "subinterfaces": [
+                                    {
+                                        "name": "GE6.100",
+                                        "subinterface_type": "SUB_INTERFACE",
+                                        "vlan": 100,
+                                        "segment_name": "segment1",
+                                        "addressing_type": "static",
+                                        "ip": "172.17.2.2",
+                                        "netmask": "255.255.255.248",
+                                        "default_gateway": "172.17.2.1",
+                                        "ipv6": "fd00:2:2:4::2/64",
+                                        "ipv6_gateway": "fd00:2:2:4::1"
+                                    },
+                                    {
+                                        "name": "GE6.101",
+                                        "subinterface_type": "SUB_INTERFACE",
+                                        "vlan": 101,
+                                        "segment_name": "segment2",
+                                        "addressing_type": "static",
+                                        "ip": "172.18.2.2",
+                                        "netmask": "255.255.255.248",
+                                        "default_gateway": "172.18.2.1",
+                                        "ipv6": "fd00:2:3:4::2/64",
+                                        "ipv6_gateway": "fd00:2:3:4::1"
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "eth6",
+                                "logical_name": "INTERNET5",
+                                "logical_interface": "GE7",
+                                "link": "b2ecmp",
+                                "mode": "routed",
+                                "addressing_type": "static",
+                                "nexthop": "cr-mpls",
+                                "ip": "172.16.2.33",
+                                "netmask": "255.255.255.248",
+                                "default_gateway": "172.16.2.34",
+                                "type": "private",
+                                "wan_overlay": "user_defined",
+                                "wanlink": {
+                                    "name": "GE7_Private",
+                                    "link_type": "private"
+                                },
+                                "ipv6": "fd00:2:1:5::2/64",
+                                "ipv6_gateway": "fd00:2:1:5::1",
+                                "subinterfaces": [
+                                    {
+                                        "name": "GE7.100",
+                                        "subinterface_type": "SUB_INTERFACE",
+                                        "vlan": 100,
+                                        "segment_name": "segment1",
+                                        "addressing_type": "static",
+                                        "ip": "172.17.2.33",
+                                        "netmask": "255.255.255.248",
+                                        "default_gateway": "172.17.2.34",
+                                        "ipv6": "fd00:2:2:5::2/64",
+                                        "ipv6_gateway": "fd00:2:2:5::1"
+                                    },
+                                    {
+                                        "name": "GE7.101",
+                                        "subinterface_type": "SUB_INTERFACE",
+                                        "vlan": 101,
+                                        "segment_name": "segment2",
+                                        "addressing_type": "static",
+                                        "ip": "172.18.2.33",
+                                        "netmask": "255.255.255.248",
+                                        "default_gateway": "172.18.2.34",
+                                        "ipv6": "fd00:2:3:5::2/64",
+                                        "ipv6_gateway": "fd00:2:3:5::1"
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "eth7",
+                                "logical_name": "INTERNET6",
+                                "logical_interface": "GE8",
+                                "link": "e2pub3",
+                                "mode": "routed",
+                                "addressing_type": "static",
+                                "ip": "169.254.12.10",
+                                "default_gateway": "169.254.12.9",
+                                "netmask": "255.255.255.248",
+                                "nexthop": "cr3-internet",
+                                "wan_overlay": "auto_detect",
+                                "type": "public",
+                                "pppoe": {
+                                    "username": "root",
+                                    "password": "velocloud"
+                                },
+                                "ipv6": "fd00:2:1:6::2/64",
+                                "ipv6_gateway": "fd00:2:1:6::1"
+                            },
+                            {
+                                "name": "lo",
+                                "ip": "1.2.0.1",
+                                "netmask": "255.255.255.255",
+                                "type": "loopback",
+                                "logical_interface": "lo",
+                                "addressing_type": "static",
+                                "link": "e2lo",
+                                "ipv6": "fd00:ffff:ffff:10::1/128",
+                                "segments": [
+                                    {
+                                        "name": "segment1",
+                                        "ip": "1.2.100.1",
+                                        "netmask": "255.255.255.255",
+                                        "ipv6": "fd00:ffff:ffff:10::2/128"
+                                    },
+                                    {
+                                        "name": "segment2",
+                                        "ip": "1.2.101.1",
+                                        "netmask": "255.255.255.255",
+                                        "ipv6": "fd00:ffff:ffff:10::3/128"
+                                    }
+                                ]
+                            }
+                        ],
+                        "direct_clients": [
+                            {
+                                "name": "b2e1-client1",
+                                "connections": {
+                                    "ip": "[[ host ]]",
+                                    "port": 1102
+                                },
+                                "credentials": {
+                                    "username": "root",
+                                    "password": "velocloud"
+                                },
+                                "interfaces": [
+                                    {
+                                        "name": "eth0",
+                                        "link": "bastion-host",
+                                        "default_gateway": "192.168.0.100",
+                                        "mode": "switched",
+                                        "ip": "192.168.0.105",
+                                        "netmask": "255.255.255.0"
+                                    },
+                                    {
+                                        "name": "eth1",
+                                        "link": "E21C1",
+                                        "mode": "switched",
+                                        "ip": "10.0.2.25",
+                                        "default_gateway": "10.0.2.1",
+                                        "unactivated_ip": "192.168.3.10",
+                                        "unactivated_gateway_ip": "192.168.3.1",
+                                        "docker_unactivated_ip": "192.168.30.10",
+                                        "docker_unactivated_gateway_ip": "192.168.30.1",
+                                        "netmask": "255.255.255.0",
+                                        "addressing_type": "DHCP",
+                                        "v6_addressing_type": "static",
+                                        "routes": [
+                                            "0.0.0.0/0"
+                                        ],
+                                        "ipv6": "fd00:2:1:0::2/64",
+                                        "ipv6_gateway": "fd00:2:1:0::1",
+                                        "segments": [
+                                            {
+                                                "name": "segment1",
+                                                "ip": "10.100.2.100",
+                                                "netmask": "255.255.255.0",
+                                                "default_gateway": "10.100.2.1",
+                                                "vlan": 100,
+                                                "namespace": "segment1",
+                                                "ipv6": "fd00:2:2:0::2/64",
+                                                "ipv6_gateway": "fd00:2:2:0::1"
+                                            },
+                                            {
+                                                "name": "segment2",
+                                                "ip": "10.101.2.100",
+                                                "netmask": "255.255.255.0",
+                                                "default_gateway": "10.101.2.1",
+                                                "vlan": 101,
+                                                "namespace": "segment2",
+                                                "ipv6": "fd00:2:3:0::2/64",
+                                                "ipv6_gateway": "fd00:2:3:0::1"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "name": "lo",
+                                        "ip": "2.2.0.1",
+                                        "netmask": "255.255.255.255",
+                                        "type": "loopback",
+                                        "addressing_type": "static",
+                                        "link": "dc2lo",
+                                        "ipv6": "fd00:ffff:ffff:11::1/128",
+                                        "segments": [
+                                            {
+                                                "name": "segment1",
+                                                "ip": "2.2.100.1",
+                                                "netmask": "255.255.255.255",
+                                                "vlan": 100,
+                                                "namespace": "segment1",
+                                                "ipv6": "fd00:ffff:ffff:11::2/128"
+                                            },
+                                            {
+                                                "name": "segment2",
+                                                "ip": "2.2.101.1",
+                                                "netmask": "255.255.255.255",
+                                                "vlan": 101,
+                                                "namespace": "segment2",
+                                                "ipv6": "fd00:ffff:ffff:11::3/128"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ],
+                "hopaway_clients": [
+                    {
+                        "name": "b2-routedclient1",
+                        "device_type": "HOPAWAY_CLIENT",
+                        "model": "LINUX",
+                        "connections": {
+                            "ip": "[[ host ]]",
+                            "port": 1202
+                        },
+                        "credentials": {
+                            "username": "root",
+                            "password": "velocloud"
+                        },
+                        "interfaces": [
+                            {
+                                "name": "eth0",
+                                "link": "bastion-host",
+                                "default_gateway": "192.168.0.100",
+                                "mode": "switched",
+                                "ip": "192.168.0.107",
+                                "netmask": "255.255.255.0"
+                            },
+                            {
+                                "name": "eth1",
+                                "link": "l3b2ce",
+                                "mode": "switched",
+                                "ip": "172.16.2.18",
+                                "netmask": "255.255.255.248",
+                                "routes": [
+                                    "0.0.0.0/0"
+                                ],
+                                "default_gateway": "172.16.2.17",
+                                "addressing_type": "static",
+                                "v6_addressing_type": "static",
+                                "ipv6": "fd00:2:1:a003::2/64",
+                                "ipv6_gateway": "fd00:2:1:a003::1",
+                                "segments": [
+                                    {
+                                        "name": "segment1",
+                                        "ip": "172.17.2.18",
+                                        "netmask": "255.255.255.248",
+                                        "default_gateway": "172.17.2.17",
+                                        "vlan": 100,
+                                        "namespace": "segment1",
+                                        "ipv6": "fd00:2:2:a003::2/64",
+                                        "ipv6_gateway": "fd00:2:2:a003::1"
+                                    },
+                                    {
+                                        "name": "segment2",
+                                        "ip": "172.18.2.18",
+                                        "netmask": "255.255.255.248",
+                                        "default_gateway": "172.18.2.17",
+                                        "vlan": 101,
+                                        "namespace": "segment2",
+                                        "ipv6": "fd00:2:3:a003::2/64",
+                                        "ipv6_gateway": "fd00:2:3:a003::1"
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "lo",
+                                "ip": "3.2.0.1",
+                                "netmask": "255.255.255.255",
+                                "type": "loopback",
+                                "addressing_type": "static",
+                                "link": "rc2lo",
+                                "ipv6": "fd00:ffff:ffff:12::1/128",
+                                "segments": [
+                                    {
+                                        "name": "segment1",
+                                        "ip": "3.2.100.1",
+                                        "netmask": "255.255.255.255",
+                                        "vlan": 100,
+                                        "namespace": "segment1",
+                                        "ipv6": "fd00:ffff:ffff:12::2/128"
+                                    },
+                                    {
+                                        "name": "segment2",
+                                        "ip": "3.2.101.1",
+                                        "netmask": "255.255.255.255",
+                                        "vlan": 101,
+                                        "namespace": "segment2",
+                                        "ipv6": "fd00:ffff:ffff:12::3/128"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ],
+                "l3switches": [
+                    {
+                        "name": "b2-l3switch1",
+                        "device_type": "L3_SWITCH",
+                        "connections": {
+                            "ip": "[[ host ]]",
+                            "port": 1302
+                        },
+                        "credentials": {
+                            "username": "root",
+                            "password": "velocloud"
+                        },
+                        "interfaces": [
+                            {
+                                "name": "eth0",
+                                "link": "bastion-host",
+                                "default_gateway": "192.168.0.100",
+                                "mode": "switched",
+                                "ip": "192.168.0.131",
+                                "netmask": "255.255.255.0"
+                            },
+                            {
+                                "name": "eth1",
+                                "link": "l3b2e",
+                                "ip": "172.16.2.9",
+                                "netmask": "255.255.255.248",
+                                "default_gateway": "172.16.2.10",
+                                "addressing_type": "static",
+                                "namespace": "global",
+                                "ipv6": "fd00:2:1:3::1/64",
+                                "ipv6_gateway": "fd00:2:1:3::2",
+                                "segments": [
+                                    {
+                                        "name": "segment1",
+                                        "ip": "172.17.2.9",
+                                        "netmask": "255.255.255.248",
+                                        "default_gateway": "172.17.2.10",
+                                        "vlan": 100,
+                                        "namespace": "segment1",
+                                        "ipv6": "fd00:2:2:3::1/64",
+                                        "ipv6_gateway": "fd00:2:2:3::2"
+                                    },
+                                    {
+                                        "name": "segment2",
+                                        "ip": "172.18.2.9",
+                                        "netmask": "255.255.255.248",
+                                        "default_gateway": "172.18.2.10",
+                                        "vlan": 101,
+                                        "namespace": "segment2",
+                                        "ipv6": "fd00:2:3:3::1/64",
+                                        "ipv6_gateway": "fd00:2:3:3::2"
+                                    }
+                                ]
+                            },
+                            {
+                                "link": "l3b2ce",
+                                "ip": "172.16.2.17",
+                                "netmask": "255.255.255.248",
+                                "name": "eth2",
+                                "default_gateway": "172.16.2.18",
+                                "addressing_type": "static",
+                                "namespace": "global",
+                                "ipv6": "fd00:2:1:a003::1/64",
+                                "ipv6_gateway": "fd00:2:1:a003::2",
+                                "segments": [
+                                    {
+                                        "name": "segment1",
+                                        "ip": "172.17.2.17",
+                                        "netmask": "255.255.255.248",
+                                        "default_gateway": "172.17.2.18",
+                                        "vlan": 100,
+                                        "namespace": "segment1",
+                                        "ipv6": "fd00:2:2:a003::1/64",
+                                        "ipv6_gateway": "fd00:2:2:a003::2"
+                                    },
+                                    {
+                                        "name": "segment2",
+                                        "ip": "172.18.2.17",
+                                        "netmask": "255.255.255.248",
+                                        "default_gateway": "172.18.2.18",
+                                        "vlan": 101,
+                                        "namespace": "segment2",
+                                        "ipv6": "fd00:2:3:a003::1/64",
+                                        "ipv6_gateway": "fd00:2:3:a003::2"
+                                    }
+                                ]
+                            },
+                            {
+                                "link": "b1b5l3",
+                                "ip": "172.16.254.27",
+                                "netmask": "255.255.255.248",
+                                "default_gateway": "172.16.254.26",
+                                "name": "eth3",
+                                "addressing_type": "static",
+                                "namespace": "global",
+                                "ipv6": "fd00:ffff:1:ffff::1/64",
+                                "ipv6_gateway": "fd00:ffff:1:ffff::2",
+                                "segments": [
+                                    {
+                                        "name": "segment1",
+                                        "ip": "172.17.254.27",
+                                        "default_gateway": "172.17.254.26",
+                                        "netmask": "255.255.255.248",
+                                        "vlan": 100,
+                                        "namespace": "segment1",
+                                        "ipv6": "fd00:ffff:2:ffff::1/64",
+                                        "ipv6_gateway": "fd00:ffff:2:ffff::2"
+                                    },
+                                    {
+                                        "name": "segment2",
+                                        "ip": "172.18.254.27",
+                                        "default_gateway": "172.18.254.26",
+                                        "netmask": "255.255.255.248",
+                                        "vlan": 101,
+                                        "namespace": "segment2",
+                                        "ipv6": "fd00:ffff:3:ffff::1/64",
+                                        "ipv6_gateway": "fd00:ffff:3:ffff::2"
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "lo",
+                                "ip": "4.2.0.1",
+                                "netmask": "255.255.255.255",
+                                "type": "loopback",
+                                "addressing_type": "static",
+                                "link": "l32lo",
+                                "ipv6": "fd00:ffff:ffff:13::1/128",
+                                "segments": [
+                                    {
+                                        "name": "segment1",
+                                        "ip": "4.2.100.1",
+                                        "netmask": "255.255.255.255",
+                                        "vlan": 100,
+                                        "namespace": "segment1",
+                                        "ipv6": "fd00:ffff:ffff:13::2/128"
+                                    },
+                                    {
+                                        "name": "segment2",
+                                        "ip": "4.2.101.1",
+                                        "netmask": "255.255.255.255",
+                                        "vlan": 101,
+                                        "namespace": "segment2",
+                                        "ipv6": "fd00:ffff:ffff:13::3/128"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ],
+                "CEs": [
+                    {
+                        "name": "b2-customer-edge1",
+                        "device_type": "CUSTOMER_EDGE",
+                        "connections": {
+                            "ip": "[[ host ]]",
+                            "port": 1402
+                        },
+                        "credentials": {
+                            "username": "root",
+                            "password": "velocloud"
+                        },
+                        "interfaces": [
+                            {
+                                "name": "eth0",
+                                "link": "bastion-host",
+                                "default_gateway": "192.168.0.100",
+                                "mode": "switched",
+                                "ip": "192.168.0.157",
+                                "netmask": "255.255.255.0"
+                            },
+                            {
+                                "name": "eth1",
+                                "link": "b2ccmp",
+                                "mode": "switched",
+                                "ip": "172.16.2.25",
+                                "netmask": "255.255.255.248",
+                                "default_gateway": "172.16.2.26",
+                                "addressing_type": "static",
+                                "ipv6": "fd00:2:1:b004::1/64",
+                                "ipv6_gateway": "fd00:2:1:b004::2",
+                                "segments": [
+                                    {
+                                        "name": "segment1",
+                                        "ip": "172.17.2.25",
+                                        "netmask": "255.255.255.248",
+                                        "default_gateway": "172.17.2.26",
+                                        "namespace": "segment1",
+                                        "ipv6": "fd00:2:2:b004::1/64",
+                                        "ipv6_gateway": "fd00:2:2:b004::2"
+                                    },
+                                    {
+                                        "name": "segment2",
+                                        "ip": "172.18.2.25",
+                                        "netmask": "255.255.255.248",
+                                        "default_gateway": "172.18.2.26",
+                                        "namespace": "segment2",
+                                        "ipv6": "fd00:2:3:b004::1/64",
+                                        "ipv6_gateway": "fd00:2:3:b004::2"
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "eth2",
+                                "link": "b2ce1",
+                                "mode": "switched",
+                                "ip": "172.16.2.1",
+                                "netmask": "255.255.255.248",
+                                "default_gateway": "172.16.2.2",
+                                "addressing_type": "static",
+                                "namespace": "global",
+                                "ipv6": "fd00:2:1:4::1/64",
+                                "ipv6_gateway": "fd00:2:1:4::2",
+                                "segments": [
+                                    {
+                                        "name": "segment1",
+                                        "ip": "172.17.2.1",
+                                        "netmask": "255.255.255.248",
+                                        "default_gateway": "172.17.2.2",
+                                        "namespace": "segment1",
+                                        "ipv6": "fd00:2:2:4::1/64",
+                                        "ipv6_gateway": "fd00:2:2:4::2"
+                                    },
+                                    {
+                                        "name": "segment2",
+                                        "ip": "172.18.2.1",
+                                        "netmask": "255.255.255.248",
+                                        "default_gateway": "172.18.2.2",
+                                        "namespace": "segment2",
+                                        "ipv6": "fd00:2:3:4::1/64",
+                                        "ipv6_gateway": "fd00:2:3:4::2"
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "lo",
+                                "ip": "5.2.0.1",
+                                "netmask": "255.255.255.255",
+                                "type": "loopback",
+                                "addressing_type": "static",
+                                "link": "ce1e2l",
+                                "ipv6": "fd00:ffff:ffff:14::1/128",
+                                "segments": [
+                                    {
+                                        "name": "segment1",
+                                        "ip": "5.2.100.1",
+                                        "netmask": "255.255.255.255",
+                                        "vlan": 100,
+                                        "namespace": "segment1",
+                                        "ipv6": "fd00:ffff:ffff:14::2/128"
+                                    },
+                                    {
+                                        "name": "segment2",
+                                        "ip": "5.2.101.1",
+                                        "netmask": "255.255.255.255",
+                                        "vlan": 101,
+                                        "namespace": "segment2",
+                                        "ipv6": "fd00:ffff:ffff:14::3/128"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "name": "branch3",
+                "type": "bronze",
+                "edges": [
+                    {
+                        "name": "b3-edge1",
+                        "model": "virtual",
+                        "management_ip": "10.0.3.2",
+                        "ha_enabled": false,
+                        "connections": {
+                            "ip": "[[ host ]]",
+                            "port": 1003
+                        },
+                        "credentials": {
+                            "username": "root",
+                            "password": "velocloud"
+                        },
+                        "vlans": [
+                            {
+                                "vlan": 1,
+                                "segment_name": "Global Segment",
+                                "ip": "10.0.3.1",
+                                "netmask": "255.255.255.0",
+                                "ipv6": "fd00:3:1:0::1/64"
+                            },
+                            {
+                                "vlan": 100,
+                                "segment_name": "segment1",
+                                "ip": "10.100.3.1",
+                                "netmask": "255.255.255.0",
+                                "ipv6": "fd00:3:2:0::1/64"
+                            },
+                            {
+                                "vlan": 101,
+                                "segment_name": "segment2",
+                                "ip": "10.101.3.1",
+                                "netmask": "255.255.255.0",
+                                "ipv6": "fd00:3:3:0::1/64"
+                            }
+                        ],
+                        "interfaces": [
+                            {
+                                "name": "eth0",
+                                "logical_name": "LAN1",
+                                "logical_interface": "GE1",
+                                "link": "B3E1_HA",
+                                "mode": "routed",
+                                "vlans": [
+                                    1
+                                ],
+                                "wan_overlay": "disabled"
+                            },
+                            {
+                                "name": "eth1",
+                                "logical_name": "LAN2",
+                                "logical_interface": "GE2",
+                                "link": "E31C1",
+                                "mode": "routed",
+                                "vlans": [
+                                    1
+                                ],
+                                "wan_overlay": "disabled",
+                                "addressing_type": "static",
+                                "v6_addressing_type": "static",
+                                "ip": "10.0.3.1",
+                                "netmask": "255.255.255.0",
+                                "default_gateway": "10.0.3.25",
+                                "properties": {
+                                    "advertise": true,
+                                    "ipv6_advertise": true,
+                                    "nat_direct": false,
+                                    "underlay_accounting": false,
+                                    "enable_dhcp_server": true,
+                                    "ipv6_nat_direct": false
+                                },
+                                "ipv6": "fd00:3:1:0::1/64",
+                                "ipv6_gateway": "fd00:3:1:0::2",
+                                "subinterfaces": [
+                                    {
+                                        "name": "GE2.100",
+                                        "subinterface_type": "SUB_INTERFACE",
+                                        "vlan": 100,
+                                        "segment_name": "segment1",
+                                        "addressing_type": "static",
+                                        "v6_addressing_type": "static",
+                                        "ip": "10.100.3.1",
+                                        "default_gateway": "10.100.3.100",
+                                        "netmask": "255.255.255.0",
+                                        "ipv6": "fd00:3:2:0::1/64",
+                                        "ipv6_gateway": "fd00:3:2:0::2",
+                                        "properties": {
+                                            "advertise": true,
+                                            "ipv6_advertise": true,
+                                            "nat_direct": false,
+                                            "enable_dhcp_server": true,
+                                            "ipv6_nat_direct": false
+                                        }
+                                    },
+                                    {
+                                        "name": "GE2.101",
+                                        "subinterface_type": "SUB_INTERFACE",
+                                        "vlan": 101,
+                                        "segment_name": "segment2",
+                                        "addressing_type": "static",
+                                        "v6_addressing_type": "static",
+                                        "ip": "10.101.3.1",
+                                        "default_gateway": "10.101.3.100",
+                                        "netmask": "255.255.255.0",
+                                        "ipv6": "fd00:3:3:0::1/64",
+                                        "ipv6_gateway": "fd00:3:3:0::2",
+                                        "properties": {
+                                            "advertise": true,
+                                            "ipv6_advertise": true,
+                                            "nat_direct": false,
+                                            "enable_dhcp_server": true,
+                                            "ipv6_nat_direct": false
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "eth2",
+                                "logical_name": "INTERNET1",
+                                "logical_interface": "GE3",
+                                "link": "B3E1W1",
+                                "mode": "routed",
+                                "addressing_type": "static",
+                                "ip": "169.254.6.57",
+                                "netmask": "255.255.255.248",
+                                "default_gateway": "169.254.6.58",
+                                "nexthop": "wansim1",
+                                "wan_overlay": "auto_detect",
+                                "type": "public",
+                                "dhcp_capable": true,
+                                "ipv6": "fd00:3:1:1::2/64",
+                                "ipv6_gateway": "fd00:3:1:1::1"
+                            },
+                            {
+                                "name": "eth3",
+                                "logical_name": "INTERNET2",
+                                "logical_interface": "GE4",
+                                "link": "B3E1W2",
+                                "mode": "routed",
+                                "addressing_type": "static",
+                                "ip": "169.254.6.65",
+                                "netmask": "255.255.255.248",
+                                "default_gateway": "169.254.6.66",
+                                "nexthop": "wansim1",
+                                "wan_overlay": "auto_detect",
+                                "type": "public",
+                                "pppoe": {
+                                    "username": "root",
+                                    "password": "velocloud"
+                                },
+                                "ipv6": "fd00:3:1:2::2/64",
+                                "ipv6_gateway": "fd00:3:1:2::1"
+                            },
+                            {
+                                "name": "eth4",
+                                "logical_name": "INTERNET3",
+                                "logical_interface": "GE5",
+                                "link": "B3E1W3",
+                                "mode": "routed",
+                                "addressing_type": "static",
+                                "ip": "169.254.12.18",
+                                "netmask": "255.255.255.248",
+                                "default_gateway": "169.254.12.17",
+                                "nexthop": "wansim1",
+                                "wan_overlay": "auto_detect",
+                                "type": "public",
+                                "pppoe": {
+                                    "username": "root",
+                                    "password": "velocloud"
+                                },
+                                "ipv6": "fd00:3:1:3::2/64",
+                                "ipv6_gateway": "fd00:3:1:3::1"
+                            },
+                            {
+                                "name": "lo",
+                                "ip": "1.3.0.1",
+                                "netmask": "255.255.255.255",
+                                "type": "loopback",
+                                "addressing_type": "static",
+                                "link": "e3lo",
+                                "logical_interface": "lo",
+                                "ipv6": "fd00:ffff:ffff:15::1/128",
+                                "segments": [
+                                    {
+                                        "name": "segment1",
+                                        "ip": "1.3.100.1",
+                                        "netmask": "255.255.255.255",
+                                        "vlan": "100",
+                                        "ipv6": "fd00:ffff:ffff:15::2/128"
+                                    },
+                                    {
+                                        "name": "segment2",
+                                        "ip": "1.3.101.1",
+                                        "netmask": "255.255.255.255",
+                                        "vlan": "101",
+                                        "ipv6": "fd00:ffff:ffff:15::3/128"
+                                    }
+                                ]
+                            }
+                        ],
+                        "direct_clients": [
+                            {
+                                "name": "b3e1-client1",
+                                "connections": {
+                                    "ip": "[[ host ]]",
+                                    "port": 1103
+                                },
+                                "credentials": {
+                                    "username": "root",
+                                    "password": "velocloud"
+                                },
+                                "interfaces": [
+                                    {
+                                        "name": "eth0",
+                                        "link": "bastion-host",
+                                        "default_gateway": "192.168.0.100",
+                                        "mode": "switched",
+                                        "ip": "192.168.0.104",
+                                        "netmask": "255.255.255.0"
+                                    },
+                                    {
+                                        "name": "eth1",
+                                        "link": "E31C1",
+                                        "mode": "switched",
+                                        "ip": "10.0.3.25",
+                                        "default_gateway": "10.0.3.1",
+                                        "unactivated_ip": "192.168.3.10",
+                                        "unactivated_gateway_ip": "192.168.3.1",
+                                        "docker_unactivated_ip": "192.168.31.10",
+                                        "docker_unactivated_gateway_ip": "192.168.31.1",
+                                        "netmask": "255.255.255.0",
+                                        "addressing_type": "DHCP",
+                                        "v6_addressing_type": "static",
+                                        "routes": [
+                                            "0.0.0.0/0"
+                                        ],
+                                        "ipv6": "fd00:3:1:0::2/64",
+                                        "ipv6_gateway": "fd00:3:1:0::1",
+                                        "segments": [
+                                            {
+                                                "name": "segment1",
+                                                "ip": "10.100.3.100",
+                                                "netmask": "255.255.255.0",
+                                                "default_gateway": "10.100.3.1",
+                                                "vlan": 100,
+                                                "namespace": "segment1",
+                                                "ipv6": "fd00:3:2:0::2/64",
+                                                "ipv6_gateway": "fd00:3:2:0::1"
+                                            },
+                                            {
+                                                "name": "segment2",
+                                                "ip": "10.101.3.100",
+                                                "netmask": "255.255.255.0",
+                                                "default_gateway": "10.101.3.1",
+                                                "vlan": 101,
+                                                "namespace": "segment2",
+                                                "ipv6": "fd00:3:3:0::2/64",
+                                                "ipv6_gateway": "fd00:3:3:0::1"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        ],
+        "corerouters": [
+            {
+                "name": "cr-mpls",
+                "model": "linux",
+                "device_type": "MPLS_ROUTER",
+                "connections": {
+                    "ip": "[[ host ]]",
+                    "port": 3004
+                },
+                "credentials": {
+                    "username": "root",
+                    "password": "velocloud"
+                },
+                "interfaces": [
+                    {
+                        "name": "eth0",
+                        "link": "bastion-host",
+                        "default_gateway": "192.168.0.100",
+                        "mode": "switched",
+                        "ip": "192.168.0.162",
+                        "netmask": "255.255.255.0"
+                    },
+                    {
+                        "name": "eth1",
+                        "link": "b1ccmp",
+                        "mode": "routed",
+                        "addressing_type": "static",
+                        "ip": "172.16.1.26",
+                        "netmask": "255.255.255.248",
+                        "default_gateway": "172.16.1.25",
+                        "ipv6": "fd00:1:1:b004::2/64",
+                        "ipv6_gateway": "fd00:1:1:b004::1",
+                        "segments": [
+                            {
+                                "name": "segment1",
+                                "ip": "172.17.1.26",
+                                "default_gateway": "172.17.1.25",
+                                "netmask": "255.255.255.248",
+                                "namespace": "segment1",
+                                "ipv6": "fd00:1:2:b004::2/64",
+                                "ipv6_gateway": "fd00:1:2:b004::1"
+                            },
+                            {
+                                "name": "segment2",
+                                "ip": "172.18.1.26",
+                                "default_gateway": "172.18.1.25",
+                                "netmask": "255.255.255.248",
+                                "namespace": "segment2",
+                                "ipv6": "fd00:1:3:b004::2/64",
+                                "ipv6_gateway": "fd00:1:3:b004::1"
+                            }
+                        ]
+                    },
+                    {
+                        "name": "eth2",
+                        "link": "b2ccmp",
+                        "mode": "routed",
+                        "addressing_type": "static",
+                        "ip": "172.16.2.26",
+                        "netmask": "255.255.255.248",
+                        "default_gateway": "172.16.2.25",
+                        "ipv6": "fd00:2:1:b004::2/64",
+                        "ipv6_gateway": "fd00:2:1:b004::1",
+                        "segments": [
+                            {
+                                "name": "segment1",
+                                "ip": "172.17.2.26",
+                                "netmask": "255.255.255.248",
+                                "default_gateway": "172.17.2.25",
+                                "namespace": "segment1",
+                                "ipv6": "fd00:2:2:b004::2/64",
+                                "ipv6_gateway": "fd00:2:2:b004::1"
+                            },
+                            {
+                                "name": "segment2",
+                                "ip": "172.18.2.26",
+                                "netmask": "255.255.255.248",
+                                "default_gateway": "172.18.2.25",
+                                "namespace": "segment2",
+                                "ipv6": "fd00:2:3:b004::2/64",
+                                "ipv6_gateway": "fd00:2:3:b004::1"
+                            }
+                        ]
+                    },
+                    {
+                        "name": "eth3",
+                        "link": "b1ecmp",
+                        "mode": "routed",
+                        "addressing_type": "static",
+                        "ip": "172.16.1.34",
+                        "netmask": "255.255.255.248",
+                        "default_gateway": "172.16.1.33",
+                        "ipv6": "fd00:1:1:5::1/64",
+                        "ipv6_gateway": "fd00:1:1:5::2",
+                        "segments": [
+                            {
+                                "name": "segment1",
+                                "ip": "172.17.1.34",
+                                "netmask": "255.255.255.248",
+                                "default_gateway": "172.17.1.33",
+                                "namespace": "segment1",
+                                "ipv6": "fd00:1:2:5::1/64",
+                                "ipv6_gateway": "fd00:1:2:5::2"
+                            },
+                            {
+                                "name": "segment2",
+                                "ip": "172.18.1.34",
+                                "netmask": "255.255.255.248",
+                                "default_gateway": "172.18.1.33",
+                                "namespace": "segment2",
+                                "ipv6": "fd00:1:3:5::1/64",
+                                "ipv6_gateway": "fd00:1:3:5::2"
+                            }
+                        ]
+                    },
+                    {
+                        "name": "eth4",
+                        "link": "b2ecmp",
+                        "mode": "routed",
+                        "addressing_type": "static",
+                        "ip": "172.16.2.34",
+                        "netmask": "255.255.255.248",
+                        "default_gateway": "172.16.2.33",
+                        "ipv6": "fd00:2:1:5::1/64",
+                        "ipv6_gateway": "fd00:2:1:5::2",
+                        "segments": [
+                            {
+                                "name": "segment1",
+                                "ip": "172.17.2.34",
+                                "netmask": "255.255.255.248",
+                                "default_gateway": "172.17.2.33",
+                                "namespace": "segment1",
+                                "ipv6": "fd00:2:2:5::1/64",
+                                "ipv6_gateway": "fd00:2:2:5::2"
+                            },
+                            {
+                                "name": "segment2",
+                                "ip": "172.18.2.34",
+                                "netmask": "255.255.255.248",
+                                "default_gateway": "172.18.2.33",
+                                "namespace": "segment2",
+                                "ipv6": "fd00:2:3:5::1/64",
+                                "ipv6_gateway": "fd00:2:3:5::2"
+                            }
+                        ]
+                    },
+                    {
+                        "name": "eth5",
+                        "link": "b1ce2c",
+                        "mode": "routed",
+                        "addressing_type": "static",
+                        "ip": "172.16.11.28",
+                        "netmask": "255.255.255.248",
+                        "default_gateway": "172.16.11.27",
+                        "ipv6": "fd00:1:4:b004::2/64",
+                        "ipv6_gateway": "fd00:1:4:b004::1",
+                        "segments": [
+                            {
+                                "name": "segment1",
+                                "ip": "172.17.11.28",
+                                "default_gateway": "172.17.11.26",
+                                "netmask": "255.255.255.248",
+                                "namespace": "segment1",
+                                "ipv6": "fd00:1:5:b004::2/64",
+                                "ipv6_gateway": "fd00:1:5:b004::1"
+                            },
+                            {
+                                "name": "segment2",
+                                "ip": "172.18.11.28",
+                                "default_gateway": "172.18.11.27",
+                                "netmask": "255.255.255.248",
+                                "namespace": "segment2",
+                                "ipv6": "fd00:1:6:b004::2/64",
+                                "ipv6_gateway": "fd00:1:6:b004::1"
+                            }
+                        ]
+                    },
+                    {
+                        "name": "eth6",
+                        "mode": "routed",
+                        "link": "crmcr1",
+                        "addressing_type": "static",
+                        "ip": "169.254.15.2",
+                        "netmask": "255.255.255.248",
+                        "default_gateway": "169.254.15.1",
+                        "ipv6": "fd00:eeee:0:4::2/64",
+                        "ipv6_gateway": "fd00:eeee:0:4::1",
+                        "segments": [
+                            {
+                                "name": "segment1",
+                                "ip": "169.254.15.10",
+                                "netmask": "255.255.255.248",
+                                "default_gateway": "169.254.15.9",
+                                "ipv6": "fd00:eeee:1:4::2/64",
+                                "ipv6_gateway": "fd00:eeee:1:4::1",
+                                "namespace": "segment1"
+                            },
+                            {
+                                "name": "segment2",
+                                "ip": "169.254.15.18",
+                                "netmask": "255.255.255.248",
+                                "default_gateway": "169.254.15.17",
+                                "ipv6": "fd00:eeee:2:4::2/64",
+                                "ipv6_gateway": "fd00:eeee:2:4::1",
+                                "namespace": "segment2"
+                            }
+                        ]
+                    },
+                    {
+                        "name": "lo",
+                        "ip": "6.1.0.1",
+                        "netmask": "255.255.255.255",
+                        "type": "loopback",
+                        "addressing_type": "static",
+                        "link": "mplslo",
+                        "ipv6": "fd00:ffff:ffff:16::1/128",
+                        "segments": [
+                            {
+                                "name": "segment1",
+                                "ip": "6.1.100.1",
+                                "netmask": "255.255.255.255",
+                                "vlan": 100,
+                                "namespace": "segment1",
+                                "ipv6": "fd00:ffff:ffff:16::2/128"
+                            },
+                            {
+                                "name": "segment2",
+                                "ip": "6.1.101.1",
+                                "netmask": "255.255.255.255",
+                                "vlan": 101,
+                                "namespace": "segment2",
+                                "ipv6": "fd00:ffff:ffff:16::3/128"
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "name": "cr1-mpls",
+                "model": "linux",
+                "device_type": "MPLS_ROUTER",
+                "connections": {
+                    "ip": "[[ host ]]",
+                    "port": 3006
+                },
+                "credentials": {
+                    "username": "root",
+                    "password": "velocloud"
+                },
+                "interfaces": [
+                    {
+                        "name": "eth0",
+                        "link": "bastion-host",
+                        "default_gateway": "192.168.0.100",
+                        "mode": "switched",
+                        "ip": "192.168.0.163",
+                        "netmask": "255.255.255.0"
+                    },
+                    {
+                        "name": "eth1",
+                        "link": "lcecmp",
+                        "mode": "routed",
+                        "addressing_type": "static",
+                        "ip": "172.16.201.10",
+                        "netmask": "255.255.255.248",
+                        "default_gateway": "172.16.201.9",
+                        "ipv6": "fd00:2001:1:2::1/64",
+                        "ipv6_gateway": "fd00:2001:1:2::2",
+                        "segments": [
+                            {
+                                "name": "segment1",
+                                "ip": "172.16.201.10",
+                                "netmask": "255.255.255.248",
+                                "default_gateway": "172.16.201.9",
+                                "namespace": "segment1",
+                                "ipv6": "fd00:2001:1:2::1/64",
+                                "ipv6_gateway": "fd00:2001:1:2::2"
+                            },
+                            {
+                                "name": "segment2",
+                                "ip": "172.16.201.10",
+                                "netmask": "255.255.255.248",
+                                "default_gateway": "172.16.201.9",
+                                "namespace": "segment2",
+                                "ipv6": "fd00:2001:1:2::1/64",
+                                "ipv6_gateway": "fd00:2001:1:2::2"
+                            }
+                        ]
+                    },
+                    {
+                        "name": "eth2",
+                        "link": "g1pcmp",
+                        "mode": "routed",
+                        "addressing_type": "static",
+                        "ip": "172.16.101.2",
+                        "netmask": "255.255.255.248",
+                        "default_gateway": "172.16.101.1",
+                        "ipv6": "fd00:dd01:1:1::2/64",
+                        "ipv6_gateway": "fd00:dd01:1:1::1",
+                        "segments": [
+                            {
+                                "name": "segment1",
+                                "ip": "172.17.101.2",
+                                "netmask": "255.255.255.248",
+                                "default_gateway": "172.17.101.1",
+                                "ipv6": "fd00:dd01:2:1::2/64",
+                                "ipv6_gateway": "fd00:dd01:2:1::1",
+                                "namespace": "segment1"
+                            },
+                            {
+                                "name": "segment2",
+                                "ip": "172.18.101.2",
+                                "netmask": "255.255.255.248",
+                                "default_gateway": "172.18.101.1",
+                                "ipv6": "fd00:dd01:3:1::2/64",
+                                "ipv6_gateway": "fd00:dd01:3:1::1",
+                                "namespace": "segment2"
+                            }
+                        ]
+                    },
+                    {
+                        "name": "eth3",
+                        "link": "g2pcmp",
+                        "mode": "routed",
+                        "addressing_type": "static",
+                        "ip": "172.16.102.2",
+                        "netmask": "255.255.255.248",
+                        "default_gateway": "172.16.102.1",
+                        "ipv6": "fd00:dd02:1:1::2/64",
+                        "ipv6_gateway": "fd00:dd02:1:1::1",
+                        "segments": [
+                            {
+                                "name": "segment1",
+                                "ip": "172.17.102.2",
+                                "netmask": "255.255.255.248",
+                                "default_gateway": "172.17.102.1",
+                                "ipv6": "fd00:dd02:2:1::2/64",
+                                "ipv6_gateway": "fd00:dd02:2:1::1",
+                                "namespace": "segment1"
+                            },
+                            {
+                                "name": "segment2",
+                                "ip": "172.18.102.2",
+                                "netmask": "255.255.255.248",
+                                "default_gateway": "172.18.102.1",
+                                "ipv6": "fd00:dd02:3:1::2/64",
+                                "ipv6_gateway": "fd00:dd02:3:1::1",
+                                "namespace": "segment2"
+                            }
+                        ]
+                    },
+                    {
+                        "name": "eth4",
+                        "mode": "routed",
+                        "link": "crmcr1",
+                        "addressing_type": "static",
+                        "ip": "169.254.15.1",
+                        "netmask": "255.255.255.248",
+                        "default_gateway": "169.254.15.2",
+                        "ipv6": "fd00:eeee:0:4::1/64",
+                        "ipv6_gateway": "fd00:eeee:0:4::2",
+                        "segments": [
+                            {
+                                "name": "segment1",
+                                "ip": "169.254.15.9",
+                                "netmask": "255.255.255.248",
+                                "default_gateway": "169.254.15.10",
+                                "ipv6": "fd00:eeee:1:4::1/64",
+                                "ipv6_gateway": "fd00:eeee:1:4::2",
+                                "namespace": "segment1"
+                            },
+                            {
+                                "name": "segment2",
+                                "ip": "169.254.15.17",
+                                "netmask": "255.255.255.248",
+                                "default_gateway": "169.254.15.18",
+                                "ipv6": "fd00:eeee:2:4::1/64",
+                                "ipv6_gateway": "fd00:eeee:2:4::2",
+                                "namespace": "segment2"
+                            }
+                        ]
+                    },
+                    {
+                        "name": "eth5",
+                        "link": "brk",
+                        "mode": "routed",
+                        "addressing_type": "static",
+                        "ip": "172.29.29.25",
+                        "netmask": "255.255.255.248",
+                        "default_gateway": "172.29.29.26",
+                        "ipv6": "fd00:29:29:29::25/64",
+                        "ipv6_gateway": "fd00:29:29:29::26",
+                        "nat_enabled": true
+                    },
+                    {
+                        "link": "cmpvco",
+                        "name": "eth6",
+                        "ip": "169.254.11.1",
+                        "addressing_type": "STATIC",
+                        "netmask": "255.255.255.248",
+                        "default_gateway": "169.254.11.2"
+                    }
+                ]
+            },
+            {
+                "name": "cr-internet",
+                "model": "linux",
+                "device_type": "CORE_ROUTER",
+                "connections": {
+                    "ip": "[[ host ]]",
+                    "port": 3003
+                },
+                "credentials": {
+                    "username": "root",
+                    "password": "velocloud"
+                },
+                "interfaces": [
+                    {
+                        "name": "eth0",
+                        "link": "bastion-host",
+                        "default_gateway": "192.168.0.100",
+                        "mode": "switched",
+                        "ip": "192.168.0.164",
+                        "netmask": "255.255.255.0",
+                        "nat_enabled": true,
+                        "routes": [
+                            "0.0.0.0/0"
+                        ]
+                    },
+                    {
+                        "name": "eth1",
+                        "link": "crcr1",
+                        "mode": "routed",
+                        "addressing_type": "static",
+                        "ip": "169.254.6.1",
+                        "netmask": "255.255.255.248",
+                        "default_gateway": "169.254.6.2",
+                        "ipv6": "fd00:eeee:0:1::1/64",
+                        "ipv6_gateway": "fd00:eeee:0:1::2"
+                    },
+                    {
+                        "name": "eth2",
+                        "link": "crcr2",
+                        "mode": "routed",
+                        "addressing_type": "static",
+                        "ip": "169.254.6.9",
+                        "netmask": "255.255.255.248",
+                        "default_gateway": "169.254.6.10",
+                        "ipv6": "fd00:eeee:0:2::1/64",
+                        "ipv6_gateway": "fd00:eeee:0:2::2"
+                    },
+                    {
+                        "name": "eth3",
+                        "link": "cricld",
+                        "mode": "routed",
+                        "addressing_type": "static",
+                        "ip": "169.254.6.17",
+                        "netmask": "255.255.255.248",
+                        "default_gateway": "169.254.6.18",
+                        "ipv6": "2222::2/64",
+                        "ipv6_gateway": "2222::1"
+                    },
+                    {
+                        "name": "eth4",
+                        "link": "crinvs",
+                        "mode": "routed",
+                        "addressing_type": "static",
+                        "ip": "169.254.6.25",
+                        "netmask": "255.255.255.248",
+                        "default_gateway": "169.254.6.26",
+                        "ipv6": "fd00:bbbb:1:1::2/64",
+                        "ipv6_gateway": "fd00:bbbb:1:1::1",
+                        "segments": [
+                            {
+                                "name": "segment1",
+                                "ip": "169.254.7.25",
+                                "default_gateway": "169.254.7.26",
+                                "netmask": "255.255.255.248",
+                                "namespace": "segment1",
+                                "ipv6": "fd00:bbbb:2:1::2/64",
+                                "ipv6_gateway": "fd00:bbbb:2:1::1"
+                            },
+                            {
+                                "name": "segment2",
+                                "ip": "169.254.8.25",
+                                "default_gateway": "169.254.8.26",
+                                "netmask": "255.255.255.248",
+                                "namespace": "segment2",
+                                "ipv6": "fd00:bbbb:3:1::2/64",
+                                "ipv6_gateway": "fd00:bbbb:3:1::1"
+                            }
+                        ]
+                    },
+                    {
+                        "name": "eth5",
+                        "link": "crivco",
+                        "mode": "routed",
+                        "addressing_type": "static",
+                        "ip": "169.254.8.1",
+                        "netmask": "255.255.255.248",
+                        "default_gateway": "169.254.8.2",
+                        "ipv6": "fd00:aaaa:1:1::1/64",
+                        "ipv6_gateway": "fd00:aaaa:1:1::2"
+                    },
+                    {
+                        "name": "eth6",
+                        "mode": "routed",
+                        "link": "g1cr1",
+                        "ip": "20.0.1.1",
+                        "netmask": "255.255.255.0",
+                        "default_gateway": "20.0.1.2",
+                        "addressing_type": "static",
+                        "ipv6": "fd00:ff01:0:1::1/64",
+                        "ipv6_gateway": "fd00:ff01:0:1::2"
+                    },
+                    {
+                        "name": "eth7",
+                        "mode": "routed",
+                        "link": "g2cr1",
+                        "ip": "20.0.2.1",
+                        "netmask": "255.255.255.0",
+                        "default_gateway": "20.0.2.2",
+                        "addressing_type": "static",
+                        "ipv6": "fd00:ff02:0:1::1/64",
+                        "ipv6_gateway": "fd00:ff02:0:1::2"
+                    },
+                    {
+                        "name": "eth8",
+                        "link": "brk",
+                        "mode": "routed",
+                        "addressing_type": "static",
+                        "ip": "172.29.29.26",
+                        "netmask": "255.255.255.248",
+                        "default_gateway": "172.29.29.25",
+                        "ipv6": "fd00:29:29:29::26/64",
+                        "ipv6_gateway": "fd00:29:29:29::25"
+                    },
+                    {
+                        "name": "eth9",
+                        "mode": "routed",
+                        "link": "cr3cri",
+                        "ip": "169.254.12.26",
+                        "netmask": "255.255.255.248",
+                        "default_gateway": "169.254.12.25",
+                        "addressing_type": "static",
+                        "ipv6": "fd00:eeee:0:3::1/64",
+                        "ipv6_gateway": "fd00:eeee:0:3::2"
+                    }
+                ]
+            },
+            {
+                "name": "cr1-internet",
+                "model": "linux",
+                "device_type": "CORE_ROUTER",
+                "connections": {
+                    "ip": "[[ host ]]",
+                    "port": 3001
+                },
+                "credentials": {
+                    "username": "root",
+                    "password": "velocloud"
+                },
+                "interfaces": [
+                    {
+                        "name": "eth0",
+                        "link": "bastion-host",
+                        "default_gateway": "192.168.0.100",
+                        "mode": "switched",
+                        "ip": "192.168.0.23",
+                        "netmask": "255.255.255.0",
+                        "nat_enabled": true,
+                        "routes": [
+                            "0.0.0.0/0"
+                        ]
+                    },
+                    {
+                        "name": "eth1",
+                        "mode": "routed",
+                        "link": "crcr1",
+                        "addressing_type": "static",
+                        "ip": "169.254.6.2",
+                        "netmask": "255.255.255.248",
+                        "default_gateway": "169.254.6.1",
+                        "ipv6": "fd00:eeee:0:1::2/64",
+                        "ipv6_gateway": "fd00:eeee:0:1::1"
+                    },
+                    {
+                        "name": "eth2",
+                        "link": "cri1e3",
+                        "mode": "routed",
+                        "ip": "169.254.6.49",
+                        "netmask": "255.255.255.248",
+                        "default_gateway": "169.254.6.50",
+                        "addressing_type": "static",
+                        "ipv6": "fd00:3:1:c001::2/64",
+                        "ipv6_gateway": "fd00:3:1:c001::1"
+                    },
+                    {
+                        "name": "eth3",
+                        "mode": "routed",
+                        "link": "cr1e1",
+                        "ip": "169.254.9.2",
+                        "netmask": "255.255.255.248",
+                        "default_gateway": "169.254.9.3",
+                        "addressing_type": "static",
+                        "ipv6": "fd00:1:1:1::1/64",
+                        "ipv6_gateway": "fd00:1:1:1::2"
+                    },
+                    {
+                        "name": "eth4",
+                        "mode": "routed",
+                        "link": "cr1e2",
+                        "ip": "169.254.9.10",
+                        "netmask": "255.255.255.248",
+                        "default_gateway": "169.254.9.9",
+                        "addressing_type": "static",
+                        "ipv6": "fd00:2:1:2::1/64",
+                        "ipv6_gateway": "fd00:2:1:2::2"
+                    },
+                    {
+                        "name": "eth5",
+                        "link": "criny",
+                        "mode": "routed",
+                        "addressing_type": "static",
+                        "ip": "172.31.31.1",
+                        "default_gateway": "172.31.31.2",
+                        "netmask": "255.255.255.248"
+                    }
+                ]
+            },
+            {
+                "name": "cr2-internet",
+                "model": "linux",
+                "device_type": "CORE_ROUTER",
+                "connections": {
+                    "ip": "[[ host ]]",
+                    "port": 3002
+                },
+                "credentials": {
+                    "username": "root",
+                    "password": "velocloud"
+                },
+                "interfaces": [
+                    {
+                        "name": "eth0",
+                        "link": "bastion-host",
+                        "default_gateway": "192.168.0.100",
+                        "mode": "switched",
+                        "ip": "192.168.0.165",
+                        "netmask": "255.255.255.0",
+                        "nat_enabled": true,
+                        "routes": [
+                            "0.0.0.0/0"
+                        ]
+                    },
+                    {
+                        "name": "eth1",
+                        "link": "crcr2",
+                        "mode": "routed",
+                        "addressing_type": "static",
+                        "ip": "169.254.6.10",
+                        "netmask": "255.255.255.248",
+                        "default_gateway": "169.254.6.9",
+                        "ipv6": "fd00:eeee:0:2::2/64",
+                        "ipv6_gateway": "fd00:eeee:0:2::1"
+                    },
+                    {
+                        "name": "eth2",
+                        "link": "cri2w1",
+                        "mode": "routed",
+                        "addressing_type": "static",
+                        "ip": "169.254.7.1",
+                        "default_gateway": "169.254.7.2",
+                        "netmask": "255.255.255.248",
+                        "ipv6": "fd00:2:1:1::1/64",
+                        "ipv6_gateway": "fd00:2:1:1::2"
+                    },
+                    {
+                        "name": "eth3",
+                        "link": "cri2w2",
+                        "mode": "routed",
+                        "addressing_type": "static",
+                        "ip": "169.254.6.73",
+                        "netmask": "255.255.255.248",
+                        "default_gateway": "169.254.6.74",
+                        "ipv6": "fd00:3:1:c002::2/64",
+                        "ipv6_gateway": "fd00:3:1:c002::1"
+                    },
+                    {
+                        "name": "eth4",
+                        "mode": "routed",
+                        "link": "cr2e1",
+                        "ip": "169.254.7.9",
+                        "netmask": "255.255.255.248",
+                        "default_gateway": "169.254.7.10",
+                        "addressing_type": "static",
+                        "ipv6": "fd00:1:1:2::1/64",
+                        "ipv6_gateway": "fd00:1:1:2::2"
+                    }
+                ]
+            },
+            {
+                "name": "cr3-internet",
+                "model": "linux",
+                "device_type": "CORE_ROUTER",
+                "connections": {
+                    "ip": "[[ host ]]",
+                    "port": 3005
+                },
+                "credentials": {
+                    "username": "root",
+                    "password": "velocloud"
+                },
+                "interfaces": [
+                    {
+                        "name": "eth0",
+                        "link": "bastion-host",
+                        "default_gateway": "192.168.0.100",
+                        "mode": "switched",
+                        "ip": "192.168.0.166",
+                        "netmask": "255.255.255.0",
+                        "nat_enabled": true,
+                        "routes": [
+                            "0.0.0.0/0"
+                        ]
+                    },
+                    {
+                        "name": "eth1",
+                        "link": "e1pub3",
+                        "mode": "routed",
+                        "addressing_type": "static",
+                        "ip": "169.254.12.1",
+                        "netmask": "255.255.255.248",
+                        "default_gateway": "169.254.12.2",
+                        "ipv6": "fd00:1:1:6::1/64",
+                        "ipv6_gateway": "fd00:1:1:6::2"
+                    },
+                    {
+                        "name": "eth2",
+                        "link": "e2pub3",
+                        "mode": "routed",
+                        "addressing_type": "static",
+                        "ip": "169.254.12.9",
+                        "default_gateway": "169.254.12.10",
+                        "netmask": "255.255.255.248",
+                        "ipv6": "fd00:2:1:6::1/64",
+                        "ipv6_gateway": "fd00:2:1:6::2"
+                    },
+                    {
+                        "name": "eth3",
+                        "link": "e3wsp3",
+                        "mode": "routed",
+                        "addressing_type": "static",
+                        "ip": "169.254.13.17",
+                        "netmask": "255.255.255.248",
+                        "default_gateway": "169.254.13.18",
+                        "ipv6": "fd00:3:1:c003::2/64",
+                        "ipv6_gateway": "fd00:3:1:c003::1"
+                    },
+                    {
+                        "name": "eth4",
+                        "mode": "routed",
+                        "link": "cr3cri",
+                        "ip": "169.254.12.25",
+                        "netmask": "255.255.255.248",
+                        "default_gateway": "169.254.12.26",
+                        "addressing_type": "static",
+                        "ipv6": "fd00:eeee:0:3::2/64",
+                        "ipv6_gateway": "fd00:eeee:0:3::1"
+                    }
+                ]
+            }
+        ],
+        "gateways": [
+            {
+                "name": "gateway-1",
+                "gateway_type": "cloud gateway",
+                "device_type": "GATEWAY",
+                "connections": {
+                    "ip": "[[ host ]]",
+                    "port": 2001
+                },
+                "credentials": {
+                    "username": "root",
+                    "password": "velocloud"
+                },
+                "interfaces": [
+                    {
+                        "name": "eth0",
+                        "link": "g1cr1",
+                        "mode": "switched",
+                        "ip": "20.0.1.2",
+                        "netmask": "255.255.255.0",
+                        "default_gateway": "20.0.1.1",
+                        "routes": [
+                            "0.0.0.0/0"
+                        ],
+                        "ipv6": "fd00:ff01:0:1::2/64",
+                        "ipv6_gateway": "fd00:ff01:0:1::1"
+                    },
+                    {
+                        "name": "eth1",
+                        "link": "g1pe",
+                        "mode": "routed",
+                        "ip": "101.101.101.11",
+                        "netmask": "255.255.255.0",
+                        "default_gateway": "101.101.101.10",
+                        "routes": [
+                            "0.0.0.0/0"
+                        ],
+                        "ipv6": "fd00:ee01:0:1::2/64",
+                        "ipv6_gateway": "fd00:ee01:0:1::1"
+                    },
+                    {
+                        "name": "eth2",
+                        "link": "bastion-host",
+                        "mode": "switched",
+                        "default_gateway": "192.168.0.100",
+                        "ip": "192.168.0.111",
+                        "netmask": "255.255.255.0"
+                    }
+                ],
+                "provider_edge": {
+                    "name": "gateway1-pe",
+                    "device_type": "PROVIDER_EDGE",
+                    "connections": {
+                        "ip": "[[ host ]]",
+                        "port": 2101
+                    },
+                    "credentials": {
+                        "username": "root",
+                        "password": "velocloud"
+                    },
+                    "interfaces": [
+                        {
+                            "name": "eth0",
+                            "link": "bastion-host",
+                            "default_gateway": "192.168.0.100",
+                            "ip": "192.168.0.153",
+                            "netmask": "255.255.255.0",
+                            "mode": "switched"
+                        },
+                        {
+                            "name": "eth1",
+                            "link": "g1pcmp",
+                            "mode": "routed",
+                            "ip": "172.16.101.1",
+                            "netmask": "255.255.255.248",
+                            "default_gateway": "172.16.101.2",
+                            "ipv6": "fd00:dd01:1:1::1/64",
+                            "ipv6_gateway": "fd00:dd01:1:1::2",
+                            "segments": [
+                                {
+                                    "name": "segment1",
+                                    "ip": "172.17.101.1",
+                                    "netmask": "255.255.255.248",
+                                    "default_gateway": "172.17.101.2",
+                                    "ipv6": "fd00:dd01:2:1::1/64",
+                                    "ipv6_gateway": "fd00:dd01:2:1::2",
+                                    "vlan": 100,
+                                    "namespace": "segment1"
+                                },
+                                {
+                                    "name": "segment2",
+                                    "ip": "172.18.101.1",
+                                    "netmask": "255.255.255.248",
+                                    "default_gateway": "172.18.101.2",
+                                    "ipv6": "fd00:dd01:3:1::1/64",
+                                    "ipv6_gateway": "fd00:dd01:3:1::2",
+                                    "vlan": 101,
+                                    "namespace": "segment2"
+                                }
+                            ]
+                        },
+                        {
+                            "link": "g1pe",
+                            "name": "eth2",
+                            "ip": "101.101.101.10",
+                            "default_gateway": "101.101.101.11",
+                            "netmask": "255.255.255.0",
+                            "mode": "routed",
+                            "ipv6": "fd00:ee01:0:1::1/64",
+                            "ipv6_gateway": "fd00:ee01:0:1::2"
+                        }
+                    ]
+                }
+            },
+            {
+                "name": "gateway-2",
+                "gateway_type": "cloud gateway",
+                "device_type": "GATEWAY",
+                "connections": {
+                    "ip": "[[ host ]]",
+                    "port": 2002
+                },
+                "credentials": {
+                    "username": "root",
+                    "password": "velocloud"
+                },
+                "interfaces": [
+                    {
+                        "name": "eth0",
+                        "link": "g2cr1",
+                        "mode": "switched",
+                        "ip": "20.0.2.2",
+                        "netmask": "255.255.255.0",
+                        "default_gateway": "20.0.2.1",
+                        "routes": [
+                            "0.0.0.0/0"
+                        ],
+                        "ipv6": "fd00:ff02:0:1::2/64",
+                        "ipv6_gateway": "fd00:ff02:0:1::1"
+                    },
+                    {
+                        "name": "eth1",
+                        "link": "g2pe",
+                        "mode": "routed",
+                        "ip": "102.102.102.11",
+                        "netmask": "255.255.255.0",
+                        "default_gateway": "102.102.102.10",
+                        "routes": [
+                            "0.0.0.0/0"
+                        ],
+                        "ipv6": "fd00:ee02:0:1::2/64",
+                        "ipv6_gateway": "fd00:ee02:0:1::1"
+                    },
+                    {
+                        "link": "bastion-host",
+                        "default_gateway": "192.168.0.100",
+                        "name": "eth2",
+                        "ip": "192.168.0.112",
+                        "netmask": "255.255.255.0",
+                        "mode": "switched"
+                    }
+                ],
+                "provider_edge": {
+                    "name": "gateway2-pe",
+                    "device_type": "PROVIDER_EDGE",
+                    "connections": {
+                        "ip": "[[ host ]]",
+                        "port": 2102
+                    },
+                    "credentials": {
+                        "username": "root",
+                        "password": "velocloud"
+                    },
+                    "interfaces": [
+                        {
+                            "name": "eth0",
+                            "link": "bastion-host",
+                            "default_gateway": "192.168.0.100",
+                            "ip": "192.168.0.154",
+                            "netmask": "255.255.255.0",
+                            "mode": "switched"
+                        },
+                        {
+                            "name": "eth1",
+                            "link": "g2pcmp",
+                            "mode": "routed",
+                            "ip": "172.16.102.1",
+                            "netmask": "255.255.255.248",
+                            "default_gateway": "172.16.102.2",
+                            "ipv6": "fd00:dd02:1:1::1/64",
+                            "ipv6_gateway": "fd00:dd02:1:1::2",
+                            "segments": [
+                                {
+                                    "name": "segment1",
+                                    "ip": "172.17.102.1",
+                                    "netmask": "255.255.255.248",
+                                    "default_gateway": "172.17.102.2",
+                                    "vlan": 100,
+                                    "namespace": "segment1",
+                                    "ipv6": "fd00:dd02:2:1::1/64",
+                                    "ipv6_gateway": "fd00:dd02:2:1::2"
+                                },
+                                {
+                                    "name": "segment2",
+                                    "ip": "172.18.102.1",
+                                    "netmask": "255.255.255.248",
+                                    "default_gateway": "172.18.102.2",
+                                    "vlan": 101,
+                                    "namespace": "segment2",
+                                    "ipv6": "fd00:dd02:3:1::1/64",
+                                    "ipv6_gateway": "fd00:dd02:3:1::2"
+                                }
+                            ]
+                        },
+                        {
+                            "name": "eth2",
+                            "link": "g2pe",
+                            "mode": "routed",
+                            "ip": "102.102.102.10",
+                            "default_gateway": "102.102.102.11",
+                            "netmask": "255.255.255.0",
+                            "ipv6": "fd00:ee02:0:1::1/64",
+                            "ipv6_gateway": "fd00:ee02:0:1::2"
+                        }
+                    ]
+                }
+            }
+        ],
+        "wansims": [
+            {
+                "name": "wansim1",
+                "device_type": "WANSIM",
+                "connections": {
+                    "ip": "[[ host ]]",
+                    "port": 4001
+                },
+                "credentials": {
+                    "username": "root",
+                    "password": "velocloud"
+                },
+                "interfaces": [
+                    {
+                        "name": "eth0",
+                        "link": "bastion-host",
+                        "default_gateway": "192.168.0.100",
+                        "ip": "192.168.0.152",
+                        "netmask": "255.255.255.0",
+                        "mode": "switched"
+                    },
+                    {
+                        "name": "eth1",
+                        "link": "cri1e3",
+                        "logical_name": "B3E1_INTERNET1",
+                        "mode": "routed",
+                        "ip": "169.254.6.50",
+                        "netmask": "255.255.255.248",
+                        "default_gateway": "169.254.6.49",
+                        "ipv6": "fd00:3:1:c001::1/64",
+                        "ipv6_gateway": "fd00:3:1:c001::2"
+                    },
+                    {
+                        "name": "eth2",
+                        "link": "cri2w2",
+                        "logical_name": "B3E1_INTERNET2",
+                        "mode": "routed",
+                        "ip": "169.254.6.74",
+                        "netmask": "255.255.255.248",
+                        "default_gateway": "169.254.6.73",
+                        "ipv6": "fd00:3:1:c002::1/64",
+                        "ipv6_gateway": "fd00:3:1:c002::2"
+                    },
+                    {
+                        "name": "eth3",
+                        "link": "B3E1W1",
+                        "logical_name": "B3E1_INTERNET1",
+                        "ip": "169.254.6.58",
+                        "nexthop": "EDGE",
+                        "netmask": "255.255.255.248",
+                        "default_gateway": "169.254.6.57",
+                        "mode": "routed",
+                        "ipv6": "fd00:3:1:1::1/64",
+                        "ipv6_gateway": "fd00:3:1:1::2"
+                    },
+                    {
+                        "name": "eth4",
+                        "link": "B3E1W2",
+                        "logical_name": "B3E1_INTERNET2",
+                        "ip": "169.254.6.66",
+                        "nexthop": "EDGE",
+                        "netmask": "255.255.255.248",
+                        "default_gateway": "169.254.6.65",
+                        "mode": "routed",
+                        "ipv6": "fd00:3:1:2::1/64",
+                        "ipv6_gateway": "fd00:3:1:2::2"
+                    },
+                    {
+                        "name": "eth5",
+                        "link": "e3wsp3",
+                        "addressing_type": "static",
+                        "ip": "169.254.13.18",
+                        "netmask": "255.255.255.248",
+                        "default_gateway": "169.254.13.17",
+                        "logical_name": "B3E1_INTERNET3",
+                        "mode": "routed",
+                        "ipv6": "fd00:3:1:c003::1/64",
+                        "ipv6_gateway": "fd00:3:1:c003::2"
+                    },
+                    {
+                        "name": "eth6",
+                        "link": "B3E1W3",
+                        "logical_name": "B3E1_INTERNET3",
+                        "ip": "169.254.12.17",
+                        "netmask": "255.255.255.248",
+                        "default_gateway": "169.254.12.18",
+                        "nexthop": "EDGE",
+                        "mode": "routed",
+                        "ipv6": "fd00:3:1:3::1/64",
+                        "ipv6_gateway": "fd00:3:1:3::2"
+                    }
+                ]
+            }
+        ],
+        "nvs": [
+            {
+                "name": "nvs-gw1",
+                "device_type": "ROUTER",
+                "connections": {
+                    "ip": "[[ host ]]",
+                    "port": 5001
+                },
+                "credentials": {
+                    "username": "root",
+                    "password": "velocloud"
+                },
+                "custom_params": {
+                    "segments": [
+                        "Global Segment",
+                        "segment1",
+                        "segment2"
+                    ],
+                    "roles": [
+                        "primary"
+                    ],
+                    "server": "dc-server"
+                },
+                "interfaces": [
+                    {
+                        "name": "eth0",
+                        "mode": "routed",
+                        "nexthop": "MGMT",
+                        "link": "bastion-host",
+                        "ip": "192.168.0.140",
+                        "default_gateway": "192.168.0.100",
+                        "netmask": "255.255.255.0"
+                    },
+                    {
+                        "name": "eth1",
+                        "mode": "routed",
+                        "nexthop": "cr-internet",
+                        "link": "crinvs",
+                        "ip": "169.254.6.26",
+                        "default_gateway": "169.254.6.25",
+                        "netmask": "255.255.255.248",
+                        "routes": [
+                            "0.0.0.0/0"
+                        ],
+                        "ipv6": "fd00:bbbb:1:1::1/64",
+                        "ipv6_gateway": "fd00:bbbb:1:1::2",
+                        "segments": [
+                            {
+                                "name": "segment1",
+                                "ip": "169.254.7.26",
+                                "default_gateway": "169.254.7.25",
+                                "netmask": "255.255.255.248",
+                                "namespace": "segment1",
+                                "ipv6": "fd00:bbbb:2:1::1/64",
+                                "ipv6_gateway": "fd00:bbbb:2:1::2"
+                            },
+                            {
+                                "name": "segment2",
+                                "ip": "169.254.8.26",
+                                "default_gateway": "169.254.8.25",
+                                "netmask": "255.255.255.248",
+                                "namespace": "segment2",
+                                "ipv6": "fd00:bbbb:3:1::1/64",
+                                "ipv6_gateway": "fd00:bbbb:3:1::2"
+                            }
+                        ]
+                    },
+                    {
+                        "name": "eth2",
+                        "mode": "routed",
+                        "nexthop": "dc-server",
+                        "link": "nvsgws",
+                        "ip": "169.254.11.26",
+                        "default_gateway": "169.254.11.25",
+                        "netmask": "255.255.255.0",
+                        "ipv6": "fd00:cccc:1:1::1/64",
+                        "ipv6_gateway": "fd00:cccc:1:1::2",
+                        "segments": [
+                            {
+                                "name": "segment1",
+                                "ip": "169.254.11.26",
+                                "default_gateway": "169.254.11.25",
+                                "netmask": "255.255.255.0",
+                                "namespace": "segment1",
+                                "ipv6": "fd00:cccc:1:1::1/64",
+                                "ipv6_gateway": "fd00:cccc:1:1::2"
+                            },
+                            {
+                                "name": "segment2",
+                                "ip": "169.254.11.26",
+                                "default_gateway": "169.254.11.25",
+                                "netmask": "255.255.255.0",
+                                "namespace": "segment2",
+                                "ipv6": "fd00:cccc:1:1::1/64",
+                                "ipv6_gateway": "fd00:cccc:1:1::2"
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "name": "zscaler-nvs-gw1",
+                "device_type": "ZSCALER",
+                "connections": {
+                    "ip": null,
+                    "port": null
+                },
+                "credentials": {
+                    "username": null,
+                    "password": null
+                },
+                "custom_params": {
+                    "pop_ip": "104.129.194.39",
+                    "roles": [
+                        "primary"
+                    ],
+                    "segments": [
+                        "Global Segment",
+                        "segment1",
+                        "segment2"
+                    ],
+                    "credentials": [
+                        {
+                            "fqdn": "hapyuser1@velocloud.net",
+                            "psk": "velocloud"
+                        },
+                        {
+                            "fqdn": "hapyuser2@velocloud.net",
+                            "psk": "velocloud"
+                        }
+                    ]
+                }
+            },
+            {
+                "name": "zscaler-nvs-gw2",
+                "device_type": "ZSCALER",
+                "connections": {
+                    "ip": null,
+                    "port": null
+                },
+                "credentials": {
+                    "username": null,
+                    "password": null
+                },
+                "custom_params": {
+                    "pop_ip": "165.225.113.217",
+                    "roles": [
+                        "secondary"
+                    ],
+                    "segments": [
+                        "Global Segment",
+                        "segment1",
+                        "segment2"
+                    ],
+                    "credentials": [
+                        {
+                            "fqdn": "hapyuser1@velocloud.net",
+                            "psk": "velocloud"
+                        },
+                        {
+                            "fqdn": "hapyuser2@velocloud.net",
+                            "psk": "velocloud"
+                        }
+                    ]
+                }
+            }
+        ],
+        "css": [
+            {
+                "name": "zscaler-css-gw1",
+                "device_type": "ZSCALER",
+                "connections": {
+                    "ip": null,
+                    "port": null
+                },
+                "credentials": {
+                    "username": null,
+                    "password": null
+                },
+                "custom_params": {
+                    "pop_ip": "104.129.194.39",
+                    "hash_algorithm": [
+                        "md5",
+                        "sha1",
+                        "sha256"
+                    ],
+                    "encryption": [
+                        "aes128",
+                        "aes256"
+                    ],
+                    "protocol": [
+                        "ikev1",
+                        "ikev2"
+                    ],
+                    "credentials": [
+                        {
+                            "fqdn": "hapyuser1@velocloud.net",
+                            "psk": "velocloud"
+                        }
+                    ]
+                }
+            },
+            {
+                "name": "zscaler-css-gw2",
+                "device_type": "ZSCALER",
+                "connections": {
+                    "ip": null,
+                    "port": null
+                },
+                "credentials": {
+                    "username": null,
+                    "password": null
+                },
+                "custom_params": {
+                    "pop_ip": "165.225.113.217",
+                    "hash_algorithm": [
+                        "md5",
+                        "sha1",
+                        "sha256"
+                    ],
+                    "encryption": [
+                        "aes128",
+                        "aes256"
+                    ],
+                    "protocol": [
+                        "ikev1",
+                        "ikev2"
+                    ],
+                    "credentials": [
+                        {
+                            "fqdn": "hapyuser2@velocloud.net",
+                            "psk": "velocloud"
+                        }
+                    ]
+                }
+            }
+        ],
+        "other_devices": [
+            {
+                "name": "vcmp-server",
+                "device_type": "SERVER",
+                "connections": {
+                    "ip": "[[ host ]]",
+                    "port": 6001
+                },
+                "credentials": {
+                    "username": "root",
+                    "password": "velocloud"
+                },
+                "interfaces": [
+                    {
+                        "name": "eth0",
+                        "mode": "switched",
+                        "nexthop": "MGMT",
+                        "link": "bastion-host",
+                        "ip": "192.168.0.150",
+                        "default_gateway": "192.168.0.100",
+                        "netmask": "255.255.255.0"
+                    },
+                    {
+                        "name": "eth1",
+                        "mode": "routed",
+                        "nexthop": "cr-internet",
+                        "link": "cricld",
+                        "ip": "169.254.6.18",
+                        "default_gateway": "169.254.6.17",
+                        "netmask": "255.255.255.248",
+                        "routes": [
+                            "0.0.0.0/0"
+                        ],
+                        "ipv6": "2222::1/64",
+                        "ipv6_gateway": "2222::2"
+                    }
+                ]
+            },
+            {
+                "name": "legacy-client",
+                "device_type": "LEGACY_CLIENT",
+                "connections": {
+                    "ip": "[[ host ]]",
+                    "port": 6002
+                },
+                "credentials": {
+                    "username": "root",
+                    "password": "velocloud"
+                },
+                "interfaces": [
+                    {
+                        "name": "eth0",
+                        "link": "bastion-host",
+                        "default_gateway": "192.168.0.100",
+                        "ip": "192.168.0.161",
+                        "netmask": "255.255.255.0",
+                        "mode": "switched"
+                    },
+                    {
+                        "name": "eth1",
+                        "link": "lcelrc",
+                        "mode": "switched",
+                        "addressing_type": "static",
+                        "ip": "172.16.201.2",
+                        "netmask": "255.255.255.248",
+                        "default_gateway": "172.16.201.1",
+                        "ipv6": "fd00:2001:1:1::1/64",
+                        "ipv6_gateway": "fd00:2001:1:1::2",
+                        "segments": [
+                            {
+                                "name": "segment1",
+                                "ip": "172.16.201.2",
+                                "netmask": "255.255.255.248",
+                                "default_gateway": "172.16.201.1",
+                                "namespace": "segment1",
+                                "ipv6": "fd00:2001:1:1::1/64",
+                                "ipv6_gateway": "fd00:2001:1:1::2"
+                            },
+                            {
+                                "name": "segment2",
+                                "ip": "172.16.201.2",
+                                "netmask": "255.255.255.248",
+                                "default_gateway": "172.16.201.1",
+                                "namespace": "segment2",
+                                "ipv6": "fd00:2001:1:1::1/64",
+                                "ipv6_gateway": "fd00:2001:1:1::2"
+                            }
+                        ],
+                        "routes": [
+                            "0.0.0.0/0"
+                        ]
+                    }
+                ]
+            },
+            {
+                "name": "legacy-provider-edge",
+                "device_type": "PROVIDER_EDGE",
+                "connections": {
+                    "ip": "[[ host ]]",
+                    "port": 6003
+                },
+                "credentials": {
+                    "username": "root",
+                    "password": "velocloud"
+                },
+                "interfaces": [
+                    {
+                        "name": "eth0",
+                        "link": "bastion-host",
+                        "default_gateway": "192.168.0.100",
+                        "ip": "192.168.0.160",
+                        "netmask": "255.255.255.0",
+                        "mode": "switched"
+                    },
+                    {
+                        "name": "eth1",
+                        "link": "lcecmp",
+                        "addressing_type": "static",
+                        "ip": "172.16.201.9",
+                        "netmask": "255.255.255.248",
+                        "default_gateway": "172.16.201.10",
+                        "ipv6": "fd00:2001:1:2::2/64",
+                        "ipv6_gateway": "fd00:2001:1:2::1",
+                        "segments": [
+                            {
+                                "name": "segment1",
+                                "ip": "172.16.201.9",
+                                "netmask": "255.255.255.248",
+                                "default_gateway": "172.16.201.10",
+                                "namespace": "segment1",
+                                "ipv6": "fd00:2001:1:2::2/64",
+                                "ipv6_gateway": "fd00:2001:1:2::1"
+                            },
+                            {
+                                "name": "segment2",
+                                "ip": "172.16.201.9",
+                                "netmask": "255.255.255.248",
+                                "default_gateway": "172.16.201.10",
+                                "namespace": "segment2",
+                                "ipv6": "fd00:2001:1:2::2/64",
+                                "ipv6_gateway": "fd00:2001:1:2::1"
+                            }
+                        ]
+                    },
+                    {
+                        "link": "lcelrc",
+                        "ip": "172.16.201.1",
+                        "netmask": "255.255.255.248",
+                        "name": "eth2",
+                        "default_gateway": "172.16.201.2",
+                        "addressing_type": "static",
+                        "namespace": "global",
+                        "ipv6": "fd00:2001:1:1::2/64",
+                        "ipv6_gateway": "fd00:2001:1:1::1",
+                        "segments": [
+                            {
+                                "name": "segment1",
+                                "ip": "172.16.201.1",
+                                "netmask": "255.255.255.248",
+                                "default_gateway": "172.16.201.2",
+                                "namespace": "segment1",
+                                "ipv6": "fd00:2001:1:1::2/64",
+                                "ipv6_gateway": "fd00:2001:1:1::1"
+                            },
+                            {
+                                "name": "segment2",
+                                "ip": "172.16.201.1",
+                                "netmask": "255.255.255.248",
+                                "default_gateway": "172.16.201.2",
+                                "namespace": "segment2",
+                                "ipv6": "fd00:2001:1:1::2/64",
+                                "ipv6_gateway": "fd00:2001:1:1::1"
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "name": "dc-server",
+                "device_type": "SERVER",
+                "connections": {
+                    "ip": "[[ host ]]",
+                    "port": 5002
+                },
+                "credentials": {
+                    "username": "root",
+                    "password": "velocloud"
+                },
+                "interfaces": [
+                    {
+                        "name": "eth0",
+                        "mode": "switched",
+                        "nexthop": "MGMT",
+                        "link": "bastion-host",
+                        "ip": "192.168.0.170",
+                        "default_gateway": "192.168.0.100",
+                        "netmask": "255.255.255.0"
+                    },
+                    {
+                        "name": "eth1",
+                        "mode": "routed",
+                        "type": "public",
+                        "nexthop": "nvs-gw1",
+                        "link": "nvsgws",
+                        "ip": "169.254.11.25",
+                        "default_gateway": "169.254.11.26",
+                        "netmask": "255.255.255.0",
+                        "routes": [
+                            "0.0.0.0/0"
+                        ],
+                        "ipv6": "fd00:cccc:1:1::2/64",
+                        "ipv6_gateway": "fd00:cccc:1:1::1",
+                        "segments": [
+                            {
+                                "name": "segment1",
+                                "ip": "169.254.11.25",
+                                "default_gateway": "169.254.11.26",
+                                "netmask": "255.255.255.0",
+                                "namespace": "segment1",
+                                "ipv6": "fd00:cccc:1:1::2/64",
+                                "ipv6_gateway": "fd00:cccc:1:1::1"
+                            },
+                            {
+                                "name": "segment2",
+                                "ip": "169.254.11.25",
+                                "default_gateway": "169.254.11.26",
+                                "netmask": "255.255.255.0",
+                                "namespace": "segment2",
+                                "ipv6": "fd00:cccc:1:1::2/64",
+                                "ipv6_gateway": "fd00:cccc:1:1::1"
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    }
+}

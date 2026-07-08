@@ -1,0 +1,2189 @@
+{
+    "topology": {
+        "branches": [
+            {
+                "name": "branch1",
+                "edges": [
+                    {
+                        "name": "b1-edge1",
+                        "router_id": "",
+                        "protocols": [
+                            {
+                                "name": "bgp",
+                                "asn": 1,
+                                "commands": [],
+                                "segments": ["Global Segment","segment1","segment2"]
+                            }
+                        ],
+                        "interfaces": [
+                            {
+                                "logical_interface": "GE2",
+                                "protocols": [
+                                    {
+                                        "name": "bgp",
+                                        "asn": 1,
+                                        "commands": [],
+                                        "segments": ["Global Segment","segment1","segment2"],
+                                        "bfd": ["Global Segment","segment1","segment2"]
+                                    },
+                                    {
+                                        "name": "bfd",
+                                        "segments": ["Global Segment","segment1","segment2"]
+                                    }
+                                ]
+                            },
+                            {
+                                "logical_interface": "GE5",
+                                "protocols": [
+                                    {
+                                        "name": "ospf",
+                                        "area": 1,
+                                        "commands": [],
+                                        "segments": ["Global Segment","segment1","segment2"],
+                                        "bfd": ["Global Segment","segment1","segment2"]
+                                    },
+                                    {
+                                        "name": "bgp",
+                                        "asn": 1,
+                                        "commands": [],
+                                        "segments": ["Global Segment","segment1","segment2"],
+                                        "bfd": ["Global Segment","segment1","segment2"]
+                                    },
+                                    {
+                                        "name": "bfd",
+                                        "segments": ["Global Segment","segment1","segment2"]
+                                    }
+                                ]
+                            },
+                            {
+                                "logical_interface": "GE6",
+                                "protocols": [
+                                    {
+                                        "name": "bgp",
+                                        "asn": 1,
+                                        "commands": [],
+                                        "segments": ["Global Segment","segment1","segment2"],
+                                        "remote_neighbours": [
+                                            {
+                                                "name": "cr-mpls1",
+                                                "max_hops": 2
+                                            }
+                                        ],
+                                        "bfd": ["Global Segment","segment1","segment2"]
+                                    },
+                                    {
+                                        "name": "ospf",
+                                        "area": 1,
+                                        "commands": [],
+                                        "segments": ["Global Segment","segment1","segment2"],
+                                        "bfd": ["Global Segment","segment1","segment2"]
+                                    },
+                                    {
+                                        "name": "bfd",
+                                        "segments": ["Global Segment","segment1","segment2"],
+                                        "remote_neighbours": [
+                                            {
+                                                "name": "cr-mpls1",
+                                                "max_hops": 2
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "logical_interface": "GE7",
+                                "protocols": [
+                                    {
+                                        "name": "ospf",
+                                        "area": 1,
+                                        "commands": [],
+                                        "segments": ["Global Segment","segment1","segment2"],
+                                        "bfd": ["Global Segment","segment1","segment2"]
+                                    },
+                                    {
+                                        "name": "bgp",
+                                        "asn": 1,
+                                        "commands": [],
+                                        "segments": ["Global Segment","segment1","segment2"],
+                                        "bfd": ["Global Segment","segment1","segment2"]
+                                    },
+                                    {
+                                        "name": "bfd",
+                                        "segments": ["Global Segment","segment1","segment2"]
+                                    }
+                                ]
+                            },
+                            {
+                                "logical_interface": "lo",
+                                "protocols": [
+                                    {
+                                        "name": "bgp",
+                                        "asn": 1,
+                                        "commands": [],
+                                        "segments": ["Global Segment","segment1","segment2"],
+                                        "remote_neighbours": [
+                                            {
+                                                "name": "cr-mpls1",
+                                                "max_hops": 2
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "name": "bfd",
+                                        "segments": ["Global Segment","segment1","segment2"],
+                                        "remote_neighbours": [
+                                            {
+                                                "name": "cr-mpls1",
+                                                "max_hops": 2
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ],
+                        "direct_clients":[
+                            {
+                                "name": "b1e1-client1",
+                                "router_id" : "1.1.1.1",
+                                "interfaces":[
+                                    {
+                                        "name": "eth1",
+                                        "protocols": [
+                                            {
+                                                "name": "bgp",
+                                                "asn": 10,
+                                                "commands": [],
+                                                "segments": ["Global Segment","segment1","segment2"]
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ],
+                "l3switches": [
+                    {
+                        "name": "b1-l3switch1",
+                        "router_id" : "1.1.1.2",
+                        "protocols": [
+                                {
+                                    "name": "pim",
+                                    "rp_address": "5.1.1.1/32",
+                                    "multicast_group": ["239.1.1.0/24"],
+                                    "commands": [],
+                                    "segments": ["Global Segment"]
+                                }
+                        ],
+                        "interfaces": [
+                            {
+                                "name": "eth1",
+                                "protocols": [
+                                    {
+                                        "name": "ospf",
+                                        "area": 1,
+                                        "commands": [],
+                                        "segments": ["Global Segment","segment1","segment2"]
+                                    },
+                                    {
+                                        "name": "bgp",
+                                        "asn": 11,
+                                        "commands": [],
+                                        "segments": ["Global Segment","segment1","segment2"]
+                                    },
+                                    {
+                                        "name": "pim",
+                                        "pim":true,
+                                        "igmp":true,
+                                        "segments": ["Global Segment"]
+                                    },
+                                    {
+                                        "name": "bfd",
+                                        "segments": ["Global Segment","segment1","segment2"],
+                                        "remote_hop": "local-address"
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "eth2",
+                                "protocols": [
+                                    {
+                                        "name": "ospf",
+                                        "area": 1,
+                                        "commands": [],
+                                        "advertise_only" : true,
+                                        "segments": ["Global Segment","segment1","segment2"]
+                                    },
+                                    {
+                                        "name": "bgp",
+                                        "asn": 11,
+                                        "commands": [],
+                                        "advertise_only" : true,
+                                        "segments": ["Global Segment","segment1","segment2"]
+                                    },
+                                    {
+                                        "name": "pim",
+                                        "pim":true,
+                                        "igmp":true,
+                                        "segments": ["Global Segment"]
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "eth3",
+                                "protocols": [
+                                    {
+                                        "name": "ospf",
+                                        "area": 0,
+                                        "commands": [],
+                                        "segments": ["Global Segment","segment1","segment2"]
+                                    },
+                                    {
+                                        "name": "bgp",
+                                        "asn": 11,
+                                        "commands": [],
+                                        "segments": ["Global Segment","segment1","segment2"]
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "eth4",
+                                "protocols": [
+                                    {
+                                        "name": "ospf",
+                                        "area": 1,
+                                        "commands": [],
+                                        "segments": ["Global Segment","segment1","segment2"]
+                                    },
+                                    {
+                                        "name": "bgp",
+                                        "asn": 11,
+                                        "commands": [],
+                                        "segments": ["Global Segment","segment1","segment2"]
+                                    },
+                                    {
+                                        "name": "pim",
+                                        "pim":true,
+                                        "igmp":true,
+                                        "segments": ["Global Segment"]
+                                    },
+                                    {
+                                        "name": "bfd",
+                                        "segments": ["Global Segment","segment1","segment2"],
+                                        "remote_hop": "local-address"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ],
+                "hopaway_clients": [
+                    {
+                        "name": "b1-routedclient1",
+                        "router_id": "1.1.1.4",
+                        "interfaces": [
+                            {
+                                "name": "eth1",
+                                "protocols": [
+                                    {
+                                        "name": "pim",
+                                        "pim":true,
+                                        "igmp":true,
+                                        "segments": [
+                                            "Global Segment"
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ],
+                "CEs": [
+                    {
+                        "name": "b1-ce1",
+                        "router_id" : "1.1.1.3",
+                        "protocols": [
+                            {
+                                "name": "bgp",
+                                "asn": 100,
+                                "commands": [],
+                                "segments": ["Global Segment","segment1","segment2"]
+                            }
+                        ],
+                        "interfaces": [
+                            {
+                                "name": "eth2",
+                                "protocols": [
+                                    {
+                                        "name": "bgp",
+                                        "asn": 100,
+                                        "commands": ["redistribute ospf"],
+                                        "v6_af_commands" : ["redistribute ospf6"],
+                                        "segments": ["Global Segment","segment1","segment2"]
+                                    },
+                                    {
+                                        "name": "ospf",
+                                        "area": 1,
+                                        "commands": ["redistribute bgp"],
+                                        "segments": ["Global Segment","segment1","segment2"]
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "name": "branch2",
+                "edges": [
+                    {
+                        "name": "b2-edge1",
+                        "router_id" : "",
+                        "protocols": [
+                            {
+                                "name": "bgp",
+                                "asn": 2,
+                                "commands": [],
+                                "segments": ["Global Segment","segment1","segment2"]
+                            }
+                        ],
+                        "interfaces": [
+                            {
+                                "logical_interface": "GE5",
+                                "protocols": [
+                                    {
+                                        "name": "bgp",
+                                        "asn": 2,
+                                        "commands": [],
+                                        "segments": ["Global Segment","segment1","segment2"]
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ],
+                "l3switches": [
+                    {
+                        "name": "b2-l3switch1",
+                        "router_id" : "2.2.2.1",
+                        "protocols": [
+                                {
+                                    "name": "pim",
+                                    "rp_address": "5.1.2.1/32",
+                                    "multicast_group": ["239.1.2.0/24"],
+                                    "commands": [],
+                                    "segments": ["Global Segment"]
+                                }
+                        ],
+                        "interfaces": [
+                            {
+                                "name": "eth1",
+                                "protocols": [
+                                    {
+                                        "name": "bgp",
+                                        "asn": 21,
+                                        "commands": [],
+                                        "segments": ["Global Segment","segment1","segment2"]
+                                    },
+                                    {
+                                        "name": "pim",
+                                        "pim":true,
+                                        "igmp":true,
+                                        "segments": ["Global Segment"]
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "eth2",
+                                "protocols": [
+                                    {
+                                        "name": "bgp",
+                                        "asn": 21,
+                                        "commands": ["redistribute ospf"],
+                                        "segments": ["Global Segment","segment1","segment2"]
+                                    },
+                                    {
+                                        "name": "ospf",
+                                        "area": 2,
+                                        "commands": ["redistribute bgp"],
+                                        "segments": ["Global Segment","segment1","segment2"]
+                                    },
+                                    {
+                                        "name": "pim",
+                                        "pim":true,
+                                        "igmp":true,
+                                        "segments": ["Global Segment"]
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "eth3",
+                                "protocols": [
+                                    {
+                                        "name": "ospf",
+                                        "area": 2,
+                                        "commands": [],
+                                        "advertise_only" : true,
+                                        "segments": ["Global Segment","segment1","segment2"]
+                                    },
+                                    {
+                                        "name": "bgp",
+                                        "asn": 21,
+                                        "commands": [],
+                                        "advertise_only" : true,
+                                        "segments": ["Global Segment","segment1","segment2"]
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+
+                ],
+                "hopaway_clients": [
+                    {
+                        "name": "b2-routedclient1",
+                        "router_id": "2.2.2.4",
+                        "interfaces": [
+                            {
+                                "name": "eth1",
+                                "protocols": [
+                                    {
+                                        "name": "pim",
+                                        "pim":true,
+                                        "igmp":true,
+                                        "segments": [
+                                            "Global Segment"
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ],
+                "CEs": [
+                    {
+                        "name": "b2-ce1",
+                        "router_id" : "2.2.2.2",
+                        "protocols": [
+                            {
+                                "name": "bgp",
+                                "asn": 100,
+                                "commands": [],
+                                "segments": ["Global Segment","segment1","segment2"]
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "name": "branch3",
+                "edges": [
+                    {
+                        "name": "b3-edge1",
+                        "router_id" : "",
+                        "protocols": [
+                            {
+                                "name": "bgp",
+                                "asn": 3,
+                                "commands": [],
+                                "segments": ["Global Segment","segment1","segment2"]
+                            }
+                        ],
+                        "interfaces": [
+                            {
+                                "logical_interface": "GE4",
+                                "protocols": [
+                                    {
+                                        "name": "bgp",
+                                        "asn": 3,
+                                        "commands": [],
+                                        "segments": ["Global Segment","segment1","segment2"]
+                                    },
+                                    {
+                                        "name": "ospf",
+                                        "area": 3,
+                                        "commands": [],
+                                        "segments": ["Global Segment","segment1","segment2"]
+                                    }
+                                ]
+                            },
+                            {
+                                "logical_interface": "GE5",
+                                "protocols": [
+                                    {
+                                        "name": "ospf",
+                                        "area": 3,
+                                        "commands": [],
+                                        "segments": ["Global Segment","segment1","segment2"],
+                                        "bfd": ["Global Segment","segment1","segment2"]
+                                    },
+                                    {
+                                        "name": "bgp",
+                                        "asn": 3,
+                                        "commands": [],
+                                        "segments": ["Global Segment","segment1","segment2"],
+                                        "bfd": ["Global Segment","segment1","segment2"]
+                                    },
+                                    {
+                                        "name": "bfd",
+                                        "segments": ["Global Segment","segment1","segment2"]
+                                    }
+                                ]
+                            },
+                            {
+                                "logical_interface": "GE6",
+                                "protocols": [
+                                    {
+                                        "name": "ospf",
+                                        "area": 3,
+                                        "commands": [],
+                                        "segments": ["Global Segment","segment1","segment2"],
+                                        "bfd": ["Global Segment","segment1","segment2"]
+                                    },
+                                    {
+                                        "name": "bgp",
+                                        "asn": 3,
+                                        "commands": [],
+                                        "segments": ["Global Segment","segment1","segment2"],
+                                        "bfd": ["Global Segment","segment1","segment2"]
+                                    },
+                                    {
+                                        "name": "bfd",
+                                        "segments": ["Global Segment","segment1","segment2"]
+                                    }
+                                ]
+                            },
+                            {
+                                "logical_interface": "GE7",
+                                "protocols": [
+                                    {
+                                        "name": "ospf",
+                                        "area": 3,
+                                        "commands": [],
+                                        "segments": ["Global Segment","segment1","segment2"],
+                                        "bfd": ["Global Segment","segment1","segment2"]
+                                    },
+                                    {
+                                        "name": "bgp",
+                                        "asn": 3,
+                                        "commands": [],
+                                        "segments": ["Global Segment","segment1","segment2"],
+                                        "bfd": ["Global Segment","segment1","segment2"]
+                                    },
+                                    {
+                                        "name": "bfd",
+                                        "segments": ["Global Segment","segment1","segment2"]
+                                    }
+                                ]
+                            },
+                            {
+                                "logical_interface": "GE8",
+                                "protocols": [
+                                    {
+                                        "name": "ospf",
+                                        "area": 3,
+                                        "commands": [],
+                                        "segments": ["Global Segment","segment1","segment2"],
+                                        "bfd": ["Global Segment","segment1","segment2"]
+                                    },
+                                    {
+                                        "name": "bgp",
+                                        "asn": 3,
+                                        "commands": [],
+                                        "segments": ["Global Segment","segment1","segment2"],
+                                        "bfd": ["Global Segment","segment1","segment2"]
+                                    },
+                                    {
+                                        "name": "bfd",
+                                        "segments": ["Global Segment","segment1","segment2"]
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ],
+                "l3switches": [
+                    {
+                        "name": "b3-l3switch1",
+                        "router_id" : "3.3.3.2",
+                        "protocols": [
+                                {
+                                    "name": "pim",
+                                    "rp_address": "3.1.3.1/32",
+                                    "multicast_group": ["239.3.3.0/24"],
+                                    "commands": [],
+                                    "segments": ["Global Segment"]
+                                }
+                        ],
+                        "interfaces":[
+                            {
+                                "name": "eth1",
+                                "protocols": [
+                                    {
+                                        "name": "ospf",
+                                        "area": 3,
+                                        "commands": [],
+                                        "segments": ["Global Segment","segment1","segment2"]
+                                    },
+                                    {
+                                        "name": "bgp",
+                                        "asn": 31,
+                                        "commands": [],
+                                        "segments": ["Global Segment","segment1","segment2"]
+                                    },
+                                    {
+                                        "name": "pim",
+                                        "pim":true,
+                                        "igmp":true,
+                                        "segments": ["Global Segment"]
+                                    },
+                                    {
+                                        "name": "bfd",
+                                        "segments": ["Global Segment","segment1","segment2"],
+                                        "remote_hop": "local-address"
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "eth2",
+                                "protocols": [
+                                    {
+                                        "name": "ospf",
+                                        "area": 3,
+                                        "commands": [],
+                                        "advertise_only" : true,
+                                        "segments": ["Global Segment","segment1","segment2"]
+                                    },
+                                    {
+                                        "name": "bgp",
+                                        "asn": 31,
+                                        "commands": [],
+                                        "advertise_only" : true,
+                                        "segments": ["Global Segment","segment1","segment2"]
+                                    },
+                                    {
+                                        "name": "pim",
+                                        "pim":true,
+                                        "igmp":true,
+                                        "segments": ["Global Segment"]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "name": "b3-l3switch2",
+                        "router_id" : "3.3.3.3",
+                        "protocols": [
+                                {
+                                    "name": "pim",
+                                    "rp_address": "3.1.3.2/32",
+                                    "multicast_group": ["239.3.4.0/24"],
+                                    "commands": [],
+                                    "segments": ["Global Segment"]
+                                }
+                        ],
+                        "interfaces":[
+                            {
+                                "name": "eth1",
+                                "protocols": [
+                                    {
+                                        "name": "ospf",
+                                        "area": 4,
+                                        "commands": [],
+                                        "segments": ["Global Segment","segment1","segment2"]
+                                    },
+                                    {
+                                        "name": "bgp",
+                                        "asn": 41,
+                                        "commands": [],
+                                        "segments": ["Global Segment","segment1","segment2"]
+                                    },
+                                    {
+                                        "name": "pim",
+                                        "pim":true,
+                                        "igmp":true,
+                                        "segments": ["Global Segment"]
+                                    },
+                                    {
+                                        "name": "bfd",
+                                        "segments": ["Global Segment","segment1","segment2"],
+                                        "remote_hop": "local-address"
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "eth2",
+                                "protocols": [
+                                    {
+                                        "name": "ospf",
+                                        "area": 4,
+                                        "commands": [],
+                                        "advertise_only" : true,
+                                        "segments": ["Global Segment","segment1","segment2"]
+                                    },
+                                    {
+                                        "name": "bgp",
+                                        "asn": 41,
+                                        "commands": [],
+                                        "advertise_only" : true,
+                                        "segments": ["Global Segment","segment1","segment2"]
+                                    },
+                                    {
+                                        "name": "pim",
+                                        "pim":true,
+                                        "igmp":true,
+                                        "segments": ["Global Segment"]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "name": "b3-l3switch3",
+                        "router_id" : "3.3.3.4",
+                        "protocols": [
+                                {
+                                    "name": "pim",
+                                    "rp_address": "3.1.3.3/32",
+                                    "multicast_group": ["239.3.5.0/24"],
+                                    "commands": [],
+                                    "segments": ["Global Segment"]
+                                }
+                        ],
+                        "interfaces":[
+                            {
+                                "name": "eth1",
+                                "protocols": [
+                                    {
+                                        "name": "ospf",
+                                        "area": 6,
+                                        "commands": [],
+                                        "segments": ["Global Segment","segment1","segment2"]
+                                    },
+                                    {
+                                        "name": "bgp",
+                                        "asn": 61,
+                                        "commands": [],
+                                        "segments": ["Global Segment","segment1","segment2"]
+                                    },
+                                    {
+                                        "name": "pim",
+                                        "pim":true,
+                                        "igmp":true,
+                                        "segments": ["Global Segment"]
+                                    },
+                                    {
+                                        "name": "bfd",
+                                        "segments": ["Global Segment","segment1","segment2"],
+                                        "remote_hop": "local-address"
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "eth2",
+                                "protocols": [
+                                    {
+                                        "name": "ospf",
+                                        "area": 6,
+                                        "commands": [],
+                                        "advertise_only" : true,
+                                        "segments": ["Global Segment","segment1","segment2"]
+                                    },
+                                    {
+                                        "name": "bgp",
+                                        "asn": 61,
+                                        "commands": [],
+                                        "advertise_only" : true,
+                                        "segments": ["Global Segment","segment1","segment2"]
+                                    },
+                                    {
+                                        "name": "pim",
+                                        "pim":true,
+                                        "igmp":true,
+                                        "segments": ["Global Segment"]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "name": "b3-l3switch4",
+                        "router_id" : "3.3.3.5",
+                        "protocols": [
+                                {
+                                    "name": "pim",
+                                    "rp_address": "3.1.3.4/32",
+                                    "multicast_group": ["239.3.6.0/24"],
+                                    "commands": [],
+                                    "segments": ["Global Segment"]
+                                }
+                        ],
+                        "interfaces":[
+                            {
+                                "name": "eth1",
+                                "protocols": [
+                                    {
+                                        "name": "ospf",
+                                        "area": 7,
+                                        "commands": [],
+                                        "segments": ["Global Segment","segment1","segment2"]
+                                    },
+                                    {
+                                        "name": "bgp",
+                                        "asn": 71,
+                                        "commands": [],
+                                        "segments": ["Global Segment","segment1","segment2"]
+                                    },
+                                    {
+                                        "name": "pim",
+                                        "pim":true,
+                                        "igmp":true,
+                                        "segments": ["Global Segment"]
+                                    },
+                                    {
+                                        "name": "bfd",
+                                        "segments": ["Global Segment","segment1","segment2"],
+                                        "remote_hop": "local-address"
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "eth2",
+                                "protocols": [
+                                    {
+                                        "name": "ospf",
+                                        "area": 7,
+                                        "commands": [],
+                                        "advertise_only" : true,
+                                        "segments": ["Global Segment","segment1","segment2"]
+                                    },
+                                    {
+                                        "name": "bgp",
+                                        "asn": 71,
+                                        "commands": [],
+                                        "advertise_only" : true,
+                                        "segments": ["Global Segment","segment1","segment2"]
+                                    },
+                                    {
+                                        "name": "pim",
+                                        "pim":true,
+                                        "igmp":true,
+                                        "segments": ["Global Segment"]
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ],
+                "hopaway_clients": [
+                    {
+                        "name": "b3-routedclient1",
+                        "router_id": "3.3.3.6",
+                        "interfaces": [
+                            {
+                                "name": "eth1",
+                                "protocols": [
+                                    {
+                                        "name": "pim",
+                                        "pim":true,
+                                        "igmp":true,
+                                        "segments": [
+                                            "Global Segment"
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ],
+                "CEs": [
+                    {
+                        "name": "b3-ce1",
+                        "router_id" : "3.3.3.1",
+                        "protocols": [
+                            {
+                                "name": "bgp",
+                                "asn": 100,
+                                "commands": [],
+                                "segments": ["Global Segment","segment1","segment2"]
+                            }
+                        ],
+                        "interfaces": [
+                            {
+                                "name": "eth2",
+                                "protocols": [
+                                    {
+                                        "name": "bgp",
+                                        "asn": 100,
+                                        "commands": ["redistribute ospf"],
+                                        "v6_af_commands" : ["redistribute ospf6"],
+                                        "segments": ["Global Segment","segment1","segment2"]
+                                    },
+                                    {
+                                        "name": "ospf",
+                                        "area": 3,
+                                        "commands": ["redistribute bgp"],
+                                        "segments": ["Global Segment","segment1","segment2"]
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "name": "branch5",
+                "edges": [
+                    {
+                        "name": "b5-edge1",
+                        "router_id" : "",
+                        "protocols": [
+                            {
+                                "name": "bgp",
+                                "asn": 5,
+                                "commands": [],
+                                "segments": ["Global Segment","segment1","segment2"]
+                            }
+                        ],
+                        "interfaces": [
+                            {
+                                "logical_interface": "GE2",
+                                "protocols": [
+                                    {
+                                        "name": "bgp",
+                                        "asn": 5,
+                                        "commands": [],
+                                        "segments": ["Global Segment","segment1","segment2"],
+                                        "bfd": ["Global Segment","segment1","segment2"]
+                                    },
+                                    {
+                                        "name": "bfd",
+                                        "segments": ["Global Segment","segment1","segment2"]
+                                    }
+                                ]
+                            },
+                            {
+                                "logical_interface": "GE4",
+                                "protocols": [
+                                    {
+                                        "name": "ospf",
+                                        "area": 5,
+                                        "commands": [],
+                                        "segments": ["Global Segment","segment1","segment2"],
+                                        "bfd": ["Global Segment","segment1","segment2"]
+                                    },
+                                    {
+                                        "name": "bgp",
+                                        "asn": 5,
+                                        "commands": [],
+                                        "segments": ["Global Segment","segment1","segment2"],
+                                        "bfd": ["Global Segment","segment1","segment2"]
+                                    },
+                                    {
+                                        "name": "bfd",
+                                        "segments": ["Global Segment","segment1","segment2"]
+                                    }
+                                ]
+                            },
+                            {
+                                "logical_interface": "GE5",
+                                "protocols": [
+                                    {
+                                        "name": "bgp",
+                                        "asn": 5,
+                                        "commands": [],
+                                        "segments": ["Global Segment","segment1","segment2"],
+                                        "remote_neighbours": [
+                                            {
+                                                "name": "cr-mpls1",
+                                                "max_hops": 2
+                                            }
+                                        ],
+                                        "bfd": ["Global Segment","segment1","segment2"]
+                                    },
+                                    {
+                                        "name": "ospf",
+                                        "area": 5,
+                                        "commands": [],
+                                        "segments": ["Global Segment","segment1","segment2"],
+                                        "bfd": ["Global Segment","segment1","segment2"]
+                                    },
+                                    {
+                                        "name": "bfd",
+                                        "segments": ["Global Segment","segment1","segment2"],
+                                        "remote_neighbours": [
+                                            {
+                                                "name": "cr-mpls1"
+                                            }
+                                        ],
+                                        "bfd": ["Global Segment","segment1","segment2"]
+                                    }
+                                ]
+                            },
+                            {
+                                "logical_interface": "lo",
+                                "protocols": [
+                                    {
+                                        "name": "bgp",
+                                        "asn": 5,
+                                        "commands": [],
+                                        "segments": ["Global Segment","segment1","segment2"],
+                                        "remote_neighbours": [
+                                            {
+                                                "name": "cr-mpls1",
+                                                "max_hops": 2
+                                            }
+                                        ],
+                                        "bfd": ["Global Segment","segment1","segment2"]
+                                    },
+                                    {
+                                        "name": "bfd",
+                                        "segments": ["Global Segment","segment1","segment2"],
+                                        "remote_neighbours": [
+                                            {
+                                                "name": "cr-mpls1"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ],
+                        "direct_clients":[
+                            {
+                                "name": "b5e1-client1",
+                                "router_id" : "5.5.5.1",
+                                "interfaces":[
+                                    {
+                                        "name": "eth1",
+                                        "protocols": [
+                                            {
+                                                "name": "bgp",
+                                                "asn": 50,
+                                                "commands": [],
+                                                "segments": ["Global Segment","segment1","segment2"]
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ],
+                "l3switches": [
+                    {
+                        "name": "b5-l3switch1",
+                        "router_id" : "5.5.5.2",
+                        "protocols": [
+                                {
+                                    "name": "pim",
+                                    "rp_address": "5.1.5.1/32",
+                                    "multicast_group": ["239.1.5.0/24"],
+                                    "commands": [],
+                                    "segments": ["Global Segment"]
+                                }
+                        ],
+                        "interfaces":[
+                            {
+                                "name": "eth1",
+                                "protocols": [
+                                    {
+                                        "name": "ospf",
+                                        "area": 5,
+                                        "commands": [],
+                                        "segments": ["Global Segment","segment1","segment2"]
+                                    },
+                                    {
+                                        "name": "bgp",
+                                        "asn": 51,
+                                        "commands": [],
+                                        "segments": ["Global Segment","segment1","segment2"]
+                                    },
+                                    {
+                                        "name": "pim",
+                                        "pim":true,
+                                        "igmp":true,
+                                        "segments": ["Global Segment"]
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "eth2",
+                                "protocols": [
+                                    {
+                                        "name": "ospf",
+                                        "area": 5,
+                                        "commands": [],
+                                        "advertise_only" : true,
+                                        "segments": ["Global Segment","segment1","segment2"]
+                                    },
+                                    {
+                                        "name": "bgp",
+                                        "asn": 51,
+                                        "commands": [],
+                                        "advertise_only" : true,
+                                        "segments": ["Global Segment","segment1","segment2"]
+                                    },
+                                    {
+                                        "name": "pim",
+                                        "pim":true,
+                                        "igmp":true,
+                                        "segments": ["Global Segment"]
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "eth3",
+                                "protocols": [
+                                    {
+                                        "name": "ospf",
+                                        "area": 0,
+                                        "commands": [],
+                                        "segments": ["Global Segment","segment1","segment2"]
+                                    },
+                                    {
+                                        "name": "bgp",
+                                        "asn": 51,
+                                        "commands": [],
+                                        "segments": ["Global Segment","segment1","segment2"]
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ],
+                "hopaway_clients": [
+                    {
+                        "name": "b5-routedclient1",
+                        "router_id": "5.5.5.4",
+                        "interfaces": [
+                            {
+                                "name": "eth1",
+                                "protocols": [
+                                    {
+                                        "name": "pim",
+                                        "pim":true,
+                                        "igmp":true,
+                                        "segments": [
+                                            "Global Segment"
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ],
+                "CEs": [
+                    {
+                        "name": "b5-ce1",
+                        "router_id" : "5.5.5.3",
+                        "protocols": [
+                            {
+                                "name": "bgp",
+                                "asn": 100,
+                                "commands": [],
+                                "segments": ["Global Segment","segment1","segment2"]
+                            }
+                        ],
+                        "interfaces": [
+                            {
+                                "name": "eth2",
+                                "protocols": [
+                                    {
+                                        "name": "bgp",
+                                        "asn": 100,
+                                        "commands": ["redistribute ospf"],
+                                        "segments": ["Global Segment","segment1","segment2"]
+                                    },
+                                    {
+                                        "name": "ospf",
+                                        "area": 5,
+                                        "commands": ["redistribute bgp"],
+                                        "segments": ["Global Segment","segment1","segment2"]
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        ],
+        "corerouters": [
+            {
+                "name": "cr-mpls1",
+                "router_id" : "1.0.0.1",
+                "protocols": [
+                    {
+                        "name": "bgp",
+                        "asn": 100,
+                        "commands": [],
+                        "segments": ["Global Segment","segment1","segment2"]
+                    }
+                ],
+                "interfaces": [
+                    {
+                        "name": "eth1",
+                        "protocols": [
+                            {
+                                "name": "bgp",
+                                "asn": 100,
+                                "commands": [],
+                                "segments": ["Global Segment","segment1","segment2"],
+                                "bfd": ["Global Segment","segment1","segment2"],
+                                "remote_neighbours": [
+                                    {
+                                        "name": "b1-edge1",
+                                        "max_hops": 2
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "bfd",
+                                "segments": ["Global Segment","segment1","segment2"],
+                                "remote_neighbours": [
+                                    {
+                                        "name": "b1-edge1"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "name": "eth4",
+                        "protocols": [
+                            {
+                                "name": "bgp",
+                                "asn": 100,
+                                "commands": [],
+                                "segments": ["Global Segment","segment1","segment2"],
+                                "bfd": ["Global Segment","segment1","segment2"],
+                                "remote_neighbours": [
+                                    {
+                                        "name": "b5-edge1",
+                                        "max_hops": 2
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "bfd",
+                                "segments": ["Global Segment","segment1","segment2"],
+                                "remote_neighbours": [
+                                    {
+                                        "name": "b5-edge1"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "name": "lo",
+                        "protocols": [
+                            {
+                                "name": "bgp",
+                                "asn": 100,
+                                "commands": [],
+                                "segments": ["Global Segment","segment1","segment2"],
+                                "bfd": ["Global Segment","segment1","segment2"],
+                                "remote_neighbours": [
+                                    {
+                                        "name": "b1-edge1",
+                                        "max_hops": 2
+                                    },
+                                    {
+                                        "name": "b5-edge1",
+                                        "max_hops": 2
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "bfd",
+                                "segments": ["Global Segment","segment1","segment2"],
+                                "remote_neighbours": [
+                                    {
+                                        "name": "b1-edge1"
+                                    },
+                                    {
+                                        "name": "b5-edge1"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "name": "cr-mpls2",
+                "router_id" : "1.0.0.5",
+                "protocols": [
+                    {
+                        "name": "bgp",
+                        "asn": 100,
+                        "commands": [],
+                        "segments": ["Global Segment","segment1","segment2"]
+                    }
+                ]
+            },
+            {
+                "name": "cr-mpls3",
+                "router_id" : "1.0.0.7",
+                "protocols": [
+                    {
+                        "name": "bgp",
+                        "asn": 100,
+                        "commands": [],
+                        "segments": ["Global Segment","segment1","segment2"]
+                    }
+                ]
+            },
+            {
+                "name": "cr-internet",
+                "router_id" : "1.0.0.2",
+                "protocols": [
+                    {
+                        "name": "bgp",
+                        "asn": 10000,
+                        "advertise_only" : true,
+                        "commands": ["redistribute connected"],
+                        "segments": ["Global Segment","segment1","segment2"]
+                    }
+                ],
+                "interfaces":[
+                    {
+                        "name": "eth6",
+                        "protocols": [
+                            {
+                                "name": "bgp",
+                                "router_id" : "1.0.0.2",
+                                "asn": 10000,
+                                "commands": [
+                                    "address-family ipv4 unicast",
+                                    "network 1.1.1.1/32",
+                                    "network 1.1.1.2/32",
+                                    "network 1.1.1.3/32",
+                                    "network 1.1.1.4/32",
+                                    "network 2.2.2.2/32",
+                                    "network 2.2.2.3/32",
+                                    "network 2.2.2.4/32",
+                                    "network 2.2.2.5/32",
+                                    "network 3.3.3.3/32",
+                                    "network 3.3.3.4/32",
+                                    "network 3.3.3.5/32",
+                                    "network 3.3.3.6/32",
+                                    "network 4.4.4.4/32",
+                                    "network 4.4.4.5/32",
+                                    "network 4.4.4.6/32",
+                                    "network 4.4.4.7/32",
+                                    "network 5.5.5.5/32",
+                                    "network 5.5.5.6/32",
+                                    "network 5.5.5.7/32",
+                                    "network 5.5.5.8/32",
+                                    "network 6.6.6.6/32",
+                                    "network 6.6.6.7/32",
+                                    "network 6.6.6.8/32",
+                                    "network 6.6.6.9/32",
+                                    "network 7.7.7.7/32",
+                                    "network 7.7.7.8/32",
+                                    "network 7.7.7.9/32",
+                                    "network 7.7.7.10/32",
+                                    "network 11.11.11.11/32",
+                                    "network 11.11.11.11/32",
+                                    "network 11.11.11.11/32",
+                                    "network 11.11.11.11/32",
+                                    "network 12.12.12.12/32",
+                                    "network 12.12.12.13/32",
+                                    "network 12.12.12.14/32",
+                                    "network 12.12.12.15/32",
+                                    "network 13.13.13.13/32",
+                                    "network 13.13.13.14/32",
+                                    "network 13.13.13.15/32",
+                                    "network 13.13.13.16/32",
+                                    "network 14.14.14.14/32",
+                                    "network 14.14.14.15/32",
+                                    "network 14.14.14.16/32",
+                                    "network 14.14.14.17/32",
+                                    "network 15.15.15.15/32",
+                                    "network 15.15.15.16/32",
+                                    "network 15.15.15.17/32",
+                                    "network 15.15.15.18/32",
+                                    "network 16.16.16.16/32",
+                                    "network 16.16.16.17/32",
+                                    "network 16.16.16.18/32",
+                                    "network 16.16.16.19/32",
+                                    "network 17.17.17.17/32",
+                                    "network 17.17.17.18/32",
+                                    "network 17.17.17.19/32",
+                                    "network 17.17.17.20/32",
+                                    "network 18.18.18.18/32",
+                                    "network 18.18.18.19/32",
+                                    "network 18.18.18.20/32",
+                                    "network 18.18.18.21/32",
+                                    "network 20.20.20.20/32",
+                                    "network 20.20.20.21/32",
+                                    "network 20.20.20.22/32",
+                                    "network 20.20.20.23/32"
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "name": "eth7",
+                        "protocols": [
+                            {
+                                "name": "bgp",
+                                "router_id" : "1.0.0.2",
+                                "asn": 10000
+                            }
+                        ]
+                    },
+                    {
+                        "name": "eth8",
+                        "protocols": [
+                            {
+                                "name": "bgp",
+                                "router_id" : "1.0.0.2",
+                                "asn": 10000
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "name": "cr-internet1",
+                "router_id" : "1.0.0.3",
+                "protocols": [
+                    {
+                        "name": "bgp",
+                        "asn": 10001,
+                        "advertise_only" : true,
+                        "commands": ["redistribute connected","redistribute static"]
+                    }
+                ],
+                "interfaces":[
+                    {
+                        "name": "eth3",
+                        "protocols": [
+                            {
+                                "name": "bgp",
+                                "router_id" : "1.0.0.3",
+                                "asn": 10001
+                            }
+                        ]
+                    },
+                    {
+                        "name": "eth7",
+                        "protocols": [
+                            {
+                                "name": "bgp",
+                                "router_id" : "1.0.0.3",
+                                "asn": 10001
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "name": "cr-internet2",
+                "router_id" : "1.0.0.4",
+                "protocols": [
+                    {
+                        "name": "bgp",
+                        "advertise_only" : true,
+                        "asn": 10002,
+                        "commands": ["redistribute connected","redistribute static"]
+                    }
+                ],
+                "interfaces":[
+                    {
+                        "name": "eth3",
+                        "protocols": [
+                            {
+                                "name": "bgp",
+                                "asn": 10002,
+                                "commands": []
+                            }
+                        ]
+                    },
+                    {
+                        "name": "eth5",
+                        "protocols": [
+                            {
+                                "name": "bgp",
+                                "asn": 10002,
+                                "commands": []
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "name": "cr-internet3",
+                "router_id" : "1.0.0.6",
+                "protocols": [
+                    {
+                        "name": "bgp",
+                        "asn": 10003,
+                        "advertise_only" : true,
+                        "commands": ["redistribute connected"],
+                        "segments": ["Global Segment","segment1","segment2"]
+                    }
+                ],
+                "interfaces":[
+                    {
+                        "name": "eth1",
+                        "protocols": [
+                            {
+                                "name": "bgp",
+                                "router_id" : "1.0.0.6",
+                                "asn": 10003
+                            }
+                        ]
+                    }
+                ]
+            }
+        ],
+        "gateways": [
+            {
+                "name": "gateway-1",
+                "router_id" : "",
+                "protocols": [
+                    {
+                        "name": "bgp",
+                        "asn": 500,
+                        "commands": [],
+                        "segments": ["Global Segment","segment1","segment2"]
+                    }
+                ],
+                "provider_edge": {
+                    "name": "gateway1-pe",
+                    "router_id" : "200.0.0.1",
+                    "interfaces":[
+                        {
+                            "name": "eth1",
+                            "protocols": [
+                                {
+                                    "name": "bgp",
+                                    "asn": 100,
+                                    "commands": [],
+                                    "segments": ["Global Segment","segment1","segment2"]
+                                }
+                            ]
+                        },
+                        {
+                            "name": "eth2",
+                            "protocols": [
+                                {
+                                    "name": "bgp",
+                                    "asn": 100,
+                                    "skip_config": true,
+                                    "segments": ["Global Segment","segment1","segment2"],
+                                    "commands": []
+                                }
+                            ]
+                        }
+                    ]
+                }
+            },
+            {
+                "name": "gateway-2",
+                "protocols": [
+                    {
+                        "name": "bgp",
+                        "asn": 501,
+                        "commands": [],
+                        "segments": ["Global Segment","segment1","segment2"]
+                    }
+                ],
+                "provider_edge": {
+                    "name": "gateway2-pe",
+                    "router_id" : "200.0.0.2",
+                    "interfaces":[
+                        {
+                            "name": "eth1",
+                            "protocols": [
+                                {
+                                    "name": "bgp",
+                                    "asn": 100,
+                                    "commands": [],
+                                    "segments": ["Global Segment","segment1","segment2"]
+                                }
+                            ]
+                        },
+                        {
+                            "name": "eth2",
+                            "protocols": [
+                                {
+                                    "name": "bgp",
+                                    "asn": 100,
+                                    "skip_config": true,
+                                    "segments": ["Global Segment","segment1","segment2"],
+                                    "commands": []
+                                }
+                            ]
+                        }
+                    ]
+                }
+            },
+            {
+                "name": "gateway-3",
+                "router_id" : "",
+                "protocols": [
+                    {
+                        "name": "bgp",
+                        "asn": 502,
+                        "commands": [],
+                        "segments": ["Global Segment","segment1","segment2"]
+                    }
+                ],
+                "provider_edge": {
+                    "name": "gateway3-pe",
+                    "router_id" : "200.0.0.3",
+                    "interfaces":[
+                        {
+                            "name": "eth1",
+                            "protocols": [
+                                {
+                                    "name": "bgp",
+                                    "asn": 100,
+                                    "commands": [],
+                                    "segments": ["Global Segment","segment1","segment2"]
+                                }
+                            ]
+                        },
+                        {
+                            "name": "eth2",
+                            "protocols": [
+                                {
+                                    "name": "bgp",
+                                    "asn": 100,
+                                    "skip_config": true,
+                                    "segments": ["Global Segment","segment1","segment2"],
+                                    "commands": []
+                                }
+                            ]
+                        }
+                    ]
+                }
+            },
+            {
+                "name": "gateway-4",
+                "router_id" : "",
+                "protocols": [
+                    {
+                        "name": "bgp",
+                        "asn": 503,
+                        "commands": [],
+                        "segments": ["Global Segment","segment1","segment2"]
+                    }
+                ],
+                "provider_edge": {
+                    "name": "gateway4-pe",
+                    "router_id" : "200.0.0.4",
+                    "interfaces":[
+                        {
+                            "name": "eth1",
+                            "protocols": [
+                                {
+                                    "name": "bgp",
+                                    "asn": 100,
+                                    "commands": [],
+                                    "segments": ["Global Segment","segment1","segment2"]
+                                }
+                            ]
+                        },
+                        {
+                            "name": "eth2",
+                            "protocols": [
+                                {
+                                    "name": "bgp",
+                                    "asn": 100,
+                                    "skip_config": true,
+                                    "segments": ["Global Segment","segment1","segment2"],
+                                    "commands": []
+                                }
+                            ]
+                        }
+                    ]
+                }
+            },
+            {
+                "name": "gateway-5",
+                "router_id" : "",
+                "protocols": [
+                    {
+                        "name": "bgp",
+                        "asn": 504,
+                        "commands": [],
+                        "segments": ["Global Segment","segment1","segment2"]
+                    }
+                ],
+                "provider_edge": {
+                    "name": "gateway5-pe",
+                    "router_id" : "200.0.0.5",
+                    "interfaces":[
+                        {
+                            "name": "eth1",
+                            "protocols": [
+                                {
+                                    "name": "bgp",
+                                    "asn": 100,
+                                    "commands": [],
+                                    "segments": ["Global Segment","segment1","segment2"]
+                                }
+                            ]
+                        },
+                        {
+                            "name": "eth2",
+                            "protocols": [
+                                {
+                                    "name": "bgp",
+                                    "asn": 100,
+                                    "skip_config": true,
+                                    "segments": ["Global Segment","segment1","segment2"],
+                                    "commands": []
+                                }
+                            ]
+                        }
+                    ]
+                }
+            },
+            {
+                "name": "gateway-6",
+                "router_id" : "",
+                "protocols": [
+                    {
+                        "name": "bgp",
+                        "asn": 505,
+                        "commands": [],
+                        "segments": ["Global Segment","segment1","segment2"]
+                    }
+                ],
+                "provider_edge": {
+                    "name": "gateway6-pe",
+                    "router_id" : "200.0.0.6",
+                    "interfaces":[
+                        {
+                            "name": "eth1",
+                            "protocols": [
+                                {
+                                    "name": "bgp",
+                                    "asn": 100,
+                                    "commands": [],
+                                    "segments": ["Global Segment","segment1","segment2"]
+                                }
+                            ]
+                        },
+                        {
+                            "name": "eth2",
+                            "protocols": [
+                                {
+                                    "name": "bgp",
+                                    "asn": 100,
+                                    "skip_config": true,
+                                    "segments": ["Global Segment","segment1","segment2"],
+                                    "commands": []
+                                }
+                            ]
+                        }
+                    ]
+                }
+            },
+            {
+                "name": "gateway-7",
+                "router_id" : "",
+                "protocols": [
+                    {
+                        "name": "bgp",
+                        "asn": 506,
+                        "commands": [],
+                        "segments": ["Global Segment","segment1","segment2"]
+                    }
+                ],
+                "provider_edge": {
+                    "name": "gateway7-pe",
+                    "router_id" : "200.0.0.7",
+                    "interfaces":[
+                        {
+                            "name": "eth1",
+                            "protocols": [
+                                {
+                                    "name": "bgp",
+                                    "asn": 100,
+                                    "commands": [],
+                                    "segments": ["Global Segment","segment1","segment2"]
+                                }
+                            ]
+                        },
+                        {
+                            "name": "eth2",
+                            "protocols": [
+                                {
+                                    "name": "bgp",
+                                    "asn": 100,
+                                    "skip_config": true,
+                                    "segments": ["Global Segment","segment1","segment2"],
+                                    "commands": []
+                                }
+                            ]
+                        }
+                    ]
+                }
+            },
+            {
+                "name": "gateway-8",
+                "protocols": [
+                    {
+                        "name": "bgp",
+                        "asn": 507,
+                        "commands": [],
+                        "segments": ["Global Segment","segment1","segment2"]
+                    }
+                ],
+                "provider_edge": {
+                    "name": "gateway8-pe",
+                    "router_id" : "200.0.0.8",
+                    "interfaces":[
+                        {
+                            "name": "eth1",
+                            "protocols": [
+                                {
+                                    "name": "bgp",
+                                    "asn": 100,
+                                    "commands": [],
+                                    "segments": ["Global Segment","segment1","segment2"]
+                                }
+                            ]
+                        },
+                        {
+                            "name": "eth2",
+                            "protocols": [
+                                {
+                                    "name": "bgp",
+                                    "asn": 100,
+                                    "skip_config": true,
+                                    "segments": ["Global Segment","segment1","segment2"],
+                                    "commands": []
+                                }
+                            ]
+                        }
+                    ]
+                }
+            },
+            {
+                "name": "gateway-9",
+                "router_id" : "",
+                "protocols": [
+                    {
+                        "name": "bgp",
+                        "asn": 508,
+                        "commands": [],
+                        "segments": ["Global Segment","segment1","segment2"]
+                    }
+                ],
+                "provider_edge": {
+                    "name": "gateway9-pe",
+                    "router_id" : "200.0.0.9",
+                    "interfaces":[
+                        {
+                            "name": "eth1",
+                            "protocols": [
+                                {
+                                    "name": "bgp",
+                                    "asn": 100,
+                                    "commands": [],
+                                    "segments": ["Global Segment","segment1","segment2"]
+                                }
+                            ]
+                        },
+                        {
+                            "name": "eth2",
+                            "protocols": [
+                                {
+                                    "name": "bgp",
+                                    "asn": 100,
+                                    "skip_config": true,
+                                    "segments": ["Global Segment","segment1","segment2"],
+                                    "commands": []
+                                }
+                            ]
+                        }
+                    ]
+                }
+            },
+            {
+                "name": "gateway-10",
+                "router_id" : "",
+                "protocols": [
+                    {
+                        "name": "bgp",
+                        "asn": 509,
+                        "commands": [],
+                        "segments": ["Global Segment","segment1","segment2"]
+                    }
+                ],
+                "provider_edge": {
+                    "name": "gateway10-pe",
+                    "router_id" : "200.0.0.10",
+                    "interfaces":[
+                        {
+                            "name": "eth1",
+                            "protocols": [
+                                {
+                                    "name": "bgp",
+                                    "asn": 100,
+                                    "commands": [],
+                                    "segments": ["Global Segment","segment1","segment2"]
+                                }
+                            ]
+                        },
+                        {
+                            "name": "eth2",
+                            "protocols": [
+                                {
+                                    "name": "bgp",
+                                    "asn": 100,
+                                    "skip_config": true,
+                                    "segments": ["Global Segment","segment1","segment2"],
+                                    "commands": []
+                                }
+                            ]
+                        }
+                    ]
+                }
+            },
+            {
+                "name": "gateway-11",
+                "router_id" : "",
+                "protocols": [
+                    {
+                        "name": "bgp",
+                        "asn": 510,
+                        "commands": [],
+                        "segments": ["Global Segment","segment1","segment2"]
+                    }
+                ],
+                "provider_edge": {
+                    "name": "gateway11-pe",
+                    "router_id" : "200.0.0.11",
+                    "interfaces":[
+                        {
+                            "name": "eth1",
+                            "protocols": [
+                                {
+                                    "name": "bgp",
+                                    "asn": 100,
+                                    "commands": [],
+                                    "segments": ["Global Segment","segment1","segment2"]
+                                }
+                            ]
+                        },
+                        {
+                            "name": "eth2",
+                            "protocols": [
+                                {
+                                    "name": "bgp",
+                                    "asn": 100,
+                                    "skip_config": true,
+                                    "segments": ["Global Segment","segment1","segment2"],
+                                    "commands": []
+                                }
+                            ]
+                        }
+                    ]
+                }
+            },
+            {
+                "name": "gateway-12",
+                "router_id" : "",
+                "protocols": [
+                    {
+                        "name": "bgp",
+                        "asn": 511,
+                        "commands": [],
+                        "segments": ["Global Segment","segment1","segment2"]
+                    }
+                ],
+                "provider_edge": {
+                    "name": "gateway12-pe",
+                    "router_id" : "200.0.0.12",
+                    "interfaces":[
+                        {
+                            "name": "eth1",
+                            "protocols": [
+                                {
+                                    "name": "bgp",
+                                    "asn": 100,
+                                    "commands": [],
+                                    "segments": ["Global Segment","segment1","segment2"]
+                                }
+                            ]
+                        },
+                        {
+                            "name": "eth2",
+                            "protocols": [
+                                {
+                                    "name": "bgp",
+                                    "asn": 100,
+                                    "skip_config": true,
+                                    "segments": ["Global Segment","segment1","segment2"],
+                                    "commands": []
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        ],
+        "wansims": [
+            {
+                "name": "wansim1",
+                "router_id": "1.2.0.1",
+                "interfaces": [
+                    {
+                        "name": "eth1",
+                        "protocols": [
+                            {
+                                "name": "bgp",
+                                "asn": 401,
+                                "commands": []
+                            }
+                        ]
+                    },
+                    {
+                        "name": "eth2",
+                        "protocols": [
+                            {
+                                "name": "bgp",
+                                "asn": 401,
+                                "advertise_only" : true,
+                                "commands": []
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "name": "wansim2",
+                "router_id": "1.2.0.2",
+                "interfaces": [
+                    {
+                        "name": "eth1",
+                        "protocols": [
+                            {
+                                "name": "bgp",
+                                "asn": 402,
+                                "commands": []
+                            }
+                        ]
+                    },
+                    {
+                        "name": "eth2",
+                        "protocols": [
+                            {
+                                "name": "bgp",
+                                "asn": 402,
+                                "advertise_only" : true,
+                                "commands": []
+                            }
+                        ]
+                    }
+                ]
+            }
+        ],
+        "nvs": [
+            {
+                "name": "eos1",
+                "router_id": "100.0.0.1",
+                "interfaces": [
+                    {
+                        "name": "Ethernet2",
+                        "protocols": [
+                            {
+                                "name": "bgp",
+                                "asn": "600",
+                                "commands": [],
+                                "segments": ["Global Segment","segment1","segment2"]
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "name": "eos2",
+                "router_id": "100.0.0.2",
+                "interfaces": [
+                    {
+                        "name": "Ethernet2",
+                        "protocols": [
+                            {
+                                "name": "bgp",
+                                "asn": "601",
+                                "commands": [],
+                                "segments": ["Global Segment","segment1","segment2"]
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "name": "eos3",
+                "router_id": "100.0.0.2",
+                "interfaces": [
+                    {
+                        "name": "Ethernet2",
+                        "protocols": [
+                            {
+                                "name": "bgp",
+                                "asn": "602",
+                                "commands": [],
+                                "segments": ["Global Segment","segment1","segment2"]
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "name": "eos4",
+                "router_id": "100.0.0.3",
+                "interfaces": [
+                    {
+                        "name": "Ethernet2",
+                        "protocols": [
+                            {
+                                "name": "bgp",
+                                "asn": "603",
+                                "commands": [],
+                                "segments": ["Global Segment","segment1","segment2"]
+                            }
+                        ]
+                    }
+                ]
+            }
+        ],
+        "other_devices": [
+            {
+                "name": "legacy-provider-edge",
+                "router_id" : "111.0.0.1",
+                "protocols": [
+                    {
+                        "name": "bgp",
+                        "asn": 111,
+                        "commands": [],
+                        "segments": ["Global Segment","segment1","segment2"]
+                    }
+                ]
+            },
+            {
+                "name": "dc-router",
+                "router_id" : "111.0.0.2",
+                "protocols": [
+                    {
+                        "name": "bgp",
+                        "asn": 112,
+                        "commands": [],
+                        "segments": ["Global Segment","segment1","segment2"]
+                    }
+                ]
+            }
+        ]
+    }
+}

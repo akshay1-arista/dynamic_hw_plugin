@@ -1,0 +1,9 @@
+{
+    "topology": {
+        "interpolators": {
+            "b2-edge1-ha-enabled": false,
+            "b4-edge1-ha-enabled": false,
+            "b5-edge1-ha-enabled": false
+        }
+    }
+}

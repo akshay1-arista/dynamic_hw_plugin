@@ -1,0 +1,225 @@
+{
+    "topology": {
+        "branches": [
+            {
+                "name": "branch1",
+                "edges": [
+                    {
+                        "name": "b1-edge1",
+                        "dpdk_enabled": true,
+                        "platform": "[[ platform ]]",
+                        "vcpu": 4,
+                        "memory": 8192,
+                        "pin_cpu": [],
+                        "server_ip": "[[ server_ip ]]",
+                        "server": "[[ server ]]",
+                        "direct_clients": [
+                            {
+                                "name": "b1e1-client1",
+                                "server_ip": "[[ server_ip ]]",
+                                "server": "[[ server ]]",
+                                "vcpu": 4,
+                                "memory": 8192,
+                                "platform": "[[ platform ]]"
+                            }
+                        ]
+                    }
+                ],
+                "l3switches": [
+                    {
+                        "name": "b1-l3switch1",
+                        "server_ip": "[[ server_ip ]]",
+                        "server": "[[ server ]]",
+                        "vcpu": 4,
+                        "memory": 8192,
+                        "platform": "[[ platform ]]"
+                    }
+                ],
+                "hopaway_clients": [
+                    {
+                        "name": "b1-routedclient1",
+                        "server_ip": "[[ server_ip ]]",
+                        "server": "[[ server ]]",
+                        "vcpu": 4,
+                        "memory": 8192,
+                        "platform": "[[ platform ]]"
+                    }
+                ],
+                "CEs": [
+                    {
+                        "name": "b1-customer-edge1",
+                        "server_ip": "[[ server_ip ]]",
+                        "server": "[[ server ]]",
+                        "vcpu": 4,
+                        "memory": 8192,
+                        "platform": "[[ platform ]]"
+                    }
+                ]
+            },
+             {
+                "name": "branch2",
+                "edges": [
+                    {
+                        "name": "b2-edge1",
+                        "dpdk_enabled": true,
+                        "platform": "[[ platform ]]",
+                        "vcpu": 4,
+                        "memory": 8192,
+                        "pin_cpu": [],
+                        "server_ip": "[[ server_ip ]]",
+                        "server": "[[ server ]]",
+                        "direct_clients": [
+                            {
+                                "name": "b2e1-client1",
+                                "server_ip": "[[ server_ip ]]",
+                                "server": "[[ server ]]",
+                                "vcpu": 4,
+                                "memory": 8192,
+                                "platform": "[[ platform ]]"
+                            }
+                        ]
+                    }
+                ],
+                "l3switches": [
+                    {
+                        "name": "b2-l3switch1",
+                        "server_ip": "[[ server_ip ]]",
+                        "server": "[[ server ]]",
+                        "vcpu": 4,
+                        "memory": 8192,
+                        "platform": "[[ platform ]]"
+                    }
+                ],
+                "hopaway_clients": [
+                    {
+                        "name": "b2-routedclient1",
+                        "server_ip": "[[ server_ip ]]",
+                        "server": "[[ server ]]",
+                        "vcpu": 4,
+                        "memory": 8192,
+                        "platform": "[[ platform ]]"
+                    }
+                ],
+                "CEs": [
+                    {
+                        "name": "b2-customer-edge1",
+                        "server_ip": "[[ server_ip ]]",
+                        "server": "[[ server ]]",
+                        "vcpu": 4,
+                        "memory": 8192,
+                        "platform": "[[ platform ]]"
+                    }
+                ]
+            },
+             {
+                "name": "branch3",
+                "edges": [
+                    {
+                        "name": "b3-edge1",
+                        "dpdk_enabled": true,
+                        "platform": "[[ platform ]]",
+                        "vcpu": 4,
+                        "memory": 8192,
+                        "pin_cpu": [],
+                        "server_ip": "[[ server_ip ]]",
+                        "server": "[[ server ]]",
+                        "direct_clients": [
+                            {
+                                "name": "b3e1-client1",
+                                "server_ip": "[[ server_ip ]]",
+                                "server": "[[ server ]]",
+                                "vcpu": 4,
+                                "memory": 8192,
+                                "platform": "[[ platform ]]"
+                            }
+                        ]
+                    }
+                ]
+            }
+         ],
+        "other_devices": [
+            {
+                "name": "legacy-provider-edge",
+                "platform": "[[ platform ]]",
+                "server_ip": "[[ server_ip ]]",
+                "server": "[[ server ]]",
+                "vcpu": 4,
+                "memory": 8192
+            },
+            {
+                "name": "legacy-client",
+                "platform": "[[ platform ]]",
+                "server_ip": "[[ server_ip ]]",
+                "server": "[[ server ]]",
+                "vcpu": 4,
+                "memory": 8192
+            }
+        ],
+        "corerouters": [
+            {
+                "name": "cr-mpls",
+                "platform": "[[ platform ]]",
+                "server_ip": "[[ server_ip ]]",
+                "server": "[[ server ]]",
+                "vcpu": 4,
+                "memory": 8192,
+                "disk": [100]
+            }
+        ],
+        "traffic_generators": [
+            {
+                "name": "vstc-1",
+                "vcpu": 4,
+                "memory": 4096,
+                "platform": "[[ platform ]]",
+                "server_ip": "[[ server_ip ]]"
+            },
+            {
+                "name": "trex-1",
+                "vcpu": 4,
+                "memory": 8192,
+                "platform": "[[ platform ]]",
+                "server_ip": "[[ server_ip ]]",
+                "disk": [100]
+            }
+        ],
+        "gateways": [
+            {
+                "name": "gateway-1",
+                "dpdk_enabled": true,
+                "vcpu": 4,
+                "memory": 8192,
+                "pin_cpu": [],
+                "provider_edge": {
+                    "name": "gateway1-pe",
+                    "vcpu": 4,
+                    "memory": 8192,
+                    "platform": "[[ platform ]]",
+                    "server_ip": "[[ server_ip ]]",
+                    "server": "[[ server ]]",
+                    "pin_cpu": []
+                },
+                "platform": "[[ platform ]]",
+                "server_ip": "[[ server_ip ]]"
+            },
+            {
+                "name": "gateway-2",
+                "dpdk_enabled": true,
+                "vcpu": 4,
+                "memory": 8192,
+                "pin_cpu": [],
+                "provider_edge": {
+                    "name": "gateway2-pe",
+                    "vcpu": 4,
+                    "memory": 8192,
+                    "platform": "[[ platform ]]",
+                    "server_ip": "[[ server_ip ]]",
+                    "server": "[[ server ]]",
+                    "pin_cpu": []
+                },
+                "platform": "[[ platform ]]",
+                "server_ip": "[[ server_ip ]]"
+            }
+        ]
+    }
+}

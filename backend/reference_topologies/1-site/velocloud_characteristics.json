@@ -1,0 +1,26 @@
+{
+    "topology":{
+        "gateways":[
+            {
+                "name": "gateway-1",
+                "roles": {
+                    "control_plane": true,
+                    "cde": false,
+                    "data_plane": true,
+                    "partner_gateway": false,
+                    "secure_vpn_gateway": true
+                }
+            },
+            {
+                "name": "gateway-2",
+                "roles": {
+                    "control_plane": true,
+                    "cde": false,
+                    "data_plane": true,
+                    "partner_gateway": true,
+                    "secure_vpn_gateway": true
+                }
+            }
+        ]
+    }
+}

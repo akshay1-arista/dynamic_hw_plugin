@@ -1,0 +1,41 @@
+{
+    "topology": {
+        "branches": [
+            {
+                "name": "branch2",
+                "edges": [
+                    {
+                        "name": "b2-edge1",
+                        "dpdk_enabled": "false",
+                        "server_ip": "[[ server_ip ]]",
+                        "bastion_ip": "[[ host ]]",
+                        "server": "[[ server ]]",
+                        "vcpu": 8,
+                        "memory": 16384,
+                        "guest_virtualization": true,
+                        "disk": 100,
+                        "platform": "[[ platform ]]",
+                        "direct_clients": [
+                            {
+                                "name": "b2e1-client1",
+                                "server_ip": "[[ server_ip ]]",
+                                "bastion_ip": "[[ host ]]",
+                                "platform": "[[ platform ]]"
+                            }
+                        ]
+                    }
+                ]
+            }
+        ],
+        "security_managers": [
+            {
+                "name": "checkpoint_mgr1",
+                "server_ip": "[[ server_ip ]]",
+                "bastion_ip": "[[ host ]]",
+                "vcpu": 8,
+                "memory": 16384,
+                "platform": "[[ platform ]]"
+            }
+        ]
+    }
+}

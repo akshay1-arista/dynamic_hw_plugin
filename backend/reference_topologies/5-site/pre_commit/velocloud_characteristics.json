@@ -1,0 +1,112 @@
+{
+    "topology": {
+        "branches": [
+            {
+                "name": "branch1",
+                "customer_index": 1,
+                "edges": [
+                    {
+                        "name": "b1-edge1",
+                        "authentication_mode": "CERTIFICATE_OPTIONAL",
+                        "roles": {
+                            "sd_wan": true,
+                            "analytics": false,
+                            "vpn_role": "hub",
+                            "location": "[[ b1e1_location ]]"
+                        }
+                    }
+                ]
+            },
+            {
+                "name": "branch2",
+                "customer_index": 1,
+                "edges": [
+                    {
+                        "name": "b2-edge1",
+                        "authentication_mode": "CERTIFICATE_OPTIONAL",
+                        "roles": {
+                            "sd_wan": true,
+                            "analytics": false,
+                            "vpn_role": "spoke",
+                            "location": "[[ b2e1_location ]]"
+                        }
+                    }
+                ]
+            },
+            {
+                "name": "branch3",
+                "customer_index": 1,
+                "edges": [
+                    {
+                        "name": "b3-edge1",
+                        "authentication_mode": "CERTIFICATE_DISABLED",
+                        "roles": {
+                            "sd_wan": true,
+                            "analytics": false,
+                            "vpn_role": "spoke",
+                            "location": "[[ b3e1_location ]]"
+                        }
+                    }
+                ]
+            },
+            {
+                "name": "branch4",
+                "customer_index": 2,
+                "edges": [
+                    {
+                        "name": "b4-edge1",
+                        "authentication_mode": "CERTIFICATE_OPTIONAL",
+                        "roles": {
+                            "sd_wan": true,
+                            "analytics": false,
+                            "vpn_role": "spoke",
+                            "location": "[[ b4e1_location ]]"
+                        }
+                    }
+                ]
+            },
+            {
+                "name": "branch5",
+                "customer_index": 2,
+                "edges": [
+                    {
+                        "name": "b5-edge1",
+                        "authentication_mode": "CERTIFICATE_OPTIONAL",
+                        "roles": {
+                            "sd_wan": true,
+                            "analytics": false,
+                            "vpn_role": "hub",
+                            "location": "[[ b5e1_location ]]"
+                        }
+                    }
+                ]
+            }
+        ],
+        "gateways": [
+            {
+                "name": "gateway-1",
+                "authentication_mode": "CERTIFICATE_OPTIONAL",
+                "roles": {
+                    "control_plane": true,
+                    "cde": false,
+                    "data_plane": true,
+                    "partner_gateway": "[[ gw1_pg_enabled ]]",
+                    "secure_vpn_gateway": true,
+                    "location": "[[ gw1_location ]]"
+                }
+            },
+            {
+                "name": "gateway-2",
+                "authentication_mode": "CERTIFICATE_OPTIONAL",
+                "roles": {
+                    "control_plane": true,
+                    "cde": false,
+                    "data_plane": true,
+                    "partner_gateway": "[[ gw2_pg_enabled ]]",
+                    "secure_vpn_gateway": true,
+                    "location": "[[ gw2_location ]]"
+                }
+            }
+        ]
+    }
+}

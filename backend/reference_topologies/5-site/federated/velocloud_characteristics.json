@@ -1,0 +1,121 @@
+{
+    "testbed": {
+        "vco_customer_ids": {
+            "1": "1",
+            "2": "2"
+        }
+    },
+    "topology": {
+        "branches": [
+            {
+                "name": "branch1",
+                "customer_index": 1,
+                "edges": [
+                    {
+                        "name": "b1-edge1",
+                        "authentication_mode": "CERTIFICATE_OPTIONAL",
+                        "roles": {
+                            "sd_wan": true,
+                            "analytics": false,
+                            "vpn_role": "hub",
+                            "location": "San Francisco"
+                        }
+                    }
+                ]
+            },
+            {
+                "name": "branch2",
+                "customer_index": 1,
+                "edges": [
+                    {
+                        "name": "b2-edge1",
+                        "authentication_mode": "CERTIFICATE_OPTIONAL",
+                        "roles": {
+                            "sd_wan": true,
+                            "analytics": false,
+                            "vpn_role": "spoke",
+                            "location": "Palo Alto"
+                        }
+                    }
+                ]
+            },
+            {
+                "name": "branch3",
+                "customer_index": 1,
+                "edges": [
+                    {
+                        "name": "b3-edge1",
+                        "authentication_mode": "CERTIFICATE_OPTIONAL",
+                        "roles": {
+                            "sd_wan": true,
+                            "analytics": false,
+                            "vpn_role": "spoke",
+                            "location": "San Jose"
+                        }
+                    }
+                ]
+            },
+            {
+                "name": "branch4",
+                "customer_index": 2,
+                "edges": [
+                    {
+                        "name": "b4-edge1",
+                        "authentication_mode": "CERTIFICATE_OPTIONAL",
+                        "roles": {
+                            "sd_wan": true,
+                            "analytics": false,
+                            "vpn_role": "spoke",
+                            "location": "Sausalito"
+                        }
+                    }
+                ]
+            },
+            {
+                "name": "branch5",
+                "customer_index": 2,
+                "edges": [
+                    {
+                        "name": "b5-edge1",
+                        "authentication_mode": "CERTIFICATE_OPTIONAL",
+                        "roles": {
+                            "sd_wan": true,
+                            "analytics": false,
+                            "vpn_role": "hub",
+                            "location": "San Francisco"
+                        }
+                    }
+                ]
+            }
+        ],
+        "gateways": [
+            {
+                "name": "gateway-1",
+                "vco_index": 1,
+                "authentication_mode": "CERTIFICATE_OPTIONAL",
+                "roles": {
+                    "control_plane": true,
+                    "cde": false,
+                    "data_plane": true,
+                    "partner_gateway": false,
+                    "secure_vpn_gateway": true,
+                    "location": "Chennai"
+                }
+            },
+            {
+                "name": "gateway-2",
+                "authentication_mode": "CERTIFICATE_OPTIONAL",
+                "roles": {
+                    "control_plane": true,
+                    "cde": true,
+                    "data_plane": true,
+                    "partner_gateway": false,
+                    "secure_vpn_gateway": true,
+                    "cloud_web_security": true,
+                    "federated_gateway": true,
+                    "location": "Palo Alto"
+                }
+            }
+        ]
+    }
+}

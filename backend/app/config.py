@@ -21,12 +21,20 @@ def _load_dotenv(path: Path) -> dict[str, str]:
     return values
 
 
+def _config_path(value: str | Path) -> Path:
+    path = Path(value).expanduser()
+    if not path.is_absolute():
+        path = APP_ROOT / path
+    return path
+
+
 DOTENV = _load_dotenv(APP_ROOT / ".env")
-REFERENCE_CONFIG_ROOT = Path(
+LOCAL_REFERENCE_CONFIG_ROOT = APP_ROOT / "backend" / "reference_topologies"
+REFERENCE_CONFIG_ROOT = _config_path(
     os.environ.get("REFERENCE_CONFIG_ROOT")
     or DOTENV.get("REFERENCE_CONFIG_ROOT", "")
-    or "/Users/akshay1.jain/Documents/automation/arista/velocloud.src/hapy/hapy/testbed/configs"
-).expanduser()
+    or LOCAL_REFERENCE_CONFIG_ROOT
+)
 INVENTORY_PATH = APP_ROOT / "backend" / "data" / "hardware_inventory.json"
 OUTPUTS_ROOT = APP_ROOT / "outputs"
 

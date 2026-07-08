@@ -1,0 +1,232 @@
+{
+    "topology": {
+        "bastion_hosts": [
+            {
+                "platform": "ESXI",
+                "name": "bastion-host",
+                "vcpu": 8,
+                "memory": 8192,
+                "disk": 500,
+                "server": "[[ server ]]",
+                "server_ip": "[[ server_ip ]]",
+                "bastion_ip": "[[ host ]]"
+            }
+        ],
+        "branches": [
+            {
+                "name": "branch1",
+                "edges": [
+                    {
+                        "name": "b1-edge1",
+                        "vcpu": 4,
+                        "platform": "ESXI",
+                        "memory": 8192,
+                        "server": "[[ server ]]",
+                        "server_ip": "[[ server_ip ]]",
+                        "bastion_ip": "[[ host ]]",
+                        "direct_clients": [
+                            {
+                                "name": "b1e1-client1",
+                                "platform": "ESXI",
+                                "vcpu": 4,
+                                "memory": 4096,
+                                "server": "[[ server ]]",
+                                "server_ip": "[[ server_ip ]]",
+                                "bastion_ip": "[[ host ]]"
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "name": "branch2",
+                "edges": [
+                    {
+                        "name": "b2-edge1",
+                        "vcpu": 4,
+                        "platform": "ESXI",
+                        "memory": 8192,
+                        "server": "[[ server ]]",
+                        "server_ip": "[[ server_ip ]]",
+                        "bastion_ip": "[[ host ]]",
+                        "direct_clients": [
+                            {
+                                "name": "b2e1-client1",
+                                "platform": "ESXI",
+                                "vcpu": 4,
+                                "memory": 4096,
+                                "server": "[[ server ]]",
+                                "server_ip": "[[ server_ip ]]",
+                                "bastion_ip": "[[ host ]]"
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "name": "branch3",
+                "edges": [
+                    {
+                        "name": "b3-edge1",
+                        "vcpu": 4,
+                        "platform": "ESXI",
+                        "memory": 8192,
+                        "server": "[[ server ]]",
+                        "server_ip": "[[ server_ip ]]",
+                        "bastion_ip": "[[ host ]]",
+                        "direct_clients": [
+                            {
+                                "name": "b3e1-client1",
+                                "platform": "ESXI",
+                                "vcpu": 4,
+                                "memory": 4096,
+                                "server": "[[ server ]]",
+                                "server_ip": "[[ server_ip ]]",
+                                "bastion_ip": "[[ host ]]"
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "name": "branch4",
+                "edges": [
+                    {
+                        "name": "b4-edge1",
+                        "vcpu": 4,
+                        "memory": 8192,
+                        "platform": "ESXI",
+                        "server": "[[ server ]]",
+                        "server_ip": "[[ server_ip ]]",
+                        "bastion_ip": "[[ host ]]",
+                        "direct_clients": [
+                            {
+                                "name": "b4e1-client1",
+                                "platform": "ESXI",
+                                "vcpu": 4,
+                                "memory": 4096,
+                                "server": "[[ server ]]",
+                                "server_ip": "[[ server_ip ]]",
+                                "bastion_ip": "[[ host ]]"
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "name": "branch5",
+                "edges": [
+                    {
+                        "name": "b5-edge1",
+                        "vcpu": 4,
+                        "memory": 8192,
+                        "platform": "ESXI",
+                        "server": "[[ server ]]",
+                        "server_ip": "[[ server_ip ]]",
+                        "bastion_ip": "[[ host ]]",
+                        "direct_clients": [
+                            {
+                                "name": "b5e1-client1",
+                                "platform": "ESXI",
+                                "vcpu": 4,
+                                "memory": 4096,
+                                "server": "[[ server ]]",
+                                "server_ip": "[[ server_ip ]]",
+                                "bastion_ip": "[[ host ]]"
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "name": "branch6",
+                "edges": [
+                    {
+                        "name": "b6-edge1",
+                        "vcpu": 4,
+                        "memory": 8192,
+                        "platform": "ESXI",
+                        "server": "[[ server ]]",
+                        "server_ip": "[[ server_ip ]]",
+                        "bastion_ip": "[[ host ]]",
+                        "direct_clients": [
+                            {
+                                "name": "b6e1-client1",
+                                "platform": "ESXI",
+                                "vcpu": 4,
+                                "memory": 4096,
+                                "server": "[[ server ]]",
+                                "server_ip": "[[ server_ip ]]",
+                                "bastion_ip": "[[ host ]]"
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "name": "branch7",
+                "edges": [
+                    {
+                        "name": "b7-edge1",
+                        "platform": "ESXI",
+                        "vcpu": 4,
+                        "memory": 8192,
+                        "server": "[[ server ]]",
+                        "server_ip": "[[ server_ip ]]",
+                        "bastion_ip": "[[ host ]]",
+                        "direct_clients": [
+                            {
+                                "name": "b7e1-client1",
+                                "platform": "ESXI",
+                                "vcpu": 4,
+                                "memory": 4096,
+                                "server": "[[ server ]]",
+                                "server_ip": "[[ server_ip ]]",
+                                "bastion_ip": "[[ host ]]"
+                            }
+                        ]
+                    }
+                ]
+            }
+        ],
+        "gateways": [
+            {
+                "name": "gateway-1",
+                "vcpu": 8,
+                "memory": 8192,
+                "platform": "ESXI",
+                "server": "[[ server ]]",
+                "server_ip": "[[ server_ip ]]",
+                "bastion_ip": "[[ host ]]"
+            },
+            {
+                "name": "gateway-2",
+                "platform": "ESXI",
+                "vcpu": 8,
+                "memory": 8192,
+                "server": "[[ server ]]",
+                "server_ip": "[[ server_ip ]]",
+                "bastion_ip": "[[ host ]]"
+            },
+            {
+                "name": "gateway-3",
+                "platform": "ESXI",
+                "vcpu": 8,
+                "memory": 8192,
+                "server": "[[ server ]]",
+                "server_ip": "[[ server_ip ]]",
+                "bastion_ip": "[[ host ]]"
+            },
+            {
+                "name": "gateway-4",
+                "platform": "ESXI",
+                "vcpu": 8,
+                "memory": 8192,
+                "server": "[[ server ]]",
+                "server_ip": "[[ server_ip ]]",
+                "bastion_ip": "[[ host ]]"
+            }
+        ]
+    }
+}
+

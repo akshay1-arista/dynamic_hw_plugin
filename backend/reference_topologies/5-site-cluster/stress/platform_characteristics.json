@@ -1,0 +1,207 @@
+{
+    "topology": {
+        "bastion_hosts": [
+            {
+                "platform": "ESXI",
+                "name": "bastion-host",
+                "vcpu": 8,
+                "memory": 8192,
+                "disk": 500
+            }
+        ],
+        "branches": [
+            {
+                "name": "branch1",
+                "edges": [
+                    {
+                        "name": "b1-edge1",
+                        "vcpu": 4,
+                        "platform": "ESXI",
+                        "memory": 8192,
+                        "direct_clients": [
+                            {
+                                "name": "b1e1-client1",
+                                "platform": "ESXI",
+                                "vcpu": 4,
+                                "memory": 4096
+                            }
+                        ]
+                    },
+                    {
+                        "name": "b1-edge2",
+                        "vcpu": 4,
+                        "platform": "ESXI",
+                        "memory": 8192,
+                        "direct_clients": [
+                            {
+                                "name": "b1e2-client1",
+                                "platform": "ESXI",
+                                "vcpu": 4,
+                                "memory": 4096
+                            }
+                        ]
+                    },
+                    {
+                        "name": "b1-edge3",
+                        "vcpu": 4,
+                        "platform": "ESXI",
+                        "memory": 8192,
+                        "direct_clients": [
+                            {
+                                "name": "b1e3-client1",
+                                "platform": "ESXI",
+                                "vcpu": 4,
+                                "memory": 4096
+                            }
+                        ]
+                    },
+                    {
+                        "name": "b1-edge4",
+                        "vcpu": 4,
+                        "platform": "ESXI",
+                        "memory": 8192,
+                        "direct_clients": [
+                            {
+                                "name": "b1e4-client1",
+                                "platform": "ESXI",
+                                "vcpu": 4,
+                                "memory": 4096
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "name": "branch2",
+                "edges": [
+                    {
+                        "name": "b2-edge1",
+                        "vcpu": 4,
+                        "platform": "ESXI",
+                        "memory": 8192,
+                        "direct_clients": [
+                            {
+                                "name": "b2e1-client1",
+                                "platform": "ESXI",
+                                "vcpu": 4,
+                                "memory": 4096
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "name": "branch3",
+                "edges": [
+                    {
+                        "name": "b3-edge1",
+                        "vcpu": 4,
+                        "platform": "ESXI",
+                        "memory": 8192,
+                        "direct_clients": [
+                            {
+                                "name": "b3e1-client1",
+                                "platform": "ESXI",
+                                "vcpu": 4,
+                                "memory": 4096
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "name": "branch4",
+                "edges": [
+                    {
+                        "name": "b4-edge1",
+                        "vcpu": 4,
+                        "memory": 8192,
+                        "platform": "ESXI",
+                        "direct_clients": [
+                            {
+                                "name": "b4e1-client1",
+                                "platform": "ESXI",
+                                "vcpu": 4,
+                                "memory": 4096
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "name": "branch5",
+                "edges": [
+                    {
+                        "name": "b5-edge1",
+                        "vcpu": 4,
+                        "memory": 8192,
+                        "platform": "ESXI",
+                        "direct_clients": [
+                            {
+                                "name": "b5e1-client1",
+                                "platform": "ESXI",
+                                "vcpu": 4,
+                                "memory": 4096
+                            }
+                        ]
+                    },
+                    {
+                        "name": "b5-edge2",
+                        "vcpu": 4,
+                        "memory": 8192,
+                        "platform": "ESXI",
+                        "direct_clients": [
+                            {
+                                "name": "b5e2-client1",
+                                "platform": "ESXI",
+                                "vcpu": 4,
+                                "memory": 4096
+                            }
+                        ]
+                    },
+                    {
+                        "name": "b5-edge3",
+                        "vcpu": 4,
+                        "memory": 8192,
+                        "platform": "ESXI",
+                        "direct_clients": [
+                            {
+                                "name": "b5e3-client1",
+                                "platform": "ESXI",
+                                "vcpu": 4,
+                                "memory": 4096
+                            }
+                        ]
+                    }
+                ]
+            }
+        ],
+        "gateways": [
+            {
+                "name": "gateway-1",
+                "vcpu": 8,
+                "memory": 8192,
+                "platform": "ESXI"
+            },
+            {
+                "name": "gateway-2",
+                "platform": "ESXI",
+                "vcpu": 8,
+                "memory": 8192
+            },
+            {
+                "name": "gateway-3",
+                "platform": "ESXI",
+                "vcpu": 8,
+                "memory": 8192
+            },
+            {
+                "name": "gateway-4",
+                "platform": "ESXI",
+                "vcpu": 8,
+                "memory": 8192
+            }
+        ]
+    }
+}
+

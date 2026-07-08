@@ -1,0 +1,229 @@
+#!/bin/bash
+
+# Last used bastion host IP (auto-updated)
+LAST_BH_IP=""
+
+# Function to set up aliases with bastion host IP
+setup_aliases() {
+    local bh_ip="$1"
+
+    # If no argument provided, use last saved IP
+    if [ -z "$bh_ip" ]; then
+        if [ -n "$LAST_BH_IP" ]; then
+            bh_ip="$LAST_BH_IP"
+            echo "Using saved bastion host: $bh_ip"
+        else
+            echo "Usage: source ssh_aliases <bastion_host_ip>"
+            echo "Example: source ssh_aliases 172.29.236.90"
+            return 1
+        fi
+    else
+        # Save the new IP to the file for next time
+        SCRIPT_PATH="${BASH_SOURCE[0]}"
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            # macOS
+            sed -i '' "s/^LAST_BH_IP=.*/LAST_BH_IP=\"$bh_ip\"/" "$SCRIPT_PATH"
+        else
+            # Linux
+            sed -i "s/^LAST_BH_IP=.*/LAST_BH_IP=\"$bh_ip\"/" "$SCRIPT_PATH"
+        fi
+        echo "Setting bastion host to: $bh_ip (saved for future use)"
+    fi
+
+    export bh=$bh_ip
+
+    # Bastion host
+    alias bh='sshpass -p velocloud ssh root@$bh -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+
+    # Branch 1 Edges
+    alias b1e1='sshpass -p velocloud ssh root@$bh -p 1001 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias b1e2='sshpass -p velocloud ssh root@$bh -p 1006 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias b1e3='sshpass -p velocloud ssh root@$bh -p 1007 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias b1e4='sshpass -p velocloud ssh root@$bh -p 1008 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+
+    # Branch 2 Edge
+    alias b2e1='sshpass -p velocloud ssh root@$bh -p 1002 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+
+    # Branch 3 Edge
+    alias b3e1='sshpass -p velocloud ssh root@$bh -p 1003 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+
+    # Branch 4 Edge
+    alias b4e1='sshpass -p velocloud ssh root@$bh -p 1004 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+
+    # Branch 5 Edges
+    alias b5e1='sshpass -p velocloud ssh root@$bh -p 1005 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias b5e2='sshpass -p velocloud ssh root@$bh -p 1009 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias b5e3='sshpass -p velocloud ssh root@$bh -p 1010 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+
+    # Generic edge aliases (e1-e10 for backward compatibility)
+    alias e1='sshpass -p velocloud ssh root@$bh -p 1001 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias e2='sshpass -p velocloud ssh root@$bh -p 1002 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias e3='sshpass -p velocloud ssh root@$bh -p 1003 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias e4='sshpass -p velocloud ssh root@$bh -p 1004 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias e5='sshpass -p velocloud ssh root@$bh -p 1005 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias e6='sshpass -p velocloud ssh root@$bh -p 1006 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias e7='sshpass -p velocloud ssh root@$bh -p 1007 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias e8='sshpass -p velocloud ssh root@$bh -p 1008 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias e9='sshpass -p velocloud ssh root@$bh -p 1009 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias e10='sshpass -p velocloud ssh root@$bh -p 1010 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+
+    # Clients
+    alias b1e1c1='sshpass -p velocloud ssh root@$bh -p 2001 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias b1e2c1='sshpass -p velocloud ssh root@$bh -p 2201 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias b1e3c1='sshpass -p velocloud ssh root@$bh -p 2301 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias b1e4c1='sshpass -p velocloud ssh root@$bh -p 2401 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias b2e1c1='sshpass -p velocloud ssh root@$bh -p 2002 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias b3e1c1='sshpass -p velocloud ssh root@$bh -p 2003 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias b4e1c1='sshpass -p velocloud ssh root@$bh -p 2004 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias b5e1c1='sshpass -p velocloud ssh root@$bh -p 2005 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias b5e2c1='sshpass -p velocloud ssh root@$bh -p 2205 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias b5e3c1='sshpass -p velocloud ssh root@$bh -p 2305 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+
+    # Generic client aliases (c1-c10 for backward compatibility)
+    alias c1='sshpass -p velocloud ssh root@$bh -p 2001 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias c2='sshpass -p velocloud ssh root@$bh -p 2002 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias c3='sshpass -p velocloud ssh root@$bh -p 2003 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias c4='sshpass -p velocloud ssh root@$bh -p 2004 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias c5='sshpass -p velocloud ssh root@$bh -p 2005 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias c6='sshpass -p velocloud ssh root@$bh -p 2201 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias c7='sshpass -p velocloud ssh root@$bh -p 2301 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias c8='sshpass -p velocloud ssh root@$bh -p 2401 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias c9='sshpass -p velocloud ssh root@$bh -p 2205 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias c10='sshpass -p velocloud ssh root@$bh -p 2305 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+
+    # Routed Clients
+    alias b1rc1='sshpass -p velocloud ssh root@$bh -p 2006 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias b2rc1='sshpass -p velocloud ssh root@$bh -p 2151 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias b4rc1='sshpass -p velocloud ssh root@$bh -p 3004 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias b5rc1='sshpass -p velocloud ssh root@$bh -p 2007 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+
+    # Generic routed client aliases
+    alias rc1='sshpass -p velocloud ssh root@$bh -p 2006 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias rc2='sshpass -p velocloud ssh root@$bh -p 2151 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias rc4='sshpass -p velocloud ssh root@$bh -p 3004 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias rc5='sshpass -p velocloud ssh root@$bh -p 2007 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+
+    # Gateways (Cluster)
+    alias gw1='sshpass -p velocloud ssh root@$bh -p 2011 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias gw2='sshpass -p velocloud ssh root@$bh -p 2012 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias gw3='sshpass -p velocloud ssh root@$bh -p 2013 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias gw4='sshpass -p velocloud ssh root@$bh -p 2014 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias gw5='sshpass -p velocloud ssh root@$bh -p 2015 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias gw6='sshpass -p velocloud ssh root@$bh -p 2016 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias gw7='sshpass -p velocloud ssh root@$bh -p 2017 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias gw8='sshpass -p velocloud ssh root@$bh -p 2018 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+
+    # Short gateway aliases
+    alias g1='sshpass -p velocloud ssh root@$bh -p 2011 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias g2='sshpass -p velocloud ssh root@$bh -p 2012 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias g3='sshpass -p velocloud ssh root@$bh -p 2013 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias g4='sshpass -p velocloud ssh root@$bh -p 2014 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias g5='sshpass -p velocloud ssh root@$bh -p 2015 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias g6='sshpass -p velocloud ssh root@$bh -p 2016 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias g7='sshpass -p velocloud ssh root@$bh -p 2017 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias g8='sshpass -p velocloud ssh root@$bh -p 2018 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+
+    # Gateway Provider Edges
+    alias gw1pe='sshpass -p velocloud ssh root@$bh -p 2153 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias gw2pe='sshpass -p velocloud ssh root@$bh -p 2154 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias gw3pe='sshpass -p velocloud ssh root@$bh -p 2155 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias gw4pe='sshpass -p velocloud ssh root@$bh -p 2166 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias gw5pe='sshpass -p velocloud ssh root@$bh -p 2170 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias gw6pe='sshpass -p velocloud ssh root@$bh -p 2171 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias gw7pe='sshpass -p velocloud ssh root@$bh -p 2172 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias gw8pe='sshpass -p velocloud ssh root@$bh -p 2173 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+
+    # Short gateway PE aliases
+    alias g1pe='sshpass -p velocloud ssh root@$bh -p 2153 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias g2pe='sshpass -p velocloud ssh root@$bh -p 2154 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias g3pe='sshpass -p velocloud ssh root@$bh -p 2155 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias g4pe='sshpass -p velocloud ssh root@$bh -p 2166 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias g5pe='sshpass -p velocloud ssh root@$bh -p 2170 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias g6pe='sshpass -p velocloud ssh root@$bh -p 2171 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias g7pe='sshpass -p velocloud ssh root@$bh -p 2172 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias g8pe='sshpass -p velocloud ssh root@$bh -p 2173 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+
+    # Customer Edge Routers
+    alias b1ce1='sshpass -p velocloud ssh root@$bh -p 2156 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias b2ce1='sshpass -p velocloud ssh root@$bh -p 2158 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias b3ce1='sshpass -p velocloud ssh root@$bh -p 2159 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias b5ce1='sshpass -p velocloud ssh root@$bh -p 2157 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+
+    # Generic CE aliases
+    alias ce1='sshpass -p velocloud ssh root@$bh -p 2156 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias ce2='sshpass -p velocloud ssh root@$bh -p 2158 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias ce3='sshpass -p velocloud ssh root@$bh -p 2159 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias ce5='sshpass -p velocloud ssh root@$bh -p 2157 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+
+    # L3 Switches
+    alias b1l3s='sshpass -p velocloud ssh root@$bh -p 2030 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias b2l3s='sshpass -p velocloud ssh root@$bh -p 2163 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias b5l3s='sshpass -p velocloud ssh root@$bh -p 2031 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+
+    # Generic L3 switch aliases
+    alias l3s1='sshpass -p velocloud ssh root@$bh -p 2030 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias l3s2='sshpass -p velocloud ssh root@$bh -p 2163 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias l3s5='sshpass -p velocloud ssh root@$bh -p 2031 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+
+    # Core Routers
+    alias cri='sshpass -p velocloud ssh root@$bh -p 2164 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias cr1='sshpass -p velocloud ssh root@$bh -p 2023 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias cr2='sshpass -p velocloud ssh root@$bh -p 2165 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias cr3='sshpass -p velocloud ssh root@$bh -p 2169 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias cr4='sshpass -p velocloud ssh root@$bh -p 2167 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias crm1i='sshpass -p velocloud ssh root@$bh -p 2164 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias crm2i='sshpass -p velocloud ssh root@$bh -p 2168 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+
+    # MPLS Routers
+    alias mpls='sshpass -p velocloud ssh root@$bh -p 2162 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias mpls2='sshpass -p velocloud ssh root@$bh -p 2182 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+
+    # WANSIMs
+    alias ws1='sshpass -p velocloud ssh root@$bh -p 2152 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias ws2='sshpass -p velocloud ssh root@$bh -p 2024 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias ws3='sshpass -p velocloud ssh root@$bh -p 2025 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias ws4='sshpass -p velocloud ssh root@$bh -p 2026 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+
+    # Legacy devices
+    alias lpe='sshpass -p velocloud ssh root@$bh -p 2160 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias lc='sshpass -p velocloud ssh root@$bh -p 2161 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+
+    # NVS (NaaS Virtual Service)
+    alias nvs='sshpass -p velocloud ssh root@$bh -p 2040 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+
+    # Servers
+    alias vcmp='sshpass -p velocloud ssh root@$bh -p 2050 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias nyansa='sshpass -p velocloud ssh root@$bh -p 2060 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+    alias dcserver='sshpass -p velocloud ssh root@$bh -p 2070 -o StrictHostKeyChecking=No -o UserKnownHostsFile=/dev/null'
+
+    echo ""
+    echo "============================================"
+    echo "SSH Aliases configured for 5-site-cluster!"
+    echo "============================================"
+    echo ""
+    echo "Edge shortcuts:"
+    echo "  b1e1-b1e4 (or e1-e4) - Branch 1 edges"
+    echo "  b2e1 (or e2) - Branch 2 edge"
+    echo "  b3e1 (or e3) - Branch 3 edge"
+    echo "  b4e1 (or e4) - Branch 4 edge"
+    echo "  b5e1-b5e3 (or e5, e9-e10) - Branch 5 edges"
+    echo ""
+    echo "Client shortcuts:"
+    echo "  b1e1c1-b1e4c1, b2e1c1, b3e1c1, b4e1c1, b5e1c1-b5e3c1"
+    echo "  or c1-c10 (generic)"
+    echo ""
+    echo "Gateway cluster:"
+    echo "  gw1-gw8 (or g1-g8)"
+    echo "  gw1pe-gw8pe (or g1pe-g8pe) - Gateway PEs"
+    echo ""
+    echo "Routed clients: rc1, rc2, rc4, rc5"
+    echo "Core routers: cri, cr1-cr4, mpls, mpls2"
+    echo "WANSIMs: ws1-ws4"
+    echo "L3 switches: l3s1, l3s2, l3s5"
+    echo "CE routers: ce1, ce2, ce3, ce5"
+    echo "Servers: vcmp, nyansa, dcserver, nvs"
+    echo ""
+}
+
+# Automatically call setup_aliases (with or without argument)
+setup_aliases "$1"

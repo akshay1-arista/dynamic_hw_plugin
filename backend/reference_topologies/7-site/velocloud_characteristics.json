@@ -1,0 +1,139 @@
+{
+    "topology": {
+        "branches": [
+            {
+                "name": "branch1",
+                "customer_index": 1,
+                "edges": [
+                    {
+                        "name": "b1-edge1",
+                        "roles": {
+                            "sd_wan": true,
+                            "analytics": false
+                        }
+                    }
+                ]
+            },
+            {
+                "name": "branch2",
+                "customer_index": 1,
+                "edges": [
+                    {
+                        "name": "b2-edge1",
+                        "roles": {
+                            "sd_wan": true,
+                            "analytics": false
+                        }
+                    }
+                ]
+            },
+            {
+                "name": "branch3",
+                "customer_index": 1,
+                "edges": [
+                    {
+                        "name": "b3-edge1",
+                        "roles": {
+                            "sd_wan": true,
+                            "analytics": false
+                        }
+                    }
+                ]
+            },
+            {
+                "name": "branch4",
+                "customer_index": 1,
+                "edges": [
+                    {
+                        "name": "b4-edge1",
+                        "roles": {
+                            "sd_wan": true,
+                            "analytics": false
+                        }
+                    }
+                ]
+            },
+            {
+                "name": "branch5",
+                "customer_index": 2,
+                "edges": [
+                    {
+                        "name": "b5-edge1",
+                        "roles": {
+                            "sd_wan": true,
+                            "analytics": false
+                        }
+                    }
+                ]
+            },
+            {
+                "name": "branch6",
+                "customer_index": 2,
+                "edges": [
+                    {
+                        "name": "b6-edge1",
+                        "roles": {
+                            "sd_wan": true,
+                            "analytics": false
+                        }
+                    }
+                ]
+            },
+            {
+                "name": "branch7",
+                "customer_index": 2,
+                "edges": [
+                    {
+                        "name": "b7-edge1",
+                        "roles": {
+                            "sd_wan": true,
+                            "analytics": false
+                        }
+                    }
+                ]
+            }
+        ],
+        "gateways": [
+            {
+                "name": "gateway-1",
+                "roles": {
+                    "control_plane": true,
+                    "cde": false,
+                    "data_plane": true,
+                    "partner_gateway": true,
+                    "secure_vpn_gateway": true
+                }
+            },
+            {
+                "name": "gateway-2",
+                "roles": {
+                    "control_plane": true,
+                    "cde": false,
+                    "data_plane": true,
+                    "partner_gateway": true,
+                    "secure_vpn_gateway": true
+                }
+            },
+            {
+                "name": "gateway-3",
+                "roles": {
+                    "control_plane": true,
+                    "cde": false,
+                    "data_plane": true,
+                    "partner_gateway": true,
+                    "secure_vpn_gateway": true
+                }
+            },
+            {
+                "name": "gateway-4",
+                "roles": {
+                    "control_plane": true,
+                    "cde": false,
+                    "data_plane": true,
+                    "partner_gateway": true,
+                    "secure_vpn_gateway": true
+                }
+            }
+        ]
+    }
+}

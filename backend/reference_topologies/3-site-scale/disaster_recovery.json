@@ -1,0 +1,53 @@
+{
+    "topology": {
+        "vco-dr": {
+            "connections": {
+                "ip": "[[ vco_host ]]",
+                "port": 6500,
+                "api_port": 6443
+            },
+            "credentials": {
+                "username": "root",
+                "password": "velocloud"
+            },
+            "interfaces": [
+                {
+                    "link": "bastion-host",
+                    "name": "eth0",
+                    "ip": "192.168.0.98",
+                    "addressing_type": "STATIC",
+                    "netmask": "255.255.255.0",
+                    "default_gateway": "192.168.0.100"
+                },
+                {
+                    "link": "cri_vco_dr",
+                    "name": "eth1",
+                    "ip": "169.254.11.3",
+                    "addressing_type": "STATIC",
+                    "netmask": "255.255.255.248",
+                    "mtu": 1320,
+                    "default_gateway": "169.254.11.1",
+                    "routes": [
+                        "0.0.0.0/0"
+                    ]
+                }
+            ]
+        },
+        "corerouters": [
+            {
+                "name": "cr-internet",
+                "interfaces": [
+                    {
+                        "name": "eth9",
+                        "link": "cri_vco_dr",
+                        "mode": "routed",
+                        "addressing_type": "static",
+                        "ip": "169.254.11.1",
+                        "netmask": "255.255.255.248",
+                        "default_gateway": "169.254.11.2"
+                    }
+                ]
+            }
+        ]
+    }
+}

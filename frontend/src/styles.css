@@ -1,0 +1,586 @@
+:root {
+  color: #172026;
+  background: #eef2f3;
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  line-height: 1.4;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+.shell {
+  min-height: 100vh;
+  padding: 24px;
+}
+
+.center {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+}
+
+.topbar {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin: 0 auto 18px;
+  max-width: 1440px;
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: 26px;
+  font-weight: 720;
+}
+
+h2 {
+  font-size: 16px;
+}
+
+.topbar p,
+.muted,
+small {
+  color: #5d6971;
+}
+
+.workspace {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+  margin: 0 auto;
+  max-width: 1440px;
+}
+
+.lower {
+  margin-top: 16px;
+}
+
+.panel {
+  background: #ffffff;
+  border: 1px solid #d7dee2;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.wide {
+  min-width: 0;
+}
+
+.panelTitle {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+label {
+  color: #344047;
+  display: grid;
+  font-size: 13px;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.labelText {
+  align-items: baseline;
+  display: inline-flex;
+  gap: 3px;
+}
+
+.requiredMark {
+  color: #b53b34;
+  font-weight: 700;
+}
+
+input,
+select {
+  background: #fbfcfc;
+  border: 1px solid #c8d1d6;
+  border-radius: 6px;
+  color: #172026;
+  min-height: 38px;
+  min-width: 0;
+  padding: 8px 10px;
+}
+
+button,
+.download {
+  align-items: center;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  gap: 8px;
+  justify-content: center;
+  min-height: 38px;
+  padding: 8px 12px;
+  text-decoration: none;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.primary {
+  background: #176b87;
+  border: 1px solid #176b87;
+  color: #ffffff;
+}
+
+.secondary {
+  background: #ffffff;
+  border: 1px solid #a9b7be;
+  color: #172026;
+}
+
+.iconButton {
+  aspect-ratio: 1;
+  background: #ffffff;
+  border: 1px solid #c8d1d6;
+  color: #344047;
+  min-height: 38px;
+  padding: 8px;
+}
+
+.danger {
+  color: #a33a33;
+}
+
+.alert {
+  background: #fff3f0;
+  border: 1px solid #e0aaa2;
+  border-radius: 8px;
+  color: #8a2822;
+  margin: 0 auto 16px;
+  max-width: 1440px;
+  padding: 10px 12px;
+}
+
+.checkboxLine,
+.toggle {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.checkboxLine input,
+.toggle input {
+  min-height: auto;
+}
+
+.branchList,
+.inventoryList,
+.messageList {
+  display: grid;
+  gap: 8px;
+}
+
+.message {
+  border-left: 3px solid #9aa7ad;
+  padding-left: 8px;
+}
+
+.message.warning {
+  border-left-color: #b87915;
+  color: #6d4a08;
+}
+
+.message.error {
+  border-left-color: #b53b34;
+  color: #8a2822;
+}
+
+.branchItem,
+.inventoryItem,
+.resultBox {
+  border: 1px solid #d7dee2;
+  border-radius: 8px;
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+}
+
+.inventoryItem {
+  align-items: start;
+  grid-template-columns: 1fr auto;
+}
+
+.inventoryItem strong,
+.inventoryItem small {
+  display: block;
+}
+
+.inventorySummary {
+  align-items: start;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  display: flex;
+  justify-content: space-between;
+  min-height: 0;
+  padding: 0;
+  text-align: left;
+}
+
+.inventorySummary strong {
+  font-size: 14px;
+}
+
+.inventorySummary svg {
+  color: #6b767d;
+  flex: 0 0 auto;
+  margin-left: 10px;
+  margin-top: 2px;
+}
+
+.inventorySummary[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+
+.searchField span {
+  align-items: center;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 18px 1fr;
+}
+
+.searchField svg {
+  color: #6b767d;
+}
+
+.searchField input {
+  width: 100%;
+}
+
+.combobox {
+  position: relative;
+}
+
+.comboboxField {
+  align-items: center;
+  background: #fbfcfc;
+  border: 1px solid #c8d1d6;
+  border-radius: 6px;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 18px minmax(0, 1fr) 24px;
+  min-height: 38px;
+  padding: 0 10px;
+}
+
+.comboboxField.open {
+  border-color: #176b87;
+  box-shadow: 0 0 0 1px rgba(23, 107, 135, 0.1);
+}
+
+.comboboxField svg {
+  color: #6b767d;
+}
+
+.comboboxInput {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  min-height: 36px;
+  padding: 0;
+}
+
+.comboboxInput:focus {
+  outline: none;
+}
+
+.comboboxToggle {
+  background: transparent;
+  border: 0;
+  color: #6b767d;
+  min-height: 0;
+  padding: 0;
+}
+
+.comboboxToggle svg {
+  transition: transform 0.2s ease;
+}
+
+.comboboxToggle svg.open {
+  transform: rotate(180deg);
+}
+
+.comboboxMenu {
+  background: #ffffff;
+  border: 1px solid #c8d1d6;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(23, 32, 38, 0.12);
+  display: grid;
+  gap: 4px;
+  left: 0;
+  margin-top: 4px;
+  max-height: 240px;
+  overflow: auto;
+  padding: 6px;
+  position: absolute;
+  right: 0;
+  top: 100%;
+  z-index: 20;
+}
+
+.comboboxOption {
+  background: #ffffff;
+  border: 0;
+  color: #172026;
+  justify-content: flex-start;
+  min-height: 0;
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.comboboxOption:hover,
+.comboboxOption.active {
+  background: #eef6f8;
+}
+
+.comboboxOption[aria-selected="true"] {
+  background: #dfeef3;
+  color: #114f63;
+}
+
+.comboboxOption:disabled {
+  background: #f4f7f8;
+  color: #8b979e;
+}
+
+.comboboxEmpty {
+  color: #5d6971;
+  padding: 8px 10px;
+}
+
+.hardwareDetails {
+  border-top: 1px solid #d7dee2;
+  display: grid;
+  gap: 10px;
+  grid-column: 1 / -1;
+  margin-top: 4px;
+  padding-top: 10px;
+}
+
+.detailGrid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.detailGrid span,
+.switchList,
+.portList {
+  background: #f7f9fa;
+  border: 1px solid #e1e7ea;
+  border-radius: 6px;
+  padding: 8px;
+}
+
+.switchList,
+.portList {
+  display: grid;
+  gap: 4px;
+}
+
+.portList {
+  max-height: 180px;
+  overflow: auto;
+}
+
+.notes {
+  color: #344047;
+}
+
+.mappingRow {
+  align-items: end;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(5, minmax(120px, 1fr)) 40px;
+  margin-bottom: 12px;
+}
+
+.mappingCaveat {
+  align-items: center;
+  background: #fff8e8;
+  border: 1px solid #e5bf74;
+  border-radius: 6px;
+  color: #6d4a08;
+  display: flex;
+  font-size: 13px;
+  gap: 8px;
+  grid-column: 1 / -1;
+  padding: 8px 10px;
+}
+
+.mappingCaveat svg {
+  flex: 0 0 auto;
+}
+
+.interfaceOverrideCard {
+  border: 1px solid #d7dee2;
+  border-radius: 8px;
+  grid-column: 1 / -1;
+  overflow: hidden;
+}
+
+.interfaceOverrideToggle {
+  align-items: center;
+  background: #f7f9fa;
+  border: 0;
+  color: #1b252b;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 12px;
+  text-align: left;
+  width: 100%;
+}
+
+.interfaceOverrideToggle span {
+  display: grid;
+  gap: 2px;
+}
+
+.interfaceOverrideToggle small,
+.interfaceOverrideLabel small {
+  color: #6b767d;
+}
+
+.interfaceOverrideToggle svg {
+  color: #6b767d;
+  transition: transform 0.2s ease;
+}
+
+.interfaceOverrideToggle svg.open {
+  transform: rotate(180deg);
+}
+
+.interfaceOverrideEditor {
+  background: #ffffff;
+  border-top: 1px solid #d7dee2;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.interfaceOverrideEditor .muted {
+  margin: 0;
+}
+
+.interfaceOverrideList {
+  display: grid;
+  gap: 10px;
+}
+
+.interfaceOverrideRow {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(180px, 1fr) minmax(240px, 1.4fr);
+}
+
+.interfaceOverrideLabel {
+  display: grid;
+  gap: 2px;
+}
+
+.actionRow {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.previewTable {
+  border: 1px solid #d7dee2;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.previewRow {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 1.2fr 1fr 1fr 80px;
+  padding: 10px;
+}
+
+.previewRow + .previewRow {
+  border-top: 1px solid #d7dee2;
+}
+
+.resultBox {
+  background: #f7fbf9;
+  margin-top: 14px;
+}
+
+.download {
+  background: #2e7d57;
+  border: 1px solid #2e7d57;
+  color: #ffffff;
+  justify-self: start;
+  margin-top: 6px;
+}
+
+.spin {
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 1050px) {
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .mappingRow {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) 40px;
+  }
+}
+
+@media (max-width: 700px) {
+  .shell {
+    padding: 14px;
+  }
+
+  .topbar {
+    align-items: start;
+    gap: 12px;
+  }
+
+  .mappingRow,
+  .previewRow,
+  .inventoryItem,
+  .detailGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .mappingRow .iconButton {
+    width: 40px;
+  }
+
+  .interfaceOverrideRow {
+    grid-template-columns: 1fr;
+  }
+}

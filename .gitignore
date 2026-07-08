@@ -1,0 +1,9 @@
+backend/.pytest_cache/
+.env
+frontend/dist/
+frontend/node_modules/
+outputs/
+logs/
+.run/
+__pycache__/
+*.pyc

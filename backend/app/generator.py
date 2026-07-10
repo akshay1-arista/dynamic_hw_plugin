@@ -405,6 +405,8 @@ def _apply_port_mappings(
         old_link = interface.get("link")
         old_logical_interface = interface.get("logical_interface")
         port.link = old_link or port.link
+        if port_assignment:
+            port_assignment.link = port.link
         port.logical_name = str(interface.get("logical_name") or old_logical_interface or port.logical_interface)
         interface["name"] = port.name
         interface["logical_interface"] = port.logical_interface
@@ -670,6 +672,7 @@ def _port_allocation_from_port(
     return HardwarePortAllocation(
         reference_interface=_reference_interface_key(interface) or port.logical_interface,
         logical_interface=port.logical_interface,
+        link=port.link,
         switch_name=_allocation_switch_name(hardware, port),
         switch_active_port=port.switch_active_port,
         switch_standby_port=port.switch_standby_port,
@@ -703,6 +706,7 @@ def _port_allocation_from_override(
         return HardwarePortAllocation(
             reference_interface=_reference_interface_key(interface) or port.logical_interface,
             logical_interface=port.logical_interface,
+            link=port.link,
             switch_name=_allocation_switch_name(hardware, port),
             switch_active_port=port.switch_active_port,
             switch_standby_port=port.switch_standby_port,
@@ -721,6 +725,7 @@ def _port_allocation_from_override(
     return HardwarePortAllocation(
         reference_interface=_reference_interface_key(interface) or port.logical_interface,
         logical_interface=port.logical_interface,
+        link=port.link,
         switch_name=_allocation_switch_name(hardware, port),
         switch_active_port=port.switch_active_port,
         switch_standby_port=port.switch_standby_port,

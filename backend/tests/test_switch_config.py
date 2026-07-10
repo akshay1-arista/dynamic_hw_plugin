@@ -808,6 +808,273 @@ def test_configure_switches_applies_command_overrides(tmp_path, monkeypatch):
     assert "interface TenGigabitEthernet 1/43" in upstream_commands
 
 
+def test_configure_switches_uses_generated_links_to_exclude_only_ha_vlan_from_transport(tmp_path, monkeypatch):
+    inventory = InventoryFile.model_validate(
+        {
+            "devices": {
+                "access_sw": {
+                    "id": "access_sw",
+                    "type": "switch",
+                    "display_name": "chn-rnd-sw-3048-J8Y00Q2",
+                    "model": "Dell-3048",
+                    "ip_address": "10.68.136.28",
+                    "switch_metadata": {
+                        "name": "chn-rnd-sw-3048-J8Y00Q2",
+                        "model": "Dell-3048",
+                        "os_family": "os9",
+                        "connections": {"ip": "10.68.136.28", "port": None},
+                        "credentials": {"username": "velocloud", "password": "N#1sdwan"},
+                    },
+                },
+                "upstream_sw": {
+                    "id": "upstream_sw",
+                    "type": "switch",
+                    "display_name": "chn-rnd-sw-4148-F19CV43",
+                    "model": "Dell-4148",
+                    "ip_address": "10.68.137.247",
+                    "switch_metadata": {
+                        "name": "chn-rnd-sw-4148-F19CV43",
+                        "model": "Dell-4148",
+                        "os_family": "os10",
+                        "connections": {"ip": "10.68.137.247", "port": None},
+                        "credentials": {"username": "velocloud", "password": "N#1sdwan"},
+                    },
+                },
+                "hypervisor": {
+                    "id": "hypervisor",
+                    "type": "hypervisor",
+                    "display_name": "chn-rnd-srv-650-G1HVKJ3",
+                    "ip_address": "10.68.137.104",
+                },
+            },
+            "connections": [
+                {
+                    "id": "access-upstream",
+                    "a": {"device_id": "access_sw", "interface": "tengigabitethernet1/52"},
+                    "b": {"device_id": "upstream_sw", "interface": "eth1/1/53"},
+                    "vlans": [1, 401, 402, 403, 404, 405, 406],
+                    "tagged_vlans": [401, 402, 403, 404, 405, 406],
+                    "untagged_vlan": 1,
+                    "role": "switch-uplink",
+                },
+                {
+                    "id": "upstream-hypervisor",
+                    "a": {"device_id": "upstream_sw", "interface": "eth1/1/54"},
+                    "b": {"device_id": "hypervisor", "interface": "vmnic2"},
+                    "vlans": [1, 401, 402, 403, 404, 405, 406],
+                    "tagged_vlans": [401, 402, 403, 404, 405, 406],
+                    "untagged_vlan": 1,
+                    "role": "hypervisor-access",
+                },
+            ],
+            "hardware": [
+                {
+                    "id": "edge-740-ha",
+                    "display_name": "HA Pair chn-rnd-edge-740-8202197 + chn-rnd-edge-740-8202193",
+                    "model": "edge7X0",
+                    "model_suffix": "740",
+                    "ha": True,
+                    "active_serial": "248202197",
+                    "standby_serial": "248202193",
+                    "switch": {
+                        "name": "chn-rnd-sw-3048-J8Y00Q2",
+                        "model": "Dell-3048",
+                        "os_family": "os9",
+                        "connections": {"ip": "10.68.136.28", "port": None},
+                        "credentials": {"username": "velocloud", "password": "N#1sdwan"},
+                    },
+                    "ports": [
+                        {
+                            "logical_name": "GE1",
+                            "name": "ge1",
+                            "logical_interface": "GE1",
+                            "link": "B2E1_HA",
+                            "switch_name": "chn-rnd-sw-3048-J8Y00Q2",
+                            "switch_active_port": "gigabitethernet1/1",
+                            "switch_standby_port": "gigabitethernet1/13",
+                            "switch_vlans": [401],
+                            "tagged_vlans": [],
+                            "untagged_vlan": 401,
+                        },
+                        {
+                            "logical_name": "GE2",
+                            "name": "ge2",
+                            "logical_interface": "GE2",
+                            "link": "E21C1",
+                            "switch_name": "chn-rnd-sw-3048-J8Y00Q2",
+                            "switch_active_port": "gigabitethernet1/2",
+                            "switch_standby_port": "gigabitethernet1/14",
+                            "switch_vlans": [402, 403, 404],
+                            "tagged_vlans": [403, 404],
+                            "untagged_vlan": 402,
+                        },
+                        {
+                            "logical_name": "GE3",
+                            "name": "ge3",
+                            "logical_interface": "GE3",
+                            "link": "cr2w1",
+                            "switch_name": "chn-rnd-sw-3048-J8Y00Q2",
+                            "switch_active_port": "gigabitethernet1/3",
+                            "switch_standby_port": "gigabitethernet1/15",
+                            "switch_vlans": [405],
+                            "tagged_vlans": [],
+                            "untagged_vlan": 405,
+                        },
+                        {
+                            "logical_name": "GE4",
+                            "name": "ge4",
+                            "logical_interface": "GE4",
+                            "link": "cr1e2",
+                            "switch_name": "chn-rnd-sw-3048-J8Y00Q2",
+                            "switch_active_port": "gigabitethernet1/4",
+                            "switch_standby_port": "gigabitethernet1/16",
+                            "switch_vlans": [406],
+                            "tagged_vlans": [],
+                            "untagged_vlan": 406,
+                        },
+                    ],
+                    "path": {
+                        "access_switch_id": "access_sw",
+                        "access_switch_name": "chn-rnd-sw-3048-J8Y00Q2",
+                        "access_switch_ip": "10.68.136.28",
+                        "access_uplink_port": "tengigabitethernet1/52",
+                        "upstream_switch_id": "upstream_sw",
+                        "upstream_switch_name": "chn-rnd-sw-4148-F19CV43",
+                        "upstream_switch_ip": "10.68.137.247",
+                        "upstream_access_port": "eth1/1/53",
+                        "upstream_hypervisor_port": "eth1/1/54",
+                        "hypervisor_id": "hypervisor",
+                        "hypervisor_name": "chn-rnd-srv-650-G1HVKJ3",
+                        "hypervisor_ip": "10.68.137.104",
+                        "complete": True,
+                    },
+                }
+            ],
+        }
+    )
+    run_root = tmp_path / "outputs" / "run123"
+    topology_root = run_root / "3-site-spirent-hw-db3a18"
+    topology_root.mkdir(parents=True)
+    (run_root / "run_metadata.json").write_text(
+        json.dumps(
+            {
+                "run_id": "run123",
+                "topology_name": "3-site-spirent-hw-db3a18",
+                "reference_topology_id": "3-site/spirent",
+                "mappings": [
+                    {
+                        "hardware_id": "edge-740-ha",
+                        "branch_name": "branch2",
+                        "edge_name": "b2-edge1",
+                        "path": inventory.hardware[0].path.model_dump(mode="json"),
+                        "allocations": [
+                            {
+                                "reference_interface": "GE1",
+                                "logical_interface": "GE1",
+                                "switch_name": "chn-rnd-sw-3048-J8Y00Q2",
+                                "switch_active_port": "gigabitethernet1/1",
+                                "switch_standby_port": "gigabitethernet1/13",
+                                "switch_vlans": [401],
+                                "tagged_vlans": [],
+                                "untagged_vlan": 401,
+                                "segment_vlans": {},
+                            },
+                            {
+                                "reference_interface": "GE2",
+                                "logical_interface": "GE2",
+                                "switch_name": "chn-rnd-sw-3048-J8Y00Q2",
+                                "switch_active_port": "gigabitethernet1/2",
+                                "switch_standby_port": "gigabitethernet1/14",
+                                "switch_vlans": [402, 403, 404],
+                                "tagged_vlans": [403, 404],
+                                "untagged_vlan": 402,
+                                "segment_vlans": {},
+                            },
+                            {
+                                "reference_interface": "GE3",
+                                "logical_interface": "GE3",
+                                "switch_name": "chn-rnd-sw-3048-J8Y00Q2",
+                                "switch_active_port": "gigabitethernet1/3",
+                                "switch_standby_port": "gigabitethernet1/15",
+                                "switch_vlans": [405],
+                                "tagged_vlans": [],
+                                "untagged_vlan": 405,
+                                "segment_vlans": {},
+                            },
+                            {
+                                "reference_interface": "GE4",
+                                "logical_interface": "GE4",
+                                "switch_name": "chn-rnd-sw-3048-J8Y00Q2",
+                                "switch_active_port": "gigabitethernet1/4",
+                                "switch_standby_port": "gigabitethernet1/16",
+                                "switch_vlans": [406],
+                                "tagged_vlans": [],
+                                "untagged_vlan": 406,
+                                "segment_vlans": {},
+                            },
+                        ],
+                    }
+                ],
+            }
+        )
+    )
+    (topology_root / "config.json").write_text(
+        json.dumps(
+            {
+                "topology": {
+                    "branches": [
+                        {
+                            "edges": [
+                                {
+                                    "l2_switches": [
+                                        {
+                                            "name": "chn-rnd-sw-3048-J8Y00Q2",
+                                            "interfaces": [
+                                                {"name": "gigabitethernet1/1", "link": "B2E1_HA"},
+                                                {"name": "gigabitethernet1/2", "link": "E21C1"},
+                                                {"name": "gigabitethernet1/3", "link": "cr2w1"},
+                                                {"name": "gigabitethernet1/4", "link": "cr1e2"},
+                                            ],
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        )
+    )
+
+    monkeypatch.setattr("app.switch_config.load_inventory", lambda _path: inventory)
+    monkeypatch.setattr("app.switch_config._fetch_running_config", lambda _device: "")
+    monkeypatch.setattr("app.switch_config._fetch_os10_interface_config", lambda _device, _interface: "")
+
+    result = configure_switches_for_run(
+        "run123",
+        SwitchConfigureRequest(dry_run=True),
+        inventory_path=tmp_path / "inventory.json",
+        outputs_root=tmp_path / "outputs",
+    )
+
+    access_commands = next(item.commands for item in result.devices if item.device_id == "access_sw")
+    upstream_commands = next(item.commands for item in result.devices if item.device_id == "upstream_sw")
+
+    vlan401_start = access_commands.index("interface Vlan 401")
+    vlan402_start = access_commands.index("interface Vlan 402")
+    vlan405_start = access_commands.index("interface Vlan 405")
+    vlan406_start = access_commands.index("interface Vlan 406")
+
+    vlan401_block = access_commands[vlan401_start:vlan402_start]
+    vlan405_block = access_commands[vlan405_start:vlan406_start]
+    vlan406_block = access_commands[vlan406_start:]
+
+    assert " tagged TenGigabitEthernet 1/52" not in vlan401_block
+    assert " tagged TenGigabitEthernet 1/52" in vlan405_block
+    assert " tagged TenGigabitEthernet 1/52" in vlan406_block
+    assert " switchport trunk allowed vlan 402-406" in upstream_commands
+
+
 def test_run_ssh_script_uses_clean_compatibility_options(monkeypatch):
     device = InventoryDevice.model_validate(
         {

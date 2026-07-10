@@ -519,6 +519,8 @@ def test_dynamic_vlan_allocations_are_reserved_and_reused():
 
     assert repeated_allocation.reserved_vlans == [200, 201, 202]
     assert inventory.allocations == []
+    assert allocation.ports[0].link == "lan1-link"
+    assert allocation.ports[1].link == "lan2-link"
 
 
 def test_manual_vlan_override_replaces_allocator_for_one_interface():

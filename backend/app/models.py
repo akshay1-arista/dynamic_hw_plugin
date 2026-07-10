@@ -65,6 +65,7 @@ class EdgePortMapping(BaseModel):
 class HardwarePortAllocation(BaseModel):
     reference_interface: str
     logical_interface: str
+    link: Optional[str] = None
     switch_name: str
     switch_active_port: str
     switch_standby_port: Optional[str] = None

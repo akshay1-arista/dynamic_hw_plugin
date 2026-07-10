@@ -43,7 +43,8 @@ def configure_switches_for_run(
     metadata = _load_run_metadata(run_id, outputs_root)
     inventory = load_inventory(inventory_path)
     hardware_by_id = {item.id: item for item in inventory.hardware}
-    plans = _build_plans(metadata, inventory, hardware_by_id)
+    generated_switch_links = _load_generated_switch_links(run_id, metadata, outputs_root)
+    plans = _build_plans(metadata, inventory, hardware_by_id, generated_switch_links)
     plans = _apply_command_overrides(plans, request)
     if not request.dry_run:
         for plan, device in plans:
@@ -69,10 +70,41 @@ def _load_run_metadata(run_id: str, outputs_root: Path) -> RunMetadata:
         return RunMetadata.model_validate(json.load(fh))
 
 
+def _load_generated_switch_links(
+    run_id: str,
+    metadata: RunMetadata,
+    outputs_root: Path,
+) -> dict[tuple[str, str], str]:
+    config_path = resolve_run_root(run_id, outputs_root) / metadata.topology_name / "config.json"
+    if not config_path.exists():
+        return {}
+
+    with config_path.open() as fh:
+        config = json.load(fh)
+
+    links: dict[tuple[str, str], str] = {}
+    for branch in config.get("topology", {}).get("branches", []):
+        for edge in branch.get("edges", []):
+            for switch in edge.get("l2_switches", []):
+                switch_name = switch.get("name")
+                if not isinstance(switch_name, str) or not switch_name.strip():
+                    continue
+                for interface in switch.get("interfaces", []):
+                    interface_name = interface.get("name")
+                    link = interface.get("link")
+                    if not isinstance(interface_name, str) or not interface_name.strip():
+                        continue
+                    if not isinstance(link, str) or not link.strip():
+                        continue
+                    links[(switch_name, interface_name)] = link
+    return links
+
+
 def _build_plans(
     metadata: RunMetadata,
     inventory: InventoryFile,
     hardware_by_id: dict[str, HardwareEdge],
+    generated_switch_links: dict[tuple[str, str], str],
 ) -> list[tuple[SwitchCommandPlan, InventoryDevice]]:
     device_states: dict[str, dict[str, object]] = {}
     for mapping in metadata.mappings:
@@ -112,18 +144,14 @@ def _build_plans(
             {
                 vlan
                 for port in access_ports
-                if port.tagged_vlans
-                for vlan in port.switch_vlans
-                if vlan is not None
+                for vlan in _transport_vlans_for_port(port, generated_switch_links)
             }
         )
         hypervisor_transport_vlans = sorted(
             {
                 vlan
                 for port in (access_ports + upstream_ports)
-                if port.tagged_vlans
-                for vlan in port.switch_vlans
-                if vlan is not None
+                for vlan in _transport_vlans_for_port(port, generated_switch_links)
             }
         )
         upstream_state["target_vlans"].update(hypervisor_transport_vlans)
@@ -207,6 +235,28 @@ def _ensure_device_state(
             "target_vlans": set(),
         }
     return states[device.id]
+
+
+def _port_link(
+    port: HardwarePortAllocation,
+    generated_switch_links: dict[tuple[str, str], str],
+) -> str | None:
+    if port.link:
+        return port.link
+    return generated_switch_links.get((port.switch_name, port.switch_active_port))
+
+
+def _transport_vlans_for_port(
+    port: HardwarePortAllocation,
+    generated_switch_links: dict[tuple[str, str], str],
+) -> list[int]:
+    link = _port_link(port, generated_switch_links)
+    if link is None:
+        if not port.tagged_vlans:
+            return []
+    elif "_HA" in link.upper():
+        return []
+    return [vlan for vlan in port.switch_vlans if vlan is not None]
 
 
 def _add_edge_port_to_state(

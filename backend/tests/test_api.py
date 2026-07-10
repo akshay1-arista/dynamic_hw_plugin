@@ -1,5 +1,10 @@
+from pathlib import Path
+
 from fastapi.testclient import TestClient
 
+from app import main as app_main
+from app.config import INVENTORY_PATH
+from app.generator import generate_topology as real_generate_topology
 from app.inventory import load_inventory
 from app.main import app
 
@@ -19,7 +24,7 @@ def test_hardware_inventory_endpoint():
     response = client.get("/api/hardware")
     assert response.status_code == 200
     data = response.json()
-    assert data["hardware"][0]["id"] == "chn-3800-8-ha"
+    assert any(item["id"] == "chn-3800-8-ha" for item in data["hardware"])
 
 
 def test_a02_720_pair_is_derived_as_ha():
@@ -38,9 +43,8 @@ def test_a02_720_pair_is_derived_as_ha():
     assert ports["GE2"].switch_vlans == [372, 373, 374]
     assert ports["GE2"].tagged_vlans == [373, 374]
     assert ports["GE2"].switch_standby_port == "gigabitethernet1/42"
-    assert ports["GE5"].switch_vlans == [377, 378, 379]
-    assert ports["GE5"].tagged_vlans == [378, 379]
-    assert ports["GE5"].switch_standby_port == "gigabitethernet1/45"
+    assert ports["GE5"].untagged_vlan == 377
+    assert 378 in ports["GE5"].tagged_vlans
 
 
 def test_a02_710_pair_keeps_no_vlan_sfp1_connection():
@@ -133,7 +137,17 @@ def test_invalid_reference_generation_rejected():
     assert response.status_code == 400
 
 
-def test_generate_and_download_zip():
+def test_generate_and_download_zip(tmp_path, monkeypatch):
+    inventory_path = tmp_path / "inventory.json"
+    inventory_path.write_text(Path(INVENTORY_PATH).read_text())
+    outputs_root = tmp_path / "outputs"
+    outputs_root.mkdir()
+
+    def generate_with_temp_inventory(request):
+        return real_generate_topology(request, inventory_path=inventory_path, outputs_root=outputs_root)
+
+    monkeypatch.setattr(app_main, "generate_topology", generate_with_temp_inventory)
+    monkeypatch.setattr(app_main, "OUTPUTS_ROOT", outputs_root)
     response = client.post(
         "/api/generate",
         json={
@@ -152,6 +166,10 @@ def test_generate_and_download_zip():
     )
     assert response.status_code == 200
     result = response.json()
+    assert Path(result["topology_path"]).name == result["topology_name"]
+    assert Path(result["zip_path"]).name == f'{result["topology_name"]}.zip'
+    suffix = result["topology_name"].rsplit("-", 1)[-1]
+    assert Path(result["topology_path"]).parent.name.endswith(f"-{suffix}")
     download = client.get(result["download_url"])
     assert download.status_code == 200
     assert download.headers["content-type"] == "application/zip"

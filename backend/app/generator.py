@@ -10,14 +10,21 @@ from pathlib import Path
 from typing import Any
 
 from .config import INVENTORY_PATH, OUTPUTS_ROOT, REFERENCE_CONFIG_ROOT
-from .inventory import load_inventory
+from .inventory import load_inventory, path_has_credentials, resolve_mapping_path
 from .models import (
     EdgePortMapping,
     GenerateRequest,
     GenerateResult,
+    GenerateMappingStatus,
+    HardwareAllocation,
     HardwareEdge,
+    HardwarePortAllocation,
     InterfaceOverride,
+    InventoryDevice,
+    InventoryFile,
     JsonObject,
+    RunMappingMetadata,
+    RunMetadata,
     ValidationMessage,
 )
 from .reference import resolve_reference_path
@@ -42,9 +49,11 @@ def generate_topology(
     hardware_by_id = {item.id: item for item in inventory.hardware}
     _validate_request(request, hardware_by_id)
 
+    topology_suffix = uuid.uuid4().hex[:6]
+    generated_topology_name = f"{request.topology_name}-{topology_suffix}"
     run_id = uuid.uuid4().hex[:12]
-    run_root = outputs_root / run_id
-    topology_path = run_root / request.topology_name
+    run_root = outputs_root / f"{run_id}-{topology_suffix}"
+    topology_path = run_root / generated_topology_name
     run_root.mkdir(parents=True, exist_ok=True)
     shutil.copytree(reference_path, topology_path)
 
@@ -54,18 +63,25 @@ def generate_topology(
     if "testbed" not in config:
         config["testbed"] = {}
     old_topology_name = config["testbed"].get("name")
-    generated_testbed_name = f"{request.topology_name}-{uuid.uuid4().hex[:6]}"
-    config["testbed"]["name"] = generated_testbed_name
+    config["testbed"]["name"] = generated_topology_name
     config["testbed"]["description"] = f"Generated from {request.reference_topology_id} topology"
 
     global_replacements: list[tuple[str, str]] = []
     if old_topology_name:
-        global_replacements.append((old_topology_name, generated_testbed_name))
+        global_replacements.append((old_topology_name, generated_topology_name))
+
+    run_metadata = RunMetadata(
+        run_id=run_id,
+        topology_name=generated_topology_name,
+        reference_topology_id=request.reference_topology_id,
+    )
+    mapping_statuses: list[GenerateMappingStatus] = []
 
     for mapping in request.mappings:
         hardware = hardware_by_id[mapping.hardware_id]
         branch = _find_branch(config, mapping.branch_name)
         edge = _find_edge(branch, mapping.edge_name)
+        reference_branch = _clone_json(branch)
 
         old_branch_name = branch["name"]
         old_edge_name = edge["name"]
@@ -87,19 +103,86 @@ def generate_topology(
                 )
             )
         _apply_hardware_to_edge(edge, hardware, new_edge_name)
-        remote_updates, dropped_links, port_messages = _apply_port_mappings(
+        remote_updates, dropped_links, port_messages, allocation = _apply_port_mappings(
             edge,
             hardware,
             old_branch_name,
             old_edge_name,
             mapping.interface_overrides,
+            inventory=inventory,
+            reference_topology_id=request.reference_topology_id,
+            reference_branch_name=mapping.branch_name,
+            reference_edge_name=mapping.edge_name,
         )
+        _apply_inventory_free_vlans_to_edge(edge, inventory, hardware.id, allocation.reserved_vlans)
         messages.extend(port_messages)
-        edge["l2_switches"] = _build_l2_switches(hardware, request.hypervisor_ip, request.hypervisor_interface)
+        mapping_path = resolve_mapping_path(
+            inventory,
+            [port.switch_name for port in allocation.ports],
+            request.hypervisor_ip,
+            request.hypervisor_interface,
+        )
+        edge["l2_switches"] = _build_l2_switches(
+            hardware,
+            request.hypervisor_ip,
+            request.hypervisor_interface,
+            mapping_path.access_uplink_port if mapping_path else None,
+            {port.logical_interface.upper() for port in allocation.ports},
+        )
+        mapping_reason = None
+        mapping_ready = False
+        if mapping_path is None:
+            mapping_reason = (
+                f"Could not resolve a unique imported path from the selected access switch to hypervisor "
+                f"{request.hypervisor_ip}."
+            )
+            messages.append(
+                ValidationMessage(
+                    level="warning",
+                    message=(
+                        f"Switch auto-config disabled for {mapping.branch_name}/{mapping.edge_name}: "
+                        f"{mapping_reason}"
+                    ),
+                )
+            )
+        elif not path_has_credentials(mapping_path, inventory):
+            mapping_reason = "The resolved access or upstream switch is missing stored credentials."
+            messages.append(
+                ValidationMessage(
+                    level="warning",
+                    message=(
+                        f"Switch auto-config disabled for {mapping.branch_name}/{mapping.edge_name}: "
+                        f"{mapping_reason}"
+                    ),
+                )
+            )
+        else:
+            mapping_ready = True
+        run_metadata.mappings.append(
+            RunMappingMetadata(
+                hardware_id=hardware.id,
+                branch_name=mapping.branch_name,
+                edge_name=mapping.edge_name,
+                path=mapping_path,
+                allocations=allocation.ports,
+            )
+        )
+        mapping_statuses.append(
+            GenerateMappingStatus(
+                hardware_id=hardware.id,
+                hardware_display_name=hardware.display_name,
+                branch_name=mapping.branch_name,
+                edge_name=mapping.edge_name,
+                path_resolved=bool(mapping_path and mapping_path.complete),
+                auto_config_ready=mapping_ready,
+                reason=mapping_reason,
+                path=mapping_path,
+            )
+        )
 
         _apply_remote_updates_to_config(config, edge, remote_updates)
         _drop_linked_interfaces(config, edge, dropped_links)
-        _apply_companion_file_updates(topology_path, new_branch_name, new_edge_name, hardware, remote_updates)
+        _apply_companion_file_updates(topology_path, reference_branch, branch)
 
         global_replacements.extend(
             [
@@ -119,13 +202,19 @@ def generate_topology(
     validation_messages = _validate_generated_json(topology_path)
     messages.extend(validation_messages)
     zip_path = _zip_topology(topology_path)
+    _write_run_metadata(run_root, run_metadata)
 
     return GenerateResult(
         run_id=run_id,
-        topology_name=generated_testbed_name,
+        topology_name=generated_topology_name,
         topology_path=str(topology_path),
         zip_path=str(zip_path),
         download_url=f"/api/runs/{run_id}/download",
+        can_configure_switches=all(
+            mapping.path and mapping.path.complete and path_has_credentials(mapping.path, inventory)
+            for mapping in run_metadata.mappings
+        ),
+        mapping_statuses=mapping_statuses,
         messages=messages,
     )
 
@@ -143,7 +232,7 @@ def _validate_request(request: GenerateRequest, hardware_by_id: dict[str, Hardwa
     for mapping in request.mappings:
         hardware = hardware_by_id[mapping.hardware_id]
         if not _topology_ports(hardware):
-            raise GenerationError(f"No VLAN-backed switch ports found for {hardware.id}")
+            raise GenerationError(f"No connected switch ports found for {hardware.id}")
 
 
 def _load_json(path: Path) -> JsonObject:
@@ -151,10 +240,46 @@ def _load_json(path: Path) -> JsonObject:
         return json.load(fh)
 
 
+def _clone_json(data: JsonObject) -> JsonObject:
+    return json.loads(json.dumps(data))
+
+
 def _write_json(path: Path, data: JsonObject) -> None:
     with path.open("w") as fh:
         json.dump(data, fh, indent=2)
         fh.write("\n")
+
+
+def _write_run_metadata(run_root: Path, metadata: RunMetadata) -> None:
+    with (run_root / "run_metadata.json").open("w") as fh:
+        json.dump(metadata.model_dump(mode="json"), fh, indent=2)
+        fh.write("\n")
+
+
+def resolve_run_root(run_id: str, outputs_root: Path = OUTPUTS_ROOT) -> Path:
+    if not re.fullmatch(r"[A-Za-z0-9_-]+", run_id):
+        raise GenerationError("Invalid run id")
+
+    outputs_root = outputs_root.resolve()
+    candidates: list[Path] = []
+    exact = outputs_root / run_id
+    if exact.exists():
+        candidates.append(exact.resolve())
+
+    for path in outputs_root.glob(f"{run_id}-*"):
+        if path.is_dir():
+            candidates.append(path.resolve())
+
+    unique_candidates = list(dict.fromkeys(candidates))
+    if not unique_candidates:
+        raise GenerationError(f"Run output not found for {run_id}")
+    if len(unique_candidates) > 1:
+        raise GenerationError(f"Multiple run outputs found for {run_id}")
+
+    run_root = unique_candidates[0]
+    if outputs_root not in run_root.parents and run_root != outputs_root:
+        raise GenerationError("Invalid run id")
+    return run_root
 
 
 def _find_branch(config: JsonObject, branch_name: str) -> JsonObject:
@@ -181,8 +306,6 @@ def _apply_hardware_to_edge(edge: JsonObject, hardware: HardwareEdge, new_edge_n
         edge["standby_slno"] = hardware.standby_serial
     else:
         edge.pop("standby_slno", None)
-    if hardware.free_vlans:
-        edge.setdefault("custom_params", {})["free_vlans"] = hardware.free_vlans
 
 
 def _apply_port_mappings(
@@ -191,7 +314,12 @@ def _apply_port_mappings(
     branch_name: str,
     edge_name: str,
     interface_overrides: list[InterfaceOverride] | None = None,
-) -> tuple[dict[str, dict[str, Any]], set[str], list[ValidationMessage]]:
+    *,
+    inventory: InventoryFile | None = None,
+    reference_topology_id: str = "",
+    reference_branch_name: str = "",
+    reference_edge_name: str = "",
+) -> tuple[dict[str, dict[str, Any]], set[str], list[ValidationMessage], HardwareAllocation]:
     remote_updates: dict[str, dict[str, Any]] = {}
     dropped_links: set[str] = set()
     messages: list[ValidationMessage] = []
@@ -200,25 +328,36 @@ def _apply_port_mappings(
         interface for interface in reference_interfaces if not _is_loopback_interface(interface)
     ]
     hardware_ports = _topology_ports(hardware)
-    no_vlan_ports = [port for port in _ordered_ports(hardware) if not port.switch_vlans]
     mapped_interfaces, mapped_ports, dropped_interfaces = _resolve_port_assignments(
         reference_interfaces,
         hardware_ports,
         interface_overrides or [],
         hardware,
     )
-
-    if no_vlan_ports:
-        messages.append(
-            ValidationMessage(
-                level="warning",
-                message=(
-                    f"{hardware.display_name} has {len(no_vlan_ports)} connected hardware port(s) "
-                    f"without VLAN metadata. Kept in inventory but excluded from generated topology: "
-                    f"{', '.join(port.logical_interface for port in no_vlan_ports)}."
-                ),
-            )
+    allocation = (
+        _reserve_vlans_for_mapping(
+            inventory,
+            hardware,
+            reference_topology_id,
+            reference_branch_name,
+            reference_edge_name,
+            edge,
+            mapped_interfaces,
+            mapped_ports,
+            interface_overrides or [],
         )
+        if inventory
+        else _legacy_allocation_from_ports(
+            hardware,
+            branch_name,
+            edge_name,
+            edge,
+            mapped_interfaces,
+            mapped_ports,
+            interface_overrides=interface_overrides or [],
+        )
+    )
+    allocation_by_port = {item.logical_interface.upper(): item for item in allocation.ports}
 
     if dropped_interfaces:
         mapped_interface_ids = {id(interface) for interface in mapped_interfaces}
@@ -257,6 +396,12 @@ def _apply_port_mappings(
         )
 
     for interface, port in zip(mapped_interfaces, mapped_ports):
+        port_assignment = allocation_by_port.get(port.logical_interface.upper())
+        if port_assignment:
+            port.switch_vlans = list(port_assignment.switch_vlans)
+            port.tagged_vlans = list(port_assignment.tagged_vlans)
+            port.untagged_vlan = port_assignment.untagged_vlan
+            port.segment_vlans = dict(port_assignment.segment_vlans)
         old_link = interface.get("link")
         old_logical_interface = interface.get("logical_interface")
         port.link = old_link or port.link
@@ -264,6 +409,7 @@ def _apply_port_mappings(
         interface["name"] = port.name
         interface["logical_interface"] = port.logical_interface
         interface["link"] = port.link
+        _update_wanlink_name(interface, old_logical_interface, port.logical_interface)
 
         segment_vlans = _derive_segment_vlans(edge, interface, port)
         port.segment_vlans = segment_vlans
@@ -279,7 +425,314 @@ def _apply_port_mappings(
                 "new_logical_interface": port.logical_interface,
             }
 
-    return remote_updates, dropped_links, messages
+    return remote_updates, dropped_links, messages, allocation
+
+
+def _reserve_vlans_for_mapping(
+    inventory: InventoryFile,
+    hardware: HardwareEdge,
+    reference_topology_id: str,
+    branch_name: str,
+    edge_name: str,
+    edge: JsonObject,
+    mapped_interfaces: list[JsonObject],
+    mapped_ports: list[EdgePortMapping],
+    interface_overrides: list[InterfaceOverride],
+) -> HardwareAllocation:
+    override_map = _normalize_interface_overrides(interface_overrides)
+    interface_fingerprint = _mapping_interface_fingerprint(
+        edge,
+        mapped_interfaces,
+        mapped_ports,
+        override_map=override_map,
+    )
+
+    pool = _inventory_vlan_pool(inventory, hardware.id)
+    available = list(pool)
+    reserved_vlans: list[int] = []
+    port_allocations: list[HardwarePortAllocation] = []
+    explicit_reserved: set[int] = set()
+    dynamic_pairs: list[tuple[JsonObject, EdgePortMapping]] = []
+
+    for interface, port in zip(mapped_interfaces, mapped_ports):
+        reference_key = _reference_interface_key(interface) or port.logical_interface.upper()
+        override = override_map.get(reference_key)
+        if override and override.switch_vlans:
+            if pool:
+                invalid_vlans = sorted(vlan for vlan in override.switch_vlans if vlan not in pool)
+                if invalid_vlans:
+                    raise GenerationError(
+                        f"VLAN override for {reference_key} on {hardware.display_name} must stay within the hardware VLAN range: "
+                        f"{', '.join(str(vlan) for vlan in invalid_vlans)}"
+                    )
+            conflicts = sorted(vlan for vlan in override.switch_vlans if vlan in explicit_reserved)
+            if conflicts:
+                raise GenerationError(
+                    f"VLAN override for {reference_key} on {hardware.display_name} conflicts with another interface in this mapping: "
+                    f"{', '.join(str(vlan) for vlan in conflicts)}"
+                )
+            port_allocations.append(
+                _port_allocation_from_override(edge, hardware, interface, port, override.switch_vlans)
+            )
+            reserved_vlans.extend(override.switch_vlans)
+            explicit_reserved.update(override.switch_vlans)
+        else:
+            dynamic_pairs.append((interface, port))
+
+    available = [vlan for vlan in available if vlan not in explicit_reserved]
+    cursor = 0
+
+    for interface, port in dynamic_pairs:
+        required_vlan_count = _required_vlan_count(edge, interface)
+        if required_vlan_count == 0:
+            if port.switch_vlans or port.untagged_vlan is not None:
+                port_allocations.append(_port_allocation_from_port(edge, hardware, interface, port))
+                continue
+            if available and cursor < len(available):
+                switch_vlans = [available[cursor]]
+                reserved_vlans.extend(switch_vlans)
+                port_allocations.append(
+                    _port_allocation_from_override(edge, hardware, interface, port, switch_vlans)
+                )
+                cursor += 1
+                continue
+            raise GenerationError(
+                f"Reference interface {_reference_interface_key(interface) or port.logical_interface} on {hardware.display_name} "
+                "needs 1 native VLAN for the mapped L2 switch port, but no free VLAN is available in the hardware range"
+            )
+        if available and cursor + required_vlan_count <= len(available):
+            switch_vlans = available[cursor : cursor + required_vlan_count]
+            reserved_vlans.extend(switch_vlans)
+            port_allocations.append(
+                _port_allocation_from_override(edge, hardware, interface, port, switch_vlans)
+            )
+            cursor += required_vlan_count
+            continue
+        port_allocations.append(_port_allocation_from_port(edge, hardware, interface, port))
+
+    allocation = HardwareAllocation(
+        hardware_id=hardware.id,
+        branch_name=branch_name,
+        edge_name=edge_name,
+        reference_topology_id=reference_topology_id,
+        interface_fingerprint=interface_fingerprint,
+        reserved_vlans=sorted(set(reserved_vlans)),
+        ports=port_allocations,
+    )
+    return allocation
+
+
+def _mapping_interface_fingerprint(
+    edge: JsonObject,
+    mapped_interfaces: list[JsonObject],
+    mapped_ports: list[EdgePortMapping],
+    *,
+    override_map: dict[str, InterfaceOverride] | None = None,
+) -> str:
+    tokens = []
+    for interface, port in zip(mapped_interfaces, mapped_ports):
+        needs_native, segment_names = _interface_vlan_requirements(edge, interface)
+        reference_key = _reference_interface_key(interface) or ""
+        override_switch_vlans = (
+            ",".join(str(vlan) for vlan in override_map[reference_key].switch_vlans)
+            if override_map and reference_key in override_map and override_map[reference_key].switch_vlans
+            else ""
+        )
+        token_parts = [
+            reference_key,
+            port.logical_interface,
+            "native" if needs_native else "none",
+            str(len(segment_names)),
+            ",".join(segment_names),
+        ]
+        if override_switch_vlans:
+            token_parts.append(override_switch_vlans)
+        tokens.append(
+            ":".join(token_parts)
+        )
+    return "|".join(tokens)
+
+
+def _interface_vlan_requirements(edge: JsonObject, interface: JsonObject) -> tuple[bool, list[str]]:
+    vlans = interface.get("vlans") if isinstance(interface.get("vlans"), list) else []
+    subinterfaces = interface.get("subinterfaces") if isinstance(interface.get("subinterfaces"), list) else []
+    if interface.get("mode") == "switched":
+        segment_names = _segment_names_for_interface(edge, interface)[: max(len(vlans) - 1, 0)]
+        return True, segment_names
+    if subinterfaces:
+        segment_names = _segment_names_for_interface(edge, interface)
+        return True, segment_names
+    if vlans:
+        return True, []
+    return False, []
+
+
+def _inventory_vlan_pool(inventory: InventoryFile, hardware_id: str) -> list[int]:
+    active = _find_inventory_active_device(inventory, hardware_id)
+    if not active:
+        return []
+    if active.free_vlans:
+        return [vlan for vlan in active.free_vlans if 1 <= vlan <= 4094]
+    if active.vlan_range:
+        return list(range(active.vlan_range.start, active.vlan_range.end + 1))
+    return []
+
+
+def _inventory_free_vlans(
+    inventory: InventoryFile,
+    hardware_id: str,
+    used_vlans: list[int] | None = None,
+) -> list[int]:
+    used = set(used_vlans or [])
+    return [vlan for vlan in _inventory_vlan_pool(inventory, hardware_id) if vlan not in used]
+
+
+def _apply_inventory_free_vlans_to_edge(
+    edge: JsonObject,
+    inventory: InventoryFile,
+    hardware_id: str,
+    used_vlans: list[int] | None = None,
+) -> None:
+    free_vlans = _inventory_free_vlans(inventory, hardware_id, used_vlans)
+    edge.setdefault("custom_params", {})["free_vlans"] = free_vlans
+
+
+def _find_inventory_active_device(inventory: InventoryFile, hardware_id: str) -> InventoryDevice | None:
+    candidates = [
+        device
+        for device in inventory.devices.values()
+        if device.type == "edge" and (device.ha_group_id or device.id) == hardware_id
+    ]
+    return next((device for device in candidates if device.ha_role == "active"), candidates[0] if candidates else None)
+
+
+def _legacy_allocation_from_ports(
+    hardware: HardwareEdge,
+    branch_name: str,
+    edge_name: str,
+    edge: JsonObject,
+    mapped_interfaces: list[JsonObject],
+    mapped_ports: list[EdgePortMapping],
+    *,
+    reference_topology_id: str = "",
+    interface_fingerprint: str | None = None,
+    interface_overrides: list[InterfaceOverride] | None = None,
+) -> HardwareAllocation:
+    override_map = _normalize_interface_overrides(interface_overrides or [])
+    ports = [
+        _port_allocation_from_override(edge, hardware, interface, port, override_map[reference_key].switch_vlans)
+        if (reference_key := (_reference_interface_key(interface) or port.logical_interface.upper())) in override_map
+        and override_map[reference_key].switch_vlans
+        else _port_allocation_from_port(edge, hardware, interface, port)
+        for interface, port in zip(mapped_interfaces, mapped_ports)
+    ]
+    reserved_vlans = sorted(
+        {
+            vlan
+            for port in ports
+            for vlan in port.switch_vlans
+        }
+    )
+    return HardwareAllocation(
+        hardware_id=hardware.id,
+        branch_name=branch_name,
+        edge_name=edge_name,
+        reference_topology_id=reference_topology_id or None,
+        interface_fingerprint=interface_fingerprint
+        or _mapping_interface_fingerprint(edge, mapped_interfaces, mapped_ports, override_map=override_map),
+        reserved_vlans=reserved_vlans,
+        ports=ports,
+    )
+
+
+def _required_vlan_count(edge: JsonObject, interface: JsonObject) -> int:
+    needs_native, segment_names = _interface_vlan_requirements(edge, interface)
+    return (1 if needs_native else 0) + len(segment_names)
+
+
+def _allocation_switch_name(hardware: HardwareEdge, port: EdgePortMapping) -> str:
+    return port.switch_name or (hardware.switches[0].name if hardware.switches else hardware.switch.name)
+
+
+def _port_allocation_from_port(
+    edge: JsonObject,
+    hardware: HardwareEdge,
+    interface: JsonObject,
+    port: EdgePortMapping,
+) -> HardwarePortAllocation:
+    switch_vlans = list(port.switch_vlans)
+    if not switch_vlans and port.untagged_vlan is not None:
+        switch_vlans = [port.untagged_vlan]
+    tagged_vlans = list(port.tagged_vlans)
+    if not tagged_vlans and len(switch_vlans) > 1 and port.untagged_vlan is not None:
+        tagged_vlans = switch_vlans[1:]
+    _needs_native, segment_names = _interface_vlan_requirements(edge, interface)
+    return HardwarePortAllocation(
+        reference_interface=_reference_interface_key(interface) or port.logical_interface,
+        logical_interface=port.logical_interface,
+        switch_name=_allocation_switch_name(hardware, port),
+        switch_active_port=port.switch_active_port,
+        switch_standby_port=port.switch_standby_port,
+        switch_vlans=switch_vlans,
+        tagged_vlans=tagged_vlans,
+        untagged_vlan=port.untagged_vlan,
+        segment_vlans={
+            segment_name: tagged_vlans[index]
+            for index, segment_name in enumerate(segment_names)
+            if index < len(tagged_vlans)
+        },
+    )
+
+
+def _port_allocation_from_override(
+    edge: JsonObject,
+    hardware: HardwareEdge,
+    interface: JsonObject,
+    port: EdgePortMapping,
+    switch_vlans: list[int],
+) -> HardwarePortAllocation:
+    needs_native, segment_names = _interface_vlan_requirements(edge, interface)
+    required_count = (1 if needs_native else 0) + len(segment_names)
+    if required_count == 0:
+        if len(switch_vlans) != 1:
+            raise GenerationError(
+                f"Reference interface {_reference_interface_key(interface) or port.logical_interface} uses the switch as an untagged access link "
+                f"and requires exactly 1 native VLAN value, but received {len(switch_vlans)}"
+            )
+        native_vlan = switch_vlans[0]
+        return HardwarePortAllocation(
+            reference_interface=_reference_interface_key(interface) or port.logical_interface,
+            logical_interface=port.logical_interface,
+            switch_name=_allocation_switch_name(hardware, port),
+            switch_active_port=port.switch_active_port,
+            switch_standby_port=port.switch_standby_port,
+            switch_vlans=list(switch_vlans),
+            tagged_vlans=[],
+            untagged_vlan=native_vlan,
+            segment_vlans={},
+        )
+    if len(switch_vlans) != required_count:
+        raise GenerationError(
+            f"Reference interface {_reference_interface_key(interface) or port.logical_interface} requires {required_count} VLAN value(s), "
+            f"but received {len(switch_vlans)}"
+        )
+    native_vlan = switch_vlans[0] if needs_native else None
+    tagged_vlans = switch_vlans[1:] if needs_native else list(switch_vlans)
+    return HardwarePortAllocation(
+        reference_interface=_reference_interface_key(interface) or port.logical_interface,
+        logical_interface=port.logical_interface,
+        switch_name=_allocation_switch_name(hardware, port),
+        switch_active_port=port.switch_active_port,
+        switch_standby_port=port.switch_standby_port,
+        switch_vlans=list(switch_vlans),
+        tagged_vlans=tagged_vlans,
+        untagged_vlan=native_vlan,
+        segment_vlans={
+            segment_name: tagged_vlans[index]
+            for index, segment_name in enumerate(segment_names)
+            if index < len(tagged_vlans)
+        },
+    )
 
 
 def _resolve_port_assignments(
@@ -319,7 +772,7 @@ def _resolve_port_assignments(
 
     invalid_hardware = []
     excluded_hardware = []
-    for hardware_key in [value for value in override_map.values() if value]:
+    for hardware_key in [override.hardware_interface for override in override_map.values() if override.hardware_interface]:
         if hardware_key not in all_ports_by_name:
             invalid_hardware.append(hardware_key)
         elif hardware_key not in hardware_ports_by_name:
@@ -335,9 +788,14 @@ def _resolve_port_assignments(
         )
 
     explicit_pairs: dict[str, EdgePortMapping] = {}
-    explicit_drop_keys = {reference_key for reference_key, hardware_key in override_map.items() if hardware_key is None}
+    explicit_drop_keys = {
+        reference_key
+        for reference_key, override in override_map.items()
+        if override.hardware_interface is None
+    }
     used_hardware_keys: set[str] = set()
-    for reference_key, hardware_key in override_map.items():
+    for reference_key, override in override_map.items():
+        hardware_key = override.hardware_interface
         if hardware_key is None:
             continue
         explicit_pairs[reference_key] = hardware_ports_by_name[hardware_key]
@@ -384,8 +842,8 @@ def _resolve_port_assignments(
     return mapped_interfaces, mapped_ports, dropped_interfaces
 
 
-def _normalize_interface_overrides(interface_overrides: list[InterfaceOverride]) -> dict[str, str | None]:
-    override_map: dict[str, str | None] = {}
+def _normalize_interface_overrides(interface_overrides: list[InterfaceOverride]) -> dict[str, InterfaceOverride]:
+    override_map: dict[str, InterfaceOverride] = {}
     used_hardware_interfaces: set[str] = set()
     for override in interface_overrides:
         reference_key = override.reference_interface.strip().upper()
@@ -394,7 +852,11 @@ def _normalize_interface_overrides(interface_overrides: list[InterfaceOverride])
             raise GenerationError(f"Reference interface override specified more than once: {reference_key}")
         if hardware_key and hardware_key in used_hardware_interfaces:
             raise GenerationError(f"Hardware interface override specified more than once: {hardware_key}")
-        override_map[reference_key] = hardware_key
+        override_map[reference_key] = InterfaceOverride(
+            reference_interface=reference_key,
+            hardware_interface=hardware_key,
+            switch_vlans=list(override.switch_vlans),
+        )
         if hardware_key:
             used_hardware_interfaces.add(hardware_key)
     return override_map
@@ -413,7 +875,7 @@ def _ordered_ports(hardware: HardwareEdge) -> list[EdgePortMapping]:
 
 
 def _topology_ports(hardware: HardwareEdge) -> list[EdgePortMapping]:
-    return [port for port in _ordered_ports(hardware) if port.switch_vlans]
+    return _ordered_ports(hardware)
 
 
 def _match_ports_to_reference_interfaces(
@@ -422,6 +884,9 @@ def _match_ports_to_reference_interfaces(
 ) -> list[EdgePortMapping]:
     if not reference_interfaces or not hardware_ports:
         return []
+    metadata_backed_ports = [port for port in hardware_ports if port.switch_vlans]
+    if len(metadata_backed_ports) >= len(reference_interfaces):
+        hardware_ports = metadata_backed_ports
 
     @lru_cache(maxsize=None)
     def assign(reference_index: int, used_mask: int) -> tuple[int, tuple[int, ...]]:
@@ -467,6 +932,8 @@ def _port_match_score(interface: JsonObject, port: EdgePortMapping) -> int:
     score += 40 if reference_has_tagged == port_has_tagged else -60
     score += 30 if reference_has_untagged == port_has_untagged else -45
     score -= abs(reference_tagged_count - port_tagged_count) * 5
+    if port.switch_vlans:
+        score += 10
     return score
 
 
@@ -496,6 +963,7 @@ def _hardware_vlan_profile(port: EdgePortMapping) -> tuple[bool, bool, int]:
 
 
 def _derive_segment_vlans(edge: JsonObject, interface: JsonObject, port: EdgePortMapping) -> dict[str, int]:
+    existing_vlans = interface.get("vlans") if isinstance(interface.get("vlans"), list) else []
     tagged_vlans = list(port.tagged_vlans)
     if not tagged_vlans and len(port.switch_vlans) > 1:
         tagged_vlans = port.switch_vlans[1:]
@@ -508,7 +976,12 @@ def _derive_segment_vlans(edge: JsonObject, interface: JsonObject, port: EdgePor
     }
 
     if interface.get("mode") == "switched":
-        interface["vlans"] = [1, *segment_vlans.values()] if segment_vlans else [1]
+        if existing_vlans:
+            interface["vlans"] = [existing_vlans[0], *segment_vlans.values()]
+        elif segment_vlans:
+            interface["vlans"] = list(segment_vlans.values())
+        else:
+            interface["vlans"] = []
 
     for subinterface in interface.get("subinterfaces", []):
         segment_name = subinterface.get("segment_name")
@@ -546,12 +1019,16 @@ def _build_l2_switches(
     hardware: HardwareEdge,
     hypervisor_ip: str,
     hypervisor_interface: str,
+    hypervisor_switch_port: str | None = None,
+    included_ports: set[str] | None = None,
 ) -> list[JsonObject]:
     switch_by_name = _switches_by_name(hardware)
     default_switch_name = next(iter(switch_by_name))
     interfaces_by_switch: dict[str, list[JsonObject]] = {name: [] for name in switch_by_name}
 
-    for port in _topology_ports(hardware):
+    for port in [item for item in _topology_ports(hardware) if item.switch_vlans]:
+        if included_ports and port.logical_interface.upper() not in included_ports:
+            continue
         switch_name = port.switch_name or default_switch_name
         if switch_name not in interfaces_by_switch:
             switch_name = default_switch_name
@@ -578,11 +1055,11 @@ def _build_l2_switches(
         interfaces = interfaces_by_switch.get(switch_name, [])
         if not interfaces:
             continue
-        switch = switch_metadata.model_dump(mode="json")
+        switch = switch_metadata.model_dump(mode="json", exclude={"os_family"})
         switch["interfaces"] = [
             *interfaces,
             {
-                "name": hypervisor_interface,
+                "name": hypervisor_switch_port or hypervisor_interface,
                 "link": hypervisor_interface,
                 "logical_name": "HYPERVISOR",
                 "default_gateway": hypervisor_ip,
@@ -677,6 +1154,31 @@ def _tagged_name(name: str, vlan: int) -> str:
     return f"{base}.{vlan}"
 
 
+def _update_wanlink_name(
+    interface: JsonObject,
+    old_logical_interface: Any,
+    new_logical_interface: str,
+) -> None:
+    wanlink = interface.get("wanlink")
+    if not isinstance(wanlink, dict):
+        return
+    name = wanlink.get("name")
+    if not isinstance(name, str):
+        return
+
+    old_name = str(old_logical_interface or "").strip()
+    new_name = str(new_logical_interface or "").strip()
+    if not old_name or not new_name or old_name == new_name:
+        return
+    if name == old_name:
+        wanlink["name"] = new_name
+        return
+
+    prefix = f"{old_name}_"
+    if name.startswith(prefix):
+        wanlink["name"] = f"{new_name}_{name[len(prefix):]}"
+
+
 def _update_segments(interface: JsonObject, segment_vlans: dict[str, int]) -> None:
     for segment in interface.get("segments", []):
         segment_name = segment.get("name")
@@ -686,60 +1188,114 @@ def _update_segments(interface: JsonObject, segment_vlans: dict[str, int]) -> No
 
 def _apply_companion_file_updates(
     topology_path: Path,
-    branch_name: str,
-    edge_name: str,
-    hardware: HardwareEdge,
-    remote_updates: dict[str, dict[str, Any]],
+    reference_branch: JsonObject,
+    generated_branch: JsonObject,
 ) -> None:
+    branch_names = {
+        name
+        for name in (reference_branch.get("name"), generated_branch.get("name"))
+        if isinstance(name, str) and name
+    }
+    device_updates = _build_companion_device_updates(reference_branch, generated_branch)
     for path in _json_paths(topology_path):
         if path.name == "config.json":
             continue
         data = _load_json(path)
-        _update_companion_edge_interfaces(data, branch_name, edge_name, hardware)
-        _update_companion_remote_interfaces(data, remote_updates)
+        _update_companion_interfaces(data, branch_names, device_updates)
         _write_json(path, data)
 
 
-def _update_companion_edge_interfaces(data: Any, branch_name: str, edge_name: str, hardware: HardwareEdge) -> None:
-    logical_map = {port.logical_name: port.logical_interface for port in hardware.ports}
-    logical_map.update({port.logical_interface: port.logical_interface for port in hardware.ports})
+def _build_companion_device_updates(
+    reference_branch: JsonObject,
+    generated_branch: JsonObject,
+) -> dict[str, dict[str, dict[str, str]]]:
+    device_updates: dict[str, dict[str, dict[str, str]]] = {}
 
-    def walk(value: Any, active_branch: bool = False, active_edge: bool = False) -> None:
+    def register_device_pair(reference_device: Any, generated_device: Any) -> None:
+        if not isinstance(reference_device, dict) or not isinstance(generated_device, dict):
+            return
+        device_name = reference_device.get("name")
+        if not isinstance(device_name, str) or not device_name:
+            return
+
+        name_map: dict[str, str] = {}
+        logical_interface_map: dict[str, str] = {}
+        reference_interfaces = reference_device.get("interfaces", [])
+        generated_interfaces = generated_device.get("interfaces", [])
+        for reference_interface, generated_interface in zip(reference_interfaces, generated_interfaces):
+            if not isinstance(reference_interface, dict) or not isinstance(generated_interface, dict):
+                continue
+
+            reference_name = reference_interface.get("name")
+            generated_name = generated_interface.get("name")
+            if isinstance(reference_name, str) and isinstance(generated_name, str) and reference_name != generated_name:
+                name_map[reference_name] = generated_name
+
+            reference_logical = reference_interface.get("logical_interface")
+            generated_logical = generated_interface.get("logical_interface")
+            if (
+                isinstance(reference_logical, str)
+                and isinstance(generated_logical, str)
+                and reference_logical != generated_logical
+            ):
+                logical_interface_map[reference_logical] = generated_logical
+
+        if name_map or logical_interface_map:
+            device_updates[device_name] = {
+                "name_map": name_map,
+                "logical_interface_map": logical_interface_map,
+            }
+
+    for key in ("edges", "CEs", "l3switches"):
+        reference_devices = reference_branch.get(key, [])
+        generated_devices = generated_branch.get(key, [])
+        for reference_device, generated_device in zip(reference_devices, generated_devices):
+            register_device_pair(reference_device, generated_device)
+            if key != "edges":
+                continue
+            reference_clients = reference_device.get("direct_clients", [])
+            generated_clients = generated_device.get("direct_clients", [])
+            for reference_client, generated_client in zip(reference_clients, generated_clients):
+                register_device_pair(reference_client, generated_client)
+
+    return device_updates
+
+
+def _update_companion_interfaces(
+    data: Any,
+    branch_names: set[str],
+    device_updates: dict[str, dict[str, dict[str, str]]],
+) -> None:
+    def walk(
+        value: Any,
+        active_branch: bool = False,
+        active_device_update: dict[str, dict[str, str]] | None = None,
+    ) -> None:
         if isinstance(value, dict):
-            branch_context = active_branch or value.get("name") == branch_name
-            edge_context = active_edge or (branch_context and value.get("name") == edge_name)
-            if edge_context and value.get("logical_interface") in logical_map:
-                value["logical_interface"] = logical_map[value["logical_interface"]]
-            for child in value.values():
-                walk(child, branch_context, edge_context)
-        elif isinstance(value, list):
-            for item in value:
-                walk(item, active_branch, active_edge)
-
-    walk(data)
-
-
-def _update_companion_remote_interfaces(data: Any, remote_updates: dict[str, dict[str, Any]]) -> None:
-    # Companion characteristic files usually do not carry link names. Update interface
-    # names conservatively when a name already has a stale tag for a mapped link.
-    old_tag_pattern = re.compile(r"^(?P<base>eth\d+)\.(100|101)$")
-
-    def walk(value: Any) -> None:
-        if isinstance(value, dict):
+            current_device_update = active_device_update
             name = value.get("name")
-            if isinstance(name, str):
-                match = old_tag_pattern.match(name)
-                if match:
-                    # Use the first mapped global VLAN as the safest correction when
-                    # link context is absent from the companion file.
-                    first_update = next(iter(remote_updates.values()), None)
-                    if first_update and first_update.get("global_vlan"):
-                        value["name"] = _tagged_name(match.group("base"), first_update["global_vlan"])
+            branch_context = active_branch or (isinstance(name, str) and name in branch_names)
+            if branch_context and isinstance(name, str) and name in device_updates:
+                current_device_update = device_updates[name]
+
+            if current_device_update:
+                interface_name = value.get("name")
+                if isinstance(interface_name, str):
+                    new_name = current_device_update["name_map"].get(interface_name)
+                    if new_name:
+                        value["name"] = new_name
+
+                logical_interface = value.get("logical_interface")
+                if isinstance(logical_interface, str):
+                    new_logical = current_device_update["logical_interface_map"].get(logical_interface)
+                    if new_logical:
+                        value["logical_interface"] = new_logical
+
             for child in value.values():
-                walk(child)
+                walk(child, branch_context, current_device_update)
         elif isinstance(value, list):
             for item in value:
-                walk(item)
+                walk(item, active_branch, active_device_update)
 
     walk(data)
 

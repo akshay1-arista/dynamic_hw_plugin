@@ -16,7 +16,8 @@ body {
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
 }
 
@@ -110,7 +111,8 @@ label {
 }
 
 input,
-select {
+select,
+textarea {
   background: #fbfcfc;
   border: 1px solid #c8d1d6;
   border-radius: 6px;
@@ -474,11 +476,12 @@ button:disabled {
 }
 
 .interfaceOverrideEditor {
-  background: #ffffff;
+  background:
+    linear-gradient(180deg, #ffffff 0%, #fbfcfd 100%);
   border-top: 1px solid #d7dee2;
   display: grid;
-  gap: 10px;
-  padding: 12px;
+  gap: 14px;
+  padding: 14px;
 }
 
 .interfaceOverrideEditor .muted {
@@ -487,19 +490,71 @@ button:disabled {
 
 .interfaceOverrideList {
   display: grid;
-  gap: 10px;
+  gap: 12px;
 }
 
 .interfaceOverrideRow {
-  align-items: center;
+  align-items: start;
+  background: #ffffff;
+  border: 1px solid #d7dee2;
+  border-radius: 10px;
   display: grid;
-  gap: 10px;
-  grid-template-columns: minmax(180px, 1fr) minmax(240px, 1.4fr);
+  gap: 12px;
+  grid-template-columns: minmax(180px, 0.95fr) minmax(280px, 1.25fr) minmax(240px, 1fr);
+  padding: 14px;
 }
 
-.interfaceOverrideLabel {
+.interfaceOverrideMeta,
+.interfaceOverrideField {
   display: grid;
-  gap: 2px;
+  gap: 4px;
+}
+
+.interfaceOverrideHeader {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.fieldCaption {
+  color: #44515a;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.interfacePill {
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 4px 8px;
+}
+
+.interfacePill.neutral {
+  background: #eef6fb;
+  border-color: #c9deeb;
+  color: #24516a;
+}
+
+.interfacePill.accent {
+  background: #fff4df;
+  border-color: #efc774;
+  color: #8a5a00;
+}
+
+.interfacePill.warning {
+  background: #fff1ef;
+  border-color: #efb2a8;
+  color: #9a3127;
+}
+
+.interfaceOverrideField small,
+.interfaceOverrideMeta small {
+  line-height: 1.45;
 }
 
 .actionRow {
@@ -529,6 +584,47 @@ button:disabled {
 .resultBox {
   background: #f7fbf9;
   margin-top: 14px;
+}
+
+.resultActions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.switchPreviewBox {
+  background: #ffffff;
+  border: 1px solid #d7dee2;
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 12px;
+}
+
+.switchPreviewHeader,
+.switchPreviewDeviceTitle {
+  display: grid;
+  gap: 2px;
+}
+
+.switchPreviewList {
+  display: grid;
+  gap: 12px;
+}
+
+.switchPreviewDevice {
+  gap: 8px;
+  margin: 0;
+}
+
+.switchPreviewEditor {
+  font-family:
+    "SFMono-Regular", ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, monospace;
+  line-height: 1.5;
+  resize: vertical;
+  white-space: pre;
 }
 
 .download {

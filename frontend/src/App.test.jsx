@@ -41,12 +41,109 @@ const references = [
             ]
           }
         ]
+      },
+      {
+        name: 'branch3',
+        edges: [
+          {
+            name: 'b3-edge1',
+            model: 'virtual',
+            interfaces: [
+              { name: 'eth2', logical_name: 'INTERNET1', logical_interface: 'GE3' },
+              { name: 'eth3', logical_name: 'INTERNET2', logical_interface: 'GE4' }
+            ]
+          }
+        ]
       }
     ]
   }
 ];
 
 const inventory = {
+  devices: {
+    'switch-a01': {
+      id: 'switch-a01',
+      type: 'switch',
+      display_name: 'a01-core-switch',
+      model: 'Dell-4148',
+      ip_address: '10.68.136.10',
+      available: true
+    },
+    'hyp-1': {
+      id: 'hyp-1',
+      type: 'hypervisor',
+      display_name: 'chn-rnd-srv-640-298VF33',
+      model: 'Dell-R640',
+      serial_number: '298VF33',
+      ip_address: '10.68.136.50',
+      available: true
+    },
+    'hyp-2': {
+      id: 'hyp-2',
+      type: 'hypervisor',
+      display_name: 'chn-rnd-srv-640-8FYS6T2',
+      model: 'Dell-R640',
+      serial_number: '8FYS6T2',
+      ip_address: '10.68.137.162',
+      available: true
+    }
+  },
+  connections: [
+    {
+      id: 'hyp-1-vmnic0',
+      a: { device_id: 'switch-a01', interface: 'eth1/1/1' },
+      b: { device_id: 'hyp-1', interface: 'vmnic0' },
+      role: 'hypervisor-access',
+      vlans: [1],
+      tagged_vlans: [],
+      untagged_vlan: 1
+    },
+    {
+      id: 'hyp-1-vmnic2',
+      a: { device_id: 'switch-a01', interface: 'eth1/1/2' },
+      b: { device_id: 'hyp-1', interface: 'vmnic2' },
+      role: 'hypervisor-access',
+      vlans: [3009],
+      tagged_vlans: [],
+      untagged_vlan: 3009
+    },
+    {
+      id: 'hyp-1-idrac',
+      a: { device_id: 'switch-a01', interface: 'eth1/1/3' },
+      b: { device_id: 'hyp-1', interface: 'iDRAC' },
+      role: 'hypervisor-access',
+      vlans: [3007],
+      tagged_vlans: [],
+      untagged_vlan: 3007
+    },
+    {
+      id: 'hyp-2-eno1np0',
+      a: { device_id: 'switch-a01', interface: 'eth1/1/4' },
+      b: { device_id: 'hyp-2', interface: 'eno1np0' },
+      role: 'hypervisor-access',
+      vlans: [1],
+      tagged_vlans: [],
+      untagged_vlan: 1
+    },
+    {
+      id: 'hyp-2-eno2np1',
+      a: { device_id: 'switch-a01', interface: 'eth1/1/5' },
+      b: { device_id: 'hyp-2', interface: 'eno2np1' },
+      role: 'hypervisor-access',
+      vlans: [1],
+      tagged_vlans: [],
+      untagged_vlan: 1
+    },
+    {
+      id: 'hyp-2-eno3',
+      a: { device_id: 'switch-a01', interface: 'eth1/1/6' },
+      b: { device_id: 'hyp-2', interface: 'eno3' },
+      role: 'hypervisor-access',
+      vlans: [3009],
+      tagged_vlans: [],
+      untagged_vlan: 3009
+    }
+  ],
   hardware: [
     {
       id: 'chn-3800-8-ha',
@@ -103,11 +200,43 @@ const inventory = {
         }
       ],
       notes: 'standalone inventory entry'
+    },
+    {
+      id: 'internet-dynamic-680',
+      short_name: 'internet-dyn-680',
+      display_name: 'Internet Dynamic 680',
+      model: 'edge6X0',
+      model_suffix: '680',
+      ha: false,
+      active_serial: 'DYN6801',
+      standby_serial: '',
+      available: true,
+      switch: { name: 'a02-access-switch', model: 'Dell-3048', connections: { ip: '10.68.136.80' } },
+      ports: [
+        {
+          logical_name: 'INTERNET1',
+          logical_interface: 'GE3',
+          switch_active_port: 'gigabitethernet1/21',
+          switch_vlans: [],
+          tagged_vlans: [],
+          untagged_vlan: null
+        },
+        {
+          logical_name: 'INTERNET2',
+          logical_interface: 'GE4',
+          switch_active_port: 'gigabitethernet1/22',
+          switch_vlans: [],
+          tagged_vlans: [],
+          untagged_vlan: null
+        }
+      ],
+      notes: 'dynamic internet ports'
     }
   ]
 };
 
 beforeEach(() => {
+  window.confirm = vi.fn(() => true);
   global.fetch = vi.fn(async (url, options = {}) => {
     if (url === '/api/reference-topologies') {
       return Response.json(references);
@@ -119,13 +248,83 @@ beforeEach(() => {
       return Response.json(JSON.parse(options.body));
     }
     if (url === '/api/generate') {
+      const payload = JSON.parse(options.body);
+      if (payload.mappings?.[0]?.hardware_id === 'a01-680-standalone') {
+        return Response.json({
+          run_id: 'abc123',
+          topology_name: '3-site-hw-a1b2c3',
+          topology_path: '/tmp/3-site-hw-a1b2c3',
+          zip_path: '/tmp/3-site-hw-a1b2c3.zip',
+          download_url: '/api/runs/abc123/download',
+          can_configure_switches: true,
+          mapping_statuses: [
+            {
+              hardware_id: 'a01-680-standalone',
+              hardware_display_name: 'A01 680 Standalone',
+              branch_name: payload.mappings[0].branch_name,
+              edge_name: payload.mappings[0].edge_name,
+              path_resolved: true,
+              auto_config_ready: true,
+              path: {
+                access_switch_name: 'a01-access-switch',
+                upstream_switch_name: 'a01-core-switch',
+                hypervisor_name: 'chn-rnd-srv-640-298VF33'
+              }
+            }
+          ],
+          messages: [{ level: 'info', message: 'All generated JSON files parsed successfully' }]
+        });
+      }
       return Response.json({
         run_id: 'abc123',
         topology_name: '3-site-hw-a1b2c3',
-        topology_path: '/tmp/3-site-hw',
-        zip_path: '/tmp/3-site-hw.zip',
+        topology_path: '/tmp/3-site-hw-a1b2c3',
+        zip_path: '/tmp/3-site-hw-a1b2c3.zip',
         download_url: '/api/runs/abc123/download',
+        can_configure_switches: false,
+        mapping_statuses: [
+          {
+            hardware_id: 'chn-3800-8-ha',
+            hardware_display_name: 'CHN 3800 HA Pair 8',
+            branch_name: 'branch2',
+            edge_name: 'b2-edge1',
+            path_resolved: false,
+            auto_config_ready: false,
+            reason: 'Could not resolve a unique imported path from the selected access switch to hypervisor 10.68.136.50.'
+          }
+        ],
         messages: [{ level: 'info', message: 'All generated JSON files parsed successfully' }]
+      });
+    }
+    if (url === '/api/runs/abc123/configure-switches' && options.method === 'POST') {
+      const payload = JSON.parse(options.body);
+      const commands =
+        payload.command_overrides?.[0]?.commands || [
+          'interface gigabitethernet1/11',
+          ' switchport mode access',
+          ' switchport access vlan 1510',
+          ' exit'
+        ];
+      return Response.json({
+        run_id: 'abc123',
+        applied: !payload.dry_run,
+        devices: [
+          {
+            device_id: 'access_sw',
+            device_name: 'a01-access-switch',
+            device_ip: '10.68.136.70',
+            interface: 'multiple',
+            commands
+          }
+        ],
+        messages: [
+          {
+            level: 'info',
+            message: payload.dry_run
+              ? 'Generated switch configuration preview.'
+              : 'Applied switch configuration.'
+          }
+        ]
       });
     }
     return new Response(null, { status: 404 });
@@ -164,6 +363,35 @@ describe('App', () => {
     expect(screen.queryByRole('option', { name: /CHN 3800 HA Pair 8/i })).not.toBeInTheDocument();
   });
 
+  test('selects hypervisor ip from inventory and prefills a matching interface', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await screen.findAllByText('CHN 3800 HA Pair 8');
+    const hypervisorIpInput = screen.getByRole('combobox', { name: 'Hypervisor IP' });
+    await user.type(hypervisorIpInput, '137.162');
+    await user.click(
+      screen.getByRole('option', { name: /10\.68\.137\.162 - chn-rnd-srv-640-8FYS6T2/i })
+    );
+
+    expect(hypervisorIpInput).toHaveValue('10.68.137.162');
+    expect(screen.getByRole('combobox', { name: 'Hypervisor interface' })).toHaveValue('eno1np0');
+  });
+
+  test('filters hypervisor interface choices for the selected hypervisor', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await screen.findAllByText('CHN 3800 HA Pair 8');
+    await user.type(screen.getByRole('combobox', { name: 'Hypervisor IP' }), '10.68.136.50');
+    const interfaceInput = screen.getByRole('combobox', { name: 'Hypervisor interface' });
+    await user.clear(interfaceInput);
+    await user.type(interfaceInput, 'vmnic2');
+
+    expect(screen.getByRole('option', { name: 'vmnic2' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'eno1np0' })).not.toBeInTheDocument();
+  });
+
   test('searches inventory by short name and expands details', async () => {
     const user = userEvent.setup();
     render(<App />);
@@ -185,13 +413,14 @@ describe('App', () => {
     await screen.findAllByText('CHN 3800 HA Pair 8');
     await chooseHardware(user, '3800', /CHN 3800 HA Pair 8/i);
     await user.selectOptions(screen.getByLabelText('Branch'), 'branch2');
-    await user.type(screen.getByLabelText('Hypervisor IP'), '10.68.136.50');
+    await user.type(screen.getByRole('combobox', { name: 'Hypervisor IP' }), '10.68.136.50');
 
     expect(screen.getByText('branch2 -> branch2')).toBeInTheDocument();
     expect(screen.getByText('b2-edge1 -> b2-edge1-3800')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /generate zip/i }));
-    await waitFor(() => expect(screen.getByText('/tmp/3-site-hw')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('/tmp/3-site-hw-a1b2c3')).toBeInTheDocument());
+    expect(screen.getByText(/branch2\/b2-edge1: path unresolved/i)).toBeInTheDocument();
     const generateCall = global.fetch.mock.calls.find(([url]) => url === '/api/generate');
     const payload = JSON.parse(generateCall[1].body);
     expect(payload.hypervisor_ip).toBe('10.68.136.50');
@@ -202,6 +431,49 @@ describe('App', () => {
       'href',
       '/api/runs/abc123/download'
     );
+  });
+
+  test('previews switch config, allows edits, and applies the edited commands', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await screen.findAllByText('CHN 3800 HA Pair 8');
+    await chooseHardware(user, 'a01 680', /A01 680 Standalone/i);
+    await user.selectOptions(screen.getByLabelText('Branch'), 'branch1');
+    await user.type(screen.getByRole('combobox', { name: 'Hypervisor IP' }), '10.68.136.50');
+    await user.click(screen.getByRole('button', { name: /generate zip/i }));
+
+    await waitFor(() => expect(screen.getByText(/path resolved/i)).toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: /preview config/i }));
+
+    const editor = await screen.findByLabelText('Switch commands for a01-access-switch');
+    expect(editor.value).toContain('interface gigabitethernet1/11');
+
+    await user.clear(editor);
+    await user.type(
+      editor,
+      'interface gigabitethernet1/11{enter} switchport mode access{enter} switchport access vlan 1511{enter} exit'
+    );
+    await user.click(screen.getByRole('button', { name: /configure switches/i }));
+
+    const configureCall = global.fetch.mock.calls
+      .filter(([url]) => url === '/api/runs/abc123/configure-switches')
+      .at(-1);
+    const payload = JSON.parse(configureCall[1].body);
+
+    expect(payload.command_overrides).toEqual([
+      {
+        device_id: 'access_sw',
+        commands: [
+          'interface gigabitethernet1/11',
+          ' switchport mode access',
+          ' switchport access vlan 1511',
+          ' exit'
+        ]
+      }
+    ]);
+    expect(window.confirm).toHaveBeenCalled();
   });
 
   test('shows default interface matches and sends override payload when edited', async () => {
@@ -222,7 +494,7 @@ describe('App', () => {
     await user.selectOptions(firstInterface, 'GE1');
     expect(firstInterface).toHaveValue('GE1');
     expect(secondInterface).toHaveValue('');
-    await user.type(screen.getByLabelText('Hypervisor IP'), '10.68.136.50');
+    await user.type(screen.getByRole('combobox', { name: 'Hypervisor IP' }), '10.68.136.50');
     await user.click(screen.getByRole('button', { name: /generate zip/i }));
 
     const generateCall = global.fetch.mock.calls.find(([url]) => url === '/api/generate');
@@ -242,7 +514,7 @@ describe('App', () => {
     await user.selectOptions(screen.getByLabelText('Branch'), 'branch2');
     await user.click(screen.getByRole('button', { name: /optional interface mapping/i }));
 
-    expect(screen.getByText('2 reference interface(s), 2 VLAN-backed hardware port(s)')).toBeInTheDocument();
+    expect(screen.getByText('2 reference interface(s), 2 connected hardware port(s)')).toBeInTheDocument();
     expect(screen.queryByLabelText('Hardware interface for LO')).not.toBeInTheDocument();
     expect(screen.queryByText(/^LO$/)).not.toBeInTheDocument();
   });
@@ -260,11 +532,48 @@ describe('App', () => {
     expect(screen.getByText('Reference VLANs 1')).toBeInTheDocument();
   });
 
+  test('sends optional VLAN overrides from interface mapping', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await screen.findAllByText('CHN 3800 HA Pair 8');
+    await chooseHardware(user, '3800', /CHN 3800 HA Pair 8/i);
+    await user.selectOptions(screen.getByLabelText('Branch'), 'branch2');
+    await user.click(screen.getByRole('button', { name: /optional interface mapping/i }));
+    await user.type(screen.getByLabelText('Switch VLANs for GE1'), '2200, 2201');
+    await user.type(screen.getByRole('combobox', { name: 'Hypervisor IP' }), '10.68.136.50');
+    await user.click(screen.getByRole('button', { name: /generate zip/i }));
+
+    const generateCall = global.fetch.mock.calls.find(([url]) => url === '/api/generate');
+    const payload = JSON.parse(generateCall[1].body);
+    expect(payload.mappings[0].interface_overrides[0]).toMatchObject({
+      reference_interface: 'GE1',
+      hardware_interface: 'GE2',
+      switch_vlans: [2200, 2201]
+    });
+  });
+
+  test('shows native VLAN allocation for switch-only internet interfaces on dynamic ports', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await screen.findAllByText('CHN 3800 HA Pair 8');
+    await chooseHardware(user, 'internet dynamic', /Internet Dynamic 680/i);
+    await user.selectOptions(screen.getByLabelText('Branch'), 'branch3');
+    await user.click(screen.getByRole('button', { name: /optional interface mapping/i }));
+
+    expect(screen.getAllByText('Needs 1 native VLAN')).toHaveLength(2);
+    expect(screen.getByLabelText('Switch VLANs for GE3')).toHaveAttribute('placeholder', 'Auto-allocate 1 from range');
+    expect(
+      screen.getAllByText('Leave blank to auto-allocate 1 VLAN from the hardware range for the access switch.')
+    ).toHaveLength(2);
+  });
+
   test('prefills hypervisor interface and keeps it editable', async () => {
     const user = userEvent.setup();
     render(<App />);
 
-    const input = await screen.findByLabelText('Hypervisor interface');
+    const input = await screen.findByRole('combobox', { name: 'Hypervisor interface' });
     expect(input).toHaveValue('vmnic0');
 
     await user.clear(input);
@@ -279,8 +588,8 @@ describe('App', () => {
     await screen.findAllByText('CHN 3800 HA Pair 8');
     await user.click(screen.getByRole('button', { name: /add mapping/i }));
     expect(screen.getAllByRole('combobox', { name: 'Hardware' })).toHaveLength(2);
-    expect(screen.getAllByLabelText('Hypervisor IP')).toHaveLength(1);
-    expect(screen.getAllByLabelText('Hypervisor interface')).toHaveLength(1);
+    expect(screen.getAllByRole('combobox', { name: 'Hypervisor IP' })).toHaveLength(1);
+    expect(screen.getAllByRole('combobox', { name: 'Hypervisor interface' })).toHaveLength(1);
     await user.click(screen.getAllByLabelText('Remove mapping')[0]);
     expect(screen.getAllByRole('combobox', { name: 'Hardware' })).toHaveLength(1);
   });
@@ -310,7 +619,7 @@ describe('App', () => {
     await screen.findAllByText('CHN 3800 HA Pair 8');
     await chooseHardware(user, '3800', /CHN 3800 HA Pair 8/i);
     await user.selectOptions(screen.getByLabelText('Branch'), 'branch2');
-    await user.type(screen.getByLabelText('Hypervisor interface'), 'vmnic0');
+    await user.type(screen.getByRole('combobox', { name: 'Hypervisor interface' }), 'vmnic0');
     await user.click(screen.getByRole('button', { name: /generate zip/i }));
 
     expect(screen.getByText('Select Hypervisor IP, Hypervisor interface, hardware, branch, and edge before generating.')).toBeInTheDocument();

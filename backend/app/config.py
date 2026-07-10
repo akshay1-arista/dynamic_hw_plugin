@@ -37,6 +37,12 @@ REFERENCE_CONFIG_ROOT = _config_path(
 )
 INVENTORY_PATH = APP_ROOT / "backend" / "data" / "hardware_inventory.json"
 OUTPUTS_ROOT = APP_ROOT / "outputs"
+LAB_NAVIGATOR_BASE_URL = (
+    os.environ.get("LAB_NAVIGATOR_BASE_URL")
+    or DOTENV.get("LAB_NAVIGATOR_BASE_URL", "")
+    or "https://lab-navigator.velo.maa.aristanetworks.com"
+)
+LAB_NAVIGATOR_API_KEY = os.environ.get("LN_PROD_API_KEY") or DOTENV.get("LN_PROD_API_KEY", "")
 
 REFERENCE_TOPOLOGIES = [
     "1-site",

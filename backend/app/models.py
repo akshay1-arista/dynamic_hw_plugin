@@ -5,20 +5,39 @@ from typing import Any, Literal, Optional
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 
+class VlanRange(BaseModel):
+    start: int
+    end: int
+
+    @field_validator("start", "end")
+    @classmethod
+    def validate_vlan(cls, value: int) -> int:
+        if value < 1 or value > 4094:
+            raise ValueError("VLAN values must be between 1 and 4094")
+        return value
+
+    @model_validator(mode="after")
+    def validate_order(self) -> "VlanRange":
+        if self.start > self.end:
+            raise ValueError("vlan_range start must be less than or equal to end")
+        return self
+
+
 class SwitchConnection(BaseModel):
     ip: str
     port: Optional[int] = None
 
 
 class SwitchCredentials(BaseModel):
-    username: str = "velocloud"
-    password: str = "N#1sdwan"
+    username: str = "velo"
+    password: str = "Velocloud@123"
 
 
 class SwitchMetadata(BaseModel):
     name: str
     device_type: str = "DELL"
     model: str = "Dell-3048"
+    os_family: Optional[Literal["os9", "os10"]] = None
     connections: SwitchConnection
     credentials: SwitchCredentials = Field(default_factory=SwitchCredentials)
 
@@ -43,6 +62,45 @@ class EdgePortMapping(BaseModel):
         return self.switch_vlans[0] if self.switch_vlans else None
 
 
+class HardwarePortAllocation(BaseModel):
+    reference_interface: str
+    logical_interface: str
+    switch_name: str
+    switch_active_port: str
+    switch_standby_port: Optional[str] = None
+    switch_vlans: list[int] = Field(default_factory=list)
+    tagged_vlans: list[int] = Field(default_factory=list)
+    untagged_vlan: Optional[int] = None
+    segment_vlans: dict[str, int] = Field(default_factory=dict)
+
+
+class HardwareAllocation(BaseModel):
+    hardware_id: str
+    branch_name: str
+    edge_name: str
+    reference_topology_id: Optional[str] = None
+    interface_fingerprint: str
+    reserved_vlans: list[int] = Field(default_factory=list)
+    ports: list[HardwarePortAllocation] = Field(default_factory=list)
+
+
+class HardwarePathSummary(BaseModel):
+    access_switch_id: Optional[str] = None
+    access_switch_name: Optional[str] = None
+    access_switch_ip: Optional[str] = None
+    access_uplink_port: Optional[str] = None
+    upstream_switch_id: Optional[str] = None
+    upstream_switch_name: Optional[str] = None
+    upstream_switch_model: Optional[str] = None
+    upstream_switch_ip: Optional[str] = None
+    upstream_access_port: Optional[str] = None
+    upstream_hypervisor_port: Optional[str] = None
+    hypervisor_id: Optional[str] = None
+    hypervisor_name: Optional[str] = None
+    hypervisor_ip: Optional[str] = None
+    complete: bool = False
+
+
 class HardwareEdge(BaseModel):
     id: str
     short_name: Optional[str] = None
@@ -54,9 +112,15 @@ class HardwareEdge(BaseModel):
     active_serial: str
     standby_serial: Optional[str] = None
     free_vlans: list[int] = Field(default_factory=list)
+    vlan_range: Optional[VlanRange] = None
     switch: Optional[SwitchMetadata] = None
     switches: list[SwitchMetadata] = Field(default_factory=list)
     ports: list[EdgePortMapping]
+    allocations: list[HardwareAllocation] = Field(default_factory=list)
+    path: Optional[HardwarePathSummary] = None
+    path_complete: bool = False
+    auto_config_ready: bool = False
+    hypervisor_ip: Optional[str] = None
     available: bool = True
     notes: Optional[str] = None
 
@@ -90,7 +154,10 @@ class InventoryDevice(BaseModel):
     ha_role: Optional[Literal["active", "standby"]] = None
     dpdk_enabled: Optional[bool] = None
     free_vlans: list[int] = Field(default_factory=list)
+    vlan_range: Optional[VlanRange] = None
     switch_metadata: Optional[SwitchMetadata] = None
+    lab_navigator_id: Optional[int] = None
+    hypervisor_ip: Optional[str] = None
     notes: Optional[str] = None
 
 
@@ -106,12 +173,14 @@ class InventoryConnection(BaseModel):
     vlans: list[int] = Field(default_factory=list)
     tagged_vlans: list[int] = Field(default_factory=list)
     untagged_vlan: Optional[int] = None
+    role: Optional[Literal["edge-access", "switch-uplink", "hypervisor-access"]] = None
     notes: Optional[str] = None
 
 
 class InventoryFile(BaseModel):
     devices: dict[str, InventoryDevice] = Field(default_factory=dict)
     connections: list[InventoryConnection] = Field(default_factory=list)
+    allocations: list[HardwareAllocation] = Field(default_factory=list)
     hardware: list[HardwareEdge]
 
 
@@ -165,6 +234,7 @@ class MappingRequest(BaseModel):
 class InterfaceOverride(BaseModel):
     reference_interface: str
     hardware_interface: Optional[str] = None
+    switch_vlans: list[int] = Field(default_factory=list)
 
     @field_validator("reference_interface")
     @classmethod
@@ -181,6 +251,25 @@ class InterfaceOverride(BaseModel):
             return None
         cleaned = value.strip()
         return cleaned or None
+
+    @field_validator("switch_vlans")
+    @classmethod
+    def validate_switch_vlans(cls, value: list[int]) -> list[int]:
+        cleaned: list[int] = []
+        seen: set[int] = set()
+        for vlan in value:
+            if vlan < 1 or vlan > 4094:
+                raise ValueError("switch_vlans values must be between 1 and 4094")
+            if vlan not in seen:
+                cleaned.append(vlan)
+                seen.add(vlan)
+        return cleaned
+
+    @model_validator(mode="after")
+    def validate_switch_vlan_usage(self) -> "InterfaceOverride":
+        if self.hardware_interface is None and self.switch_vlans:
+            raise ValueError("switch_vlans require hardware_interface")
+        return self
 
 
 class GenerateRequest(BaseModel):
@@ -222,13 +311,107 @@ class ValidationMessage(BaseModel):
     message: str
 
 
+class GenerateMappingStatus(BaseModel):
+    hardware_id: str
+    hardware_display_name: str
+    branch_name: str
+    edge_name: str
+    path_resolved: bool = False
+    auto_config_ready: bool = False
+    reason: Optional[str] = None
+    path: Optional[HardwarePathSummary] = None
+
+
 class GenerateResult(BaseModel):
     run_id: str
     topology_name: str
     topology_path: str
     zip_path: str
     download_url: str
+    can_configure_switches: bool = False
+    mapping_statuses: list[GenerateMappingStatus] = Field(default_factory=list)
     messages: list[ValidationMessage] = Field(default_factory=list)
+
+
+class InventoryRefreshRequest(BaseModel):
+    hardware_ids: list[str] = Field(default_factory=list)
+
+    @field_validator("hardware_ids")
+    @classmethod
+    def require_hardware_ids(cls, value: list[str]) -> list[str]:
+        cleaned = [item.strip() for item in value if item and item.strip()]
+        if not cleaned:
+            raise ValueError("hardware_ids is required")
+        return cleaned
+
+
+class InventoryRefreshChange(BaseModel):
+    change_type: Literal["add-device", "update-device", "add-connection", "update-connection"]
+    target: str
+    summary: str
+
+
+class InventoryRefreshResult(BaseModel):
+    hardware_ids: list[str]
+    changes: list[InventoryRefreshChange] = Field(default_factory=list)
+    inventory: InventoryFile
+    messages: list[ValidationMessage] = Field(default_factory=list)
+
+
+class SwitchCommandPlan(BaseModel):
+    device_id: str
+    device_name: str
+    device_ip: str
+    interface: str
+    commands: list[str] = Field(default_factory=list)
+
+
+class SwitchCommandOverride(BaseModel):
+    device_id: str
+    commands: list[str] = Field(default_factory=list)
+
+    @field_validator("device_id")
+    @classmethod
+    def require_device_id(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("device_id is required")
+        return cleaned
+
+    @field_validator("commands")
+    @classmethod
+    def validate_commands(cls, value: list[str]) -> list[str]:
+        cleaned = [str(command).rstrip() for command in value if str(command).strip()]
+        if not cleaned:
+            raise ValueError("commands are required")
+        return cleaned
+
+
+class SwitchConfigureRequest(BaseModel):
+    dry_run: bool = False
+    command_overrides: list[SwitchCommandOverride] = Field(default_factory=list)
+
+
+class SwitchConfigureResult(BaseModel):
+    run_id: str
+    applied: bool
+    devices: list[SwitchCommandPlan] = Field(default_factory=list)
+    messages: list[ValidationMessage] = Field(default_factory=list)
+
+
+class RunMappingMetadata(BaseModel):
+    hardware_id: str
+    branch_name: str
+    edge_name: str
+    path: Optional[HardwarePathSummary] = None
+    allocations: list[HardwarePortAllocation] = Field(default_factory=list)
+
+
+class RunMetadata(BaseModel):
+    run_id: str
+    topology_name: str
+    reference_topology_id: str
+    mappings: list[RunMappingMetadata] = Field(default_factory=list)
 
 
 JsonObject = dict[str, Any]

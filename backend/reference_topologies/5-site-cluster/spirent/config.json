@@ -108,7 +108,8 @@
                                 "mode": "switched",
                                 "vlans": [
                                     1
-                                ]
+                                ],
+                                "wan_overlay": "disabled"
                             },
                             {
                                 "name": "eth1",
@@ -135,6 +136,7 @@
                                 "default_gateway": "50.254.7.9",
                                 "type": "public",
                                 "wan_overlay": "auto_detect",
+                                "dhcp_capable": "true",
                                 "ipv6": "fd00:1:1:13::2/64",
                                 "ipv6_gateway": "fd00:1:1:13::1"
                             },
@@ -302,8 +304,8 @@
                                         "mode": "switched",
                                         "ip": "10.0.1.25",
                                         "default_gateway": "10.0.1.1",
-                                        "unactivated_ip": "192.168.3.10",
-                                        "unactivated_gateway_ip": "192.168.3.1",
+                                        "unactivated_ip": "192.168.2.10",
+                                        "unactivated_gateway_ip": "192.168.2.1",
                                         "netmask": "255.255.255.0",
                                         "addressing_type": "DHCP",
                                         "routes": [
@@ -385,7 +387,8 @@
                                 "mode": "switched",
                                 "vlans": [
                                     1
-                                ]
+                                ],
+                                "wan_overlay": "disabled"
                             },
                             {
                                 "name": "eth1",
@@ -412,6 +415,7 @@
                                 "default_gateway": "50.254.12.2",
                                 "type": "public",
                                 "wan_overlay": "auto_detect",
+                                "dhcp_capable": "true",
                                 "ipv6": "fd00:1:1:23::2/64",
                                 "ipv6_gateway": "fd00:1:1:23::1"
                             },
@@ -575,8 +579,8 @@
                                         "mode": "switched",
                                         "ip": "10.2.1.25",
                                         "default_gateway": "10.2.1.1",
-                                        "unactivated_ip": "192.168.3.10",
-                                        "unactivated_gateway_ip": "192.168.3.1",
+                                        "unactivated_ip": "192.168.2.10",
+                                        "unactivated_gateway_ip": "192.168.2.1",
                                         "netmask": "255.255.255.0",
                                         "addressing_type": "DHCP",
                                         "routes": [
@@ -658,7 +662,8 @@
                                 "mode": "switched",
                                 "vlans": [
                                     1
-                                ]
+                                ],
+                                "wan_overlay": "disabled"
                             },
                             {
                                 "name": "eth1",
@@ -685,6 +690,7 @@
                                 "default_gateway": "50.254.12.18",
                                 "type": "public",
                                 "wan_overlay": "auto_detect",
+                                "dhcp_capable": "true",
                                 "ipv6": "fd00:1:1:33::2/64",
                                 "ipv6_gateway": "fd00:1:1:33::1"
                             },
@@ -1689,7 +1695,8 @@
                                 "mode": "switched",
                                 "vlans": [
                                     1
-                                ]
+                                ],
+                                "wan_overlay": "disabled"
                             },
                             {
                                 "name": "eth1",
@@ -1716,6 +1723,7 @@
                                 "default_gateway": "50.254.6.41",
                                 "type": "public",
                                 "wan_overlay": "auto_detect",
+                                "dhcp_capable": "true",
                                 "ipv6": "fd00:2:1:13::2/64",
                                 "ipv6_gateway": "fd00:2:1:13::1"
                             },
@@ -1732,6 +1740,10 @@
                                 "default_gateway": "50.254.7.1",
                                 "wan_overlay": "auto_detect",
                                 "type": "public",
+                                "pppoe": {
+                                    "username": "root",
+                                    "password": "velocloud"
+                                },
                                 "ipv6": "fd00:2:1:14::2/64",
                                 "ipv6_gateway": "fd00:2:1:14::1"
                             },
@@ -1752,6 +1764,7 @@
                                     "link_type": "private"
                                 },
                                 "type": "private",
+                                "wan_overlay": "disabled",
                                 "subinterfaces": [
                                     {
                                         "name": "GE5.100",
@@ -1832,8 +1845,8 @@
                                         "mode": "switched",
                                         "ip": "10.0.2.25",
                                         "default_gateway": "10.0.2.1",
-                                        "unactivated_ip": "192.168.3.10",
-                                        "unactivated_gateway_ip": "192.168.3.1",
+                                        "unactivated_ip": "192.168.2.10",
+                                        "unactivated_gateway_ip": "192.168.2.1",
                                         "netmask": "255.255.255.0",
                                         "addressing_type": "DHCP",
                                         "routes": [
@@ -2493,7 +2506,8 @@
                                 "mode": "switched",
                                 "vlans": [
                                     1
-                                ]
+                                ],
+                                "wan_overlay": "disabled"
                             },
                             {
                                 "name": "eth1",
@@ -2520,6 +2534,7 @@
                                 "nexthop": "wansim1",
                                 "wan_overlay": "auto_detect",
                                 "type": "public",
+                                "dhcp_capable": "true",
                                 "ipv6": "fd00:4:1:13::2/64",
                                 "ipv6_gateway": "fd00:4:1:13::1"
                             },
@@ -2590,8 +2605,8 @@
                                         "mode": "switched",
                                         "ip": "10.0.4.25",
                                         "default_gateway": "10.0.4.1",
-                                        "unactivated_ip": "192.168.3.10",
-                                        "unactivated_gateway_ip": "192.168.3.1",
+                                        "unactivated_ip": "192.168.2.10",
+                                        "unactivated_gateway_ip": "192.168.2.1",
                                         "netmask": "255.255.255.0",
                                         "addressing_type": "DHCP",
                                         "routes": [
@@ -7955,7 +7970,7 @@
                 "device_type": "SPIRENT",
                 "model": "virtual_regular",
                 "connections": {
-                    "ip": "[[ spirent_chassis_ip ]]",
+                    "ip": "10.68.141.161",
                     "port": 22
                 },
                 "credentials": {
@@ -7976,9 +7991,9 @@
                         "name": "mgmt",
                         "type": "management",
                         "link": "mgmt",
-                        "ip": "[[ spirent_chassis_ip ]]",
-                        "default_gateway": "[[ spirent_chassis_gw ]]",
-                        "netmask": "[[ spirent_chassis_netmask ]]"
+                        "ip": "10.68.141.161",
+                        "default_gateway": "10.68.136.1",
+                        "netmask": "255.255.248.0"
                     },
                     {
                         "name": "port1",

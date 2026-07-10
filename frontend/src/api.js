@@ -63,8 +63,29 @@ export function saveInventory(inventory) {
   });
 }
 
+export function previewInventoryRefresh(hardwareIds) {
+  return request('/api/hardware/refresh-preview', {
+    method: 'POST',
+    body: JSON.stringify({ hardware_ids: hardwareIds })
+  });
+}
+
+export function applyInventoryRefresh(hardwareIds) {
+  return request('/api/hardware/refresh-apply', {
+    method: 'POST',
+    body: JSON.stringify({ hardware_ids: hardwareIds })
+  });
+}
+
 export function generateTopology(payload) {
   return request('/api/generate', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
+export function configureSwitches(runId, payload = {}) {
+  return request(`/api/runs/${runId}/configure-switches`, {
     method: 'POST',
     body: JSON.stringify(payload)
   });

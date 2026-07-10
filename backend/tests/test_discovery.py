@@ -1,0 +1,159 @@
+import json
+
+from app.discovery import apply_inventory_refresh, preview_inventory_refresh
+from app.models import InventoryRefreshRequest
+
+
+class StubLabNavigatorClient:
+    def close(self):
+        return None
+
+    def search(self, query):
+        if query == "10.0.0.10":
+            return [{"id": 11, "name": "access-sw", "ip_address": "10.0.0.10", "device_model": "Dell-3048"}]
+        if query == "10.0.0.20":
+            return [{"id": 33, "name": "esxi-01", "ip_address": "10.0.0.20", "device_model": "ESXi"}]
+        if query == "agg-sw":
+            return [{"id": 22, "name": "agg-sw", "ip_address": "10.0.0.11", "device_model": "Dell-4048"}]
+        return []
+
+    def get_wiremap(self, device_id):
+        if device_id == 11:
+            return {
+                "connections": [
+                    {
+                        "interface_name": "Te1/1",
+                        "remote_device": "agg-sw",
+                        "remote_interface": "Te1/49",
+                    }
+                ]
+            }
+        if device_id == 22:
+            return {
+                "connections": [
+                    {
+                        "interface_name": "Te1/49",
+                        "remote_device": "access-sw",
+                        "remote_interface": "Te1/1",
+                    },
+                    {
+                        "interface_name": "Te1/50",
+                        "remote_device": "esxi-01",
+                        "remote_interface": "vmnic0",
+                    },
+                ]
+            }
+        return {"connections": []}
+
+
+def test_inventory_refresh_preview_adds_upstream_path(tmp_path):
+    inventory_path = tmp_path / "inventory.json"
+    inventory_path.write_text(
+        json.dumps(
+            {
+                "devices": {
+                    "edge-1-active": {
+                        "id": "edge-1-active",
+                        "type": "edge",
+                        "display_name": "Edge 1",
+                        "model": "edge6X0",
+                        "model_suffix": "680",
+                        "serial_number": "SERIAL1",
+                        "ha_group_id": "edge-1",
+                        "ha_role": "active",
+                        "hypervisor_ip": "10.0.0.20",
+                        "vlan_range": {"start": 200, "end": 210},
+                    },
+                    "access_sw": {
+                        "id": "access_sw",
+                        "type": "switch",
+                        "display_name": "access-sw",
+                        "model": "Dell-3048",
+                        "ip_address": "10.0.0.10",
+                        "switch_metadata": {
+                            "name": "access-sw",
+                            "model": "Dell-3048",
+                            "connections": {"ip": "10.0.0.10", "port": None},
+                            "credentials": {"username": "velocloud", "password": "N#1sdwan"},
+                        },
+                    },
+                },
+                "connections": [
+                    {
+                        "id": "edge-1-ge1-access",
+                        "a": {"device_id": "edge-1-active", "interface": "GE1"},
+                        "b": {"device_id": "access_sw", "interface": "Gi1/1"},
+                        "role": "edge-access",
+                    }
+                ],
+            }
+        )
+    )
+
+    result = preview_inventory_refresh(
+        InventoryRefreshRequest(hardware_ids=["edge-1"]),
+        inventory_path=inventory_path,
+        client=StubLabNavigatorClient(),
+    )
+
+    summaries = [item.summary for item in result.changes]
+    assert any("Add switch agg-sw" in summary for summary in summaries)
+    assert any("Add hypervisor esxi-01" in summary for summary in summaries)
+    assert result.inventory.hardware[0].path_complete is True
+    assert result.inventory.hardware[0].path.upstream_switch_name == "agg-sw"
+
+
+def test_inventory_refresh_apply_persists_graph_updates(tmp_path):
+    inventory_path = tmp_path / "inventory.json"
+    inventory_path.write_text(
+        json.dumps(
+            {
+                "devices": {
+                    "edge-1-active": {
+                        "id": "edge-1-active",
+                        "type": "edge",
+                        "display_name": "Edge 1",
+                        "model": "edge6X0",
+                        "model_suffix": "680",
+                        "serial_number": "SERIAL1",
+                        "ha_group_id": "edge-1",
+                        "ha_role": "active",
+                        "hypervisor_ip": "10.0.0.20",
+                        "vlan_range": {"start": 200, "end": 210},
+                    },
+                    "access_sw": {
+                        "id": "access_sw",
+                        "type": "switch",
+                        "display_name": "access-sw",
+                        "model": "Dell-3048",
+                        "ip_address": "10.0.0.10",
+                        "switch_metadata": {
+                            "name": "access-sw",
+                            "model": "Dell-3048",
+                            "connections": {"ip": "10.0.0.10", "port": None},
+                            "credentials": {"username": "velocloud", "password": "N#1sdwan"},
+                        },
+                    },
+                },
+                "connections": [
+                    {
+                        "id": "edge-1-ge1-access",
+                        "a": {"device_id": "edge-1-active", "interface": "GE1"},
+                        "b": {"device_id": "access_sw", "interface": "Gi1/1"},
+                        "role": "edge-access",
+                    }
+                ],
+            }
+        )
+    )
+
+    result = apply_inventory_refresh(
+        InventoryRefreshRequest(hardware_ids=["edge-1"]),
+        inventory_path=inventory_path,
+        client=StubLabNavigatorClient(),
+    )
+
+    device_ids = set(result.inventory.devices)
+    assert "agg_sw" in device_ids
+    assert "esxi_01" in device_ids
+    assert result.inventory.hardware[0].auto_config_ready is True

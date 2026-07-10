@@ -6,11 +6,21 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
+from .discovery import DiscoveryError, apply_inventory_refresh, preview_inventory_refresh
 from .config import OUTPUTS_ROOT
-from .generator import GenerationError, generate_topology
+from .generator import GenerationError, generate_topology, resolve_run_root
 from .inventory import load_inventory, save_inventory
-from .models import GenerateRequest, GenerateResult, InventoryFile
+from .models import (
+    GenerateRequest,
+    GenerateResult,
+    InventoryFile,
+    InventoryRefreshRequest,
+    InventoryRefreshResult,
+    SwitchConfigureRequest,
+    SwitchConfigureResult,
+)
 from .reference import list_references
+from .switch_config import SwitchConfigError, configure_switches_for_run
 
 
 app = FastAPI(title="Dynamic Hardware Topology Generator", version="0.1.0")
@@ -39,6 +49,22 @@ def put_hardware(inventory: InventoryFile):
     return save_inventory(inventory)
 
 
+@app.post("/api/hardware/refresh-preview", response_model=InventoryRefreshResult)
+def post_hardware_refresh_preview(request: InventoryRefreshRequest):
+    try:
+        return preview_inventory_refresh(request)
+    except (DiscoveryError, GenerationError, ValueError, FileNotFoundError) as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@app.post("/api/hardware/refresh-apply", response_model=InventoryRefreshResult)
+def post_hardware_refresh_apply(request: InventoryRefreshRequest):
+    try:
+        return apply_inventory_refresh(request)
+    except (DiscoveryError, GenerationError, ValueError, FileNotFoundError) as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
 @app.post("/api/generate", response_model=GenerateResult)
 def post_generate(request: GenerateRequest):
     try:
@@ -47,14 +73,21 @@ def post_generate(request: GenerateRequest):
         raise HTTPException(status_code=400, detail=str(error)) from error
 
 
+@app.post("/api/runs/{run_id}/configure-switches", response_model=SwitchConfigureResult)
+def post_configure_switches(run_id: str, request: SwitchConfigureRequest):
+    try:
+        return configure_switches_for_run(run_id, request)
+    except (SwitchConfigError, GenerationError, ValueError, FileNotFoundError) as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
 @app.get("/api/runs/{run_id}/download")
 def download_run(run_id: str):
-    run_root = (OUTPUTS_ROOT / run_id).resolve()
-    outputs_root = OUTPUTS_ROOT.resolve()
-    if outputs_root not in run_root.parents and run_root != outputs_root:
-        raise HTTPException(status_code=400, detail="Invalid run id")
+    try:
+        run_root = resolve_run_root(run_id, OUTPUTS_ROOT)
+    except GenerationError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
     zip_files = list(Path(run_root).glob("*.zip"))
     if not zip_files:
         raise HTTPException(status_code=404, detail="Run zip not found")
     return FileResponse(zip_files[0], filename=zip_files[0].name, media_type="application/zip")
-

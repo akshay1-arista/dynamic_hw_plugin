@@ -1,0 +1,20 @@
+[Unit]
+Description=Dynamic Hardware Topology Frontend
+After=network-online.target __BACKEND_SERVICE_NAME__.service
+Wants=network-online.target __BACKEND_SERVICE_NAME__.service
+
+[Service]
+Type=simple
+User=__SERVICE_USER__
+Group=__SERVICE_GROUP__
+Environment="APP_ROOT=__APP_ROOT__"
+Environment="FRONTEND_HOST=__FRONTEND_HOST__"
+Environment="FRONTEND_PORT=__FRONTEND_PORT__"
+EnvironmentFile=-__ENV_FILE__
+ExecStart=/bin/bash -lc 'cd "$APP_ROOT/frontend" && exec npm exec vite preview -- --host "$FRONTEND_HOST" --port "$FRONTEND_PORT"'
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

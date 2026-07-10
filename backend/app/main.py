@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
@@ -23,11 +24,23 @@ from .reference import list_references
 from .switch_config import SwitchConfigError, configure_switches_for_run
 
 
+def _cors_allowed_origins() -> list[str]:
+    configured = os.environ.get("CORS_ALLOWED_ORIGINS", "")
+    if configured.strip():
+        return [origin.strip() for origin in configured.split(",") if origin.strip()]
+    return [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:5400",
+        "http://127.0.0.1:5400",
+    ]
+
+
 app = FastAPI(title="Dynamic Hardware Topology Generator", version="0.1.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=_cors_allowed_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -1,0 +1,24 @@
+[Unit]
+Description=Dynamic Hardware Topology Backend
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__SERVICE_USER__
+Group=__SERVICE_GROUP__
+Environment="APP_ROOT=__APP_ROOT__"
+Environment="VENV_DIR=__VENV_DIR__"
+Environment="BACKEND_HOST=__BACKEND_HOST__"
+Environment="BACKEND_PORT=__BACKEND_PORT__"
+Environment="FRONTEND_PORT=__FRONTEND_PORT__"
+Environment="PUBLIC_HOST=__PUBLIC_HOST__"
+Environment="CORS_ALLOWED_ORIGINS=__CORS_ALLOWED_ORIGINS__"
+EnvironmentFile=-__ENV_FILE__
+ExecStart=/bin/bash -lc 'cd "$APP_ROOT/backend" && export PYTHONPATH=. && exec "$VENV_DIR/bin/python" -m uvicorn app.main:app --host "$BACKEND_HOST" --port "$BACKEND_PORT"'
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

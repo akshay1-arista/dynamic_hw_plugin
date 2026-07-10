@@ -21,6 +21,38 @@ npm run dev
 
 Open `http://127.0.0.1:5173`.
 
+## Deploy For Production
+
+Run the production deployment script from the repo root:
+
+```bash
+sudo ./deploy_production.sh
+```
+
+It will:
+
+- create or refresh `.venv-production`
+- install backend dependencies from `backend/requirements.txt`
+- run `npm ci` and `npm run build`
+- install `systemd` services for the frontend and backend
+- enable and restart the frontend on `5400`
+- enable and restart the backend on `5401`
+
+By default it builds the UI against `http://127.0.0.1:5401`. Override `PUBLIC_HOST` when the app is accessed through a server IP or DNS name:
+
+```bash
+sudo PUBLIC_HOST=your-server-name ./deploy_production.sh
+```
+
+The services restart automatically on crash and on reboot. After deployment:
+
+```bash
+systemctl status dynamic-hw-topology-backend.service dynamic-hw-topology-frontend.service
+journalctl -u dynamic-hw-topology-backend.service -u dynamic-hw-topology-frontend.service -f
+```
+
+Optional persistent overrides and secrets can be supplied with `/etc/default/dynamic-hw-topology`. A sample file is available at `deploy/systemd/dynamic-hw-topology.env.example`.
+
 ## Data And Outputs
 
 - Hardware inventory: `backend/data/hardware_inventory.json`

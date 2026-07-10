@@ -1060,6 +1060,15 @@ def test_configure_switches_uses_generated_links_to_exclude_only_ha_vlan_from_tr
     access_commands = next(item.commands for item in result.devices if item.device_id == "access_sw")
     upstream_commands = next(item.commands for item in result.devices if item.device_id == "upstream_sw")
 
+    ge1_start = access_commands.index("interface GigabitEthernet 1/1")
+    ge2_start = access_commands.index("interface GigabitEthernet 1/2")
+    ge3_start = access_commands.index("interface GigabitEthernet 1/3")
+    ge4_start = access_commands.index("interface GigabitEthernet 1/4")
+
+    ge1_block = access_commands[ge1_start:ge2_start]
+    ge3_block = access_commands[ge3_start:ge4_start]
+    ge4_block = access_commands[ge4_start:access_commands.index("interface GigabitEthernet 1/13")]
+
     vlan401_start = access_commands.index("interface Vlan 401")
     vlan402_start = access_commands.index("interface Vlan 402")
     vlan405_start = access_commands.index("interface Vlan 405")
@@ -1069,6 +1078,16 @@ def test_configure_switches_uses_generated_links_to_exclude_only_ha_vlan_from_tr
     vlan405_block = access_commands[vlan405_start:vlan406_start]
     vlan406_block = access_commands[vlan406_start:]
 
+    assert " vlan-stack access" in ge1_block
+    assert " vlan-stack access" not in ge3_block
+    assert " vlan-stack access" not in ge4_block
+    assert " member GigabitEthernet 1/1,1/13" in vlan401_block
+    assert " vlan-stack compatible" in vlan401_block
+    assert " untagged GigabitEthernet 1/3,1/15" in vlan405_block
+    assert " member GigabitEthernet 1/3,1/15" not in vlan405_block
+    assert " vlan-stack compatible" not in vlan405_block
+    assert " untagged GigabitEthernet 1/4,1/16" in vlan406_block
+    assert " member GigabitEthernet 1/4,1/16" not in vlan406_block
     assert " tagged TenGigabitEthernet 1/52" not in vlan401_block
     assert " tagged TenGigabitEthernet 1/52" in vlan405_block
     assert " tagged TenGigabitEthernet 1/52" in vlan406_block

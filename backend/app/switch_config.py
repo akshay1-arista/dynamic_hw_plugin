@@ -131,10 +131,22 @@ def _build_plans(
                 )
             port_state = _ensure_device_state(device_states, port_switch)
             port_state["target_vlans"].update(vlan for vlan in port.switch_vlans if vlan is not None)
-            _add_edge_port_to_state(port_state, hardware, port, standby=False)
+            _add_edge_port_to_state(
+                port_state,
+                hardware,
+                port,
+                standby=False,
+                generated_switch_links=generated_switch_links,
+            )
             if port.switch_standby_port:
-                _add_edge_port_to_state(port_state, hardware, port, standby=True)
-            _add_access_vlan_state(port_state, port)
+                _add_edge_port_to_state(
+                    port_state,
+                    hardware,
+                    port,
+                    standby=True,
+                    generated_switch_links=generated_switch_links,
+                )
+            _add_access_vlan_state(port_state, port, generated_switch_links)
             if port_switch.id == access_switch.id:
                 access_ports.append(port)
             elif port_switch.id == upstream_switch.id:
@@ -259,12 +271,25 @@ def _transport_vlans_for_port(
     return [vlan for vlan in port.switch_vlans if vlan is not None]
 
 
+def _uses_vlan_stack_access(
+    port: HardwarePortAllocation,
+    generated_switch_links: dict[tuple[str, str], str],
+) -> bool:
+    if port.untagged_vlan is None or port.tagged_vlans:
+        return False
+    link = _port_link(port, generated_switch_links)
+    if link is None:
+        return True
+    return "_HA" in link.upper()
+
+
 def _add_edge_port_to_state(
     state: dict[str, object],
     hardware: HardwareEdge,
     port: HardwarePortAllocation,
     *,
     standby: bool,
+    generated_switch_links: dict[tuple[str, str], str],
 ) -> None:
     interface_name = port.switch_standby_port if standby else port.switch_active_port
     if not interface_name:
@@ -275,12 +300,16 @@ def _add_edge_port_to_state(
     config["tagged_vlans"].update(port.tagged_vlans)
     config["shared"] = False
     config["flowcontrol_receive_on"] = True
-    if not port.tagged_vlans and port.untagged_vlan is not None:
+    if _uses_vlan_stack_access(port, generated_switch_links):
         config["vlan_stack_access"] = True
     state["cleanup_ports"].add(interface_name)
 
 
-def _add_access_vlan_state(state: dict[str, object], port: HardwarePortAllocation) -> None:
+def _add_access_vlan_state(
+    state: dict[str, object],
+    port: HardwarePortAllocation,
+    generated_switch_links: dict[tuple[str, str], str],
+) -> None:
     if state["family"] != "os9":
         return
     interface_names = [port.switch_active_port]
@@ -298,7 +327,8 @@ def _add_access_vlan_state(state: dict[str, object], port: HardwarePortAllocatio
 
     if port.untagged_vlan is not None:
         vlan_state = state["os9_vlans"][port.untagged_vlan]
-        vlan_state["member"].update(interface_names)
+        target = "member" if _uses_vlan_stack_access(port, generated_switch_links) else "untagged"
+        vlan_state[target].update(interface_names)
 
 
 def _add_shared_port(

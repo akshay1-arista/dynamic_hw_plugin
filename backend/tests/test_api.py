@@ -16,6 +16,7 @@ def test_reference_topologies_include_nested_id():
     response = client.get("/api/reference-topologies")
     assert response.status_code == 200
     ids = {item["id"] for item in response.json()}
+    assert "3-site/spirent" in ids
     assert "3-site-scale/spirent" in ids
     assert "5-site-cluster/hitless" in ids
 

@@ -48,6 +48,7 @@ REFERENCE_TOPOLOGIES = [
     "1-site",
     "2-site",
     "3-site",
+    "3-site/spirent",
     "3-site-ipv6",
     "3-site-scale",
     "3-site-scale/spirent",

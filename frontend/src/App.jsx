@@ -177,6 +177,18 @@ export function App() {
       reason: 'Configure switches unavailable for one or more generated mappings.'
     };
   }, [result]);
+  const existingReferenceCount = useMemo(
+    () => references.filter((reference) => reference.exists).length,
+    [references]
+  );
+  const availableHardwareCount = useMemo(
+    () => inventory.hardware.filter((hardware) => hardware.available).length,
+    [inventory.hardware]
+  );
+  const selectedMappingCount = useMemo(
+    () => mappings.filter((mapping) => mapping.hardware_id && mapping.branch_name && mapping.edge_name).length,
+    [mappings]
+  );
 
   async function loadData() {
     setLoading(true);
@@ -493,30 +505,48 @@ export function App() {
   if (loading) {
     return (
       <main className="shell center">
-        <Loader2 className="spin" aria-hidden="true" />
+        <div className="loadingCard">
+          <BrandMark />
+          <Loader2 className="spin" aria-hidden="true" />
+          <span>Loading Dynamic Topology Engine</span>
+        </div>
       </main>
     );
   }
 
   return (
     <main className="shell">
-      <header className="topbar">
-        <div>
-          <h1>Hardware Topology Generator</h1>
-          <p>Phase1 folder generation for Hapy virtual-to-hardware branch mappings.</p>
+      <header className="appHeader">
+        <div className="brandCluster">
+          <BrandMark />
+          <div className="brandCopy">
+            <span className="eyebrow">Dynamic hardware topology generation</span>
+            <h1>Dynamic Topology Engine</h1>
+            <p>Generate hardware-backed topology folders from virtual references, inventory, and switch paths.</p>
+          </div>
         </div>
-        <button className="iconButton" onClick={loadData} aria-label="Refresh data" title="Refresh data">
-          <RefreshCw size={18} />
-        </button>
+        <div className="headerActions">
+          <div className="metricStrip" aria-label="Workspace summary">
+            <MetricPill icon={<GitBranch size={14} />} label="References" value={existingReferenceCount} />
+            <MetricPill icon={<HardDrive size={14} />} label="Available hardware" value={`${availableHardwareCount}/${inventory.hardware.length}`} />
+            <MetricPill icon={<Server size={14} />} label="Private branches" value={privateBranches.length} />
+          </div>
+          <button className="iconButton refreshButton" onClick={loadData} aria-label="Refresh data" title="Refresh data">
+            <RefreshCw size={18} />
+          </button>
+        </div>
       </header>
 
       {error && <div className="alert">{error}</div>}
 
-      <section className="workspace">
-        <div className="panel">
+      <section className="workspace primaryWorkspace">
+        <div className="panel setupPanel">
           <div className="panelTitle">
             <GitBranch size={18} />
-            <h2>Reference</h2>
+            <div>
+              <h2>Topology Setup</h2>
+              <p>Choose the virtual reference and target hypervisor context.</p>
+            </div>
           </div>
           <label>
             <RequiredLabel>Topology</RequiredLabel>
@@ -585,17 +615,23 @@ export function App() {
           <div className="branchList">
             {selectedReference?.branches.map((branch) => (
               <div key={branch.name} className="branchItem">
-                <span>{branch.name}</span>
+                <span>
+                  <strong>{branch.name}</strong>
+                  <small>{branch.edges.length} edge{branch.edges.length === 1 ? '' : 's'}</small>
+                </span>
                 <small>{branch.edges.map((edge) => `${edge.name} (${edge.model})`).join(', ')}</small>
               </div>
             ))}
           </div>
         </div>
 
-        <div className="panel wide">
+        <div className="panel wide mappingPanel">
           <div className="panelTitle">
             <HardDrive size={18} />
-            <h2>Mappings</h2>
+            <div>
+              <h2>Hardware Mapping</h2>
+              <p>{selectedMappingCount} of {mappings.length} mapping row{mappings.length === 1 ? '' : 's'} ready.</p>
+            </div>
           </div>
           {mappings.map((mapping, index) => (
             <MappingRow
@@ -623,11 +659,14 @@ export function App() {
         </div>
       </section>
 
-      <section className="workspace lower">
-        <div className="panel">
+      <section className="workspace lower secondaryWorkspace">
+        <div className="panel inventoryPanel">
           <div className="panelTitle">
             <Server size={18} />
-            <h2>Hardware Inventory</h2>
+            <div>
+              <h2>Inventory</h2>
+              <p>Search, inspect, and mark physical hardware availability.</p>
+            </div>
           </div>
           <label className="searchField">
             Search hardware
@@ -653,9 +692,16 @@ export function App() {
                   <span>
                     <strong>{hardware.short_name || hardware.display_name}</strong>
                     <small>{hardware.display_name}</small>
-                    <small>
-                      {hardware.model} / {hardware.ha ? 'HA' : 'standalone'} / {hardware.ports.length} links
-                    </small>
+                    <span className="inventoryBadges">
+                      <StatusBadge tone={hardware.available ? 'success' : 'neutral'}>
+                        {hardware.available ? 'Available' : 'Unavailable'}
+                      </StatusBadge>
+                      <StatusBadge tone={hardware.ha ? 'accent' : 'neutral'}>{hardware.ha ? 'HA' : 'Standalone'}</StatusBadge>
+                      <StatusBadge tone={hardware.path_complete ? 'success' : 'warning'}>
+                        {hardware.path_complete ? 'Path complete' : 'Path pending'}
+                      </StatusBadge>
+                    </span>
+                    <small>{hardware.model} / {hardware.ports.length} switch links</small>
                   </span>
                   <ChevronDown size={16} aria-hidden="true" />
                 </button>
@@ -688,12 +734,24 @@ export function App() {
         <div className="panel wide">
           <div className="panelTitle">
             <CheckCircle2 size={18} />
-            <h2>Preview And Result</h2>
+            <div>
+              <h2>Preview & Delivery</h2>
+              <p>Validate generated names, download output, publish branches, and configure switches.</p>
+            </div>
           </div>
           {previewRows.length === 0 ? (
-            <p className="muted">Select hardware, branch, and edge to preview generated names.</p>
+            <div className="emptyState">
+              <Archive size={18} aria-hidden="true" />
+              <p>Select hardware, branch, and edge to preview generated names.</p>
+            </div>
           ) : (
             <div className="previewTable">
+              <div className="previewRow previewHeader" aria-hidden="true">
+                <span>Hardware</span>
+                <span>Branch</span>
+                <span>Edge</span>
+                <span>Links</span>
+              </div>
               {previewRows.map((row, index) => (
                 <div className="previewRow" key={`${row.hardware}-${index}`}>
                   <span>{row.hardware}</span>
@@ -709,8 +767,13 @@ export function App() {
 
           {result && (
             <div className="resultBox">
-              <strong>{result.topology_name}</strong>
-              <span>{result.topology_path}</span>
+              <div className="resultHeader">
+                <CheckCircle2 size={18} aria-hidden="true" />
+                <span>
+                  <strong>{result.topology_name}</strong>
+                  <small>{result.topology_path}</small>
+                </span>
+              </div>
               {result.mapping_statuses?.length > 0 && (
                 <div className="messageList">
                   {result.mapping_statuses.map((status, index) => (
@@ -867,14 +930,20 @@ export function App() {
         </div>
       </section>
 
-      <section className="workspace lower">
+      <section className="workspace lower registryWorkspace">
         <div className="panel wide branchRegistryPanel">
           <div className="panelTitle">
             <GitBranch size={18} />
-            <h2>Gerrit Private Branches</h2>
+            <div>
+              <h2>Gerrit Private Branches</h2>
+              <p>Recently created private branches for generated topology runs.</p>
+            </div>
           </div>
           {privateBranches.length === 0 ? (
-            <p className="muted">No private branches created by the tool yet.</p>
+            <div className="emptyState">
+              <GitBranch size={18} aria-hidden="true" />
+              <p>No private branches created by the tool yet.</p>
+            </div>
           ) : (
             <div className="branchRegistryList">
               {privateBranches.map((branch) => (
@@ -1480,6 +1549,33 @@ function HardwareDetails({ hardware, refreshing, onVlanRangeChange, onRefresh })
       {hardware.notes && <small className="notes">{hardware.notes}</small>}
     </div>
   );
+}
+
+function BrandMark() {
+  return (
+    <span className="brandMark" aria-hidden="true">
+      <GitBranch size={24} />
+      <span className="brandChip">
+        <HardDrive size={13} />
+      </span>
+    </span>
+  );
+}
+
+function MetricPill({ icon, label, value }) {
+  return (
+    <span className="metricPill">
+      {icon}
+      <span>
+        <strong>{value}</strong>
+        <small>{label}</small>
+      </span>
+    </span>
+  );
+}
+
+function StatusBadge({ children, tone = 'neutral' }) {
+  return <span className={`statusBadge ${tone}`}>{children}</span>;
 }
 
 function RequiredLabel({ children }) {

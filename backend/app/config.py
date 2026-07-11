@@ -28,6 +28,15 @@ def _config_path(value: str | Path) -> Path:
     return path
 
 
+def _optional_config_path(value: str | Path | None) -> Path | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    return _config_path(text)
+
+
 DOTENV = _load_dotenv(APP_ROOT / ".env")
 LOCAL_REFERENCE_CONFIG_ROOT = APP_ROOT / "backend" / "reference_topologies"
 REFERENCE_CONFIG_ROOT = _config_path(
@@ -37,6 +46,30 @@ REFERENCE_CONFIG_ROOT = _config_path(
 )
 INVENTORY_PATH = APP_ROOT / "backend" / "data" / "hardware_inventory.json"
 OUTPUTS_ROOT = APP_ROOT / "outputs"
+HAPY_REPO_ROOT = _optional_config_path(
+    os.environ.get("HAPY_REPO_ROOT") or DOTENV.get("HAPY_REPO_ROOT", "")
+)
+HAPY_TESTBED_CONFIG_ROOT = _optional_config_path(
+    os.environ.get("HAPY_TESTBED_CONFIG_ROOT")
+    or DOTENV.get("HAPY_TESTBED_CONFIG_ROOT", "")
+) or (HAPY_REPO_ROOT / "hapy" / "hapy" / "testbed" / "configs" if HAPY_REPO_ROOT else None)
+HAPY_GERRIT_REMOTE_NAME = (
+    os.environ.get("HAPY_GERRIT_REMOTE_NAME")
+    or DOTENV.get("HAPY_GERRIT_REMOTE_NAME", "")
+    or "origin"
+)
+HAPY_PRIVATE_BRANCH_REGISTRY_PATH = _config_path(
+    os.environ.get("HAPY_PRIVATE_BRANCH_REGISTRY_PATH")
+    or DOTENV.get("HAPY_PRIVATE_BRANCH_REGISTRY_PATH", "")
+    or (APP_ROOT / "backend" / "data" / "hapy_private_branches.json")
+)
+HAPY_BASE_BRANCHES = [
+    "release_5.2",
+    "release_6.1",
+    "release_6.4",
+    "release_7.0",
+    "master",
+]
 LAB_NAVIGATOR_BASE_URL = (
     os.environ.get("LAB_NAVIGATOR_BASE_URL")
     or DOTENV.get("LAB_NAVIGATOR_BASE_URL", "")

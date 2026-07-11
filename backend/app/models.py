@@ -359,6 +359,76 @@ class InventoryRefreshResult(BaseModel):
     messages: list[ValidationMessage] = Field(default_factory=list)
 
 
+BaseBranchName = Literal["release_5.2", "release_6.1", "release_6.4", "release_7.0", "master"]
+
+
+class HapyCommitRequest(BaseModel):
+    base_branch: BaseBranchName = "master"
+
+
+class HapyPublishMetadata(BaseModel):
+    run_id: str
+    topology_name: str
+    reference_topology_id: str
+    repo_path: str
+    destination_path: str
+    destination_relative_path: str
+    base_branch: BaseBranchName
+    private_branch_name: str
+    commit_sha: str
+    commit_message: str
+    private_branch_pushed: bool = False
+    remote_name: str = "origin"
+    remote_branch_ref: Optional[str] = None
+    fetch_command: Optional[str] = None
+    workspace_path: Optional[str] = None
+    created_at: str
+    updated_at: str
+
+
+class HapyCommitResult(BaseModel):
+    run_id: str
+    topology_name: Optional[str] = None
+    reference_topology_id: Optional[str] = None
+    repo_path: str
+    destination_path: str
+    destination_relative_path: str
+    base_branch: BaseBranchName
+    private_branch_name: str
+    commit_sha: str
+    commit_message: str
+    private_branch_pushed: bool = False
+    remote_name: str = "origin"
+    remote_branch_ref: Optional[str] = None
+    fetch_command: Optional[str] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+    messages: list[ValidationMessage] = Field(default_factory=list)
+
+
+class HapyPrivateBranchRecord(BaseModel):
+    run_id: str
+    topology_name: str
+    reference_topology_id: str
+    repo_path: str
+    destination_path: str
+    destination_relative_path: str
+    base_branch: BaseBranchName
+    private_branch_name: str
+    commit_sha: str
+    commit_message: str
+    private_branch_pushed: bool = False
+    remote_name: str = "origin"
+    remote_branch_ref: Optional[str] = None
+    fetch_command: Optional[str] = None
+    created_at: str
+    updated_at: str
+
+
+class HapyPrivateBranchListResult(BaseModel):
+    branches: list[HapyPrivateBranchRecord] = Field(default_factory=list)
+
+
 class SwitchCommandPlan(BaseModel):
     device_id: str
     device_name: str
@@ -413,6 +483,7 @@ class RunMetadata(BaseModel):
     topology_name: str
     reference_topology_id: str
     mappings: list[RunMappingMetadata] = Field(default_factory=list)
+    hapy_publishes: list[HapyPublishMetadata] = Field(default_factory=list)
 
 
 JsonObject = dict[str, Any]

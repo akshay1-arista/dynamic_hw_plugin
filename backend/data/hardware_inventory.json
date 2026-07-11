@@ -1379,7 +1379,7 @@
       "vlan_range": null,
       "switch_metadata": {
         "name": "chn-rnd-sw-4148-DQ8CV43",
-        "device_type": "DELL",
+        "device_type": "DELL_OS_10",
         "model": "Dell-4148",
         "os_family": null,
         "connections": {
@@ -1855,7 +1855,7 @@
       "model_suffix": "720",
       "serial_number": "246218451",
       "ip_address": null,
-      "available": false,
+      "available": true,
       "ha_group_id": "ln-ha-a03-476-248202223-a03-573-246218451",
       "ha_role": "standby",
       "dpdk_enabled": null,
@@ -1875,7 +1875,7 @@
       "model_suffix": "720",
       "serial_number": "248202223",
       "ip_address": null,
-      "available": false,
+      "available": true,
       "ha_group_id": "ln-ha-a03-476-248202223-a03-573-246218451",
       "ha_role": "active",
       "dpdk_enabled": null,
@@ -1895,7 +1895,7 @@
       "model_suffix": "740",
       "serial_number": "248202193",
       "ip_address": null,
-      "available": false,
+      "available": true,
       "ha_group_id": "ln-ha-a03-515-248202197-a03-516-248202193",
       "ha_role": "standby",
       "dpdk_enabled": null,
@@ -1915,7 +1915,7 @@
       "model_suffix": "740",
       "serial_number": "248202197",
       "ip_address": null,
-      "available": false,
+      "available": true,
       "ha_group_id": "ln-ha-a03-515-248202197-a03-516-248202193",
       "ha_role": "active",
       "dpdk_enabled": null,
@@ -2421,7 +2421,7 @@
       "vlan_range": null,
       "switch_metadata": {
         "name": "chn-rnd-sw-4148-F19CV43",
-        "device_type": "DELL",
+        "device_type": "DELL_OS_10",
         "model": "Dell-4148",
         "os_family": null,
         "connections": {

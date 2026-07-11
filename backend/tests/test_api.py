@@ -174,3 +174,70 @@ def test_generate_and_download_zip(tmp_path, monkeypatch):
     download = client.get(result["download_url"])
     assert download.status_code == 200
     assert download.headers["content-type"] == "application/zip"
+
+
+def test_commit_hapy_route(monkeypatch):
+    monkeypatch.setattr(
+        app_main,
+        "publish_run_private_branch",
+        lambda run_id, request: {
+            "run_id": run_id,
+            "topology_name": "demo-topology",
+            "reference_topology_id": "3-site",
+            "repo_path": "/repo/velocloud.src",
+            "destination_path": "/repo/velocloud.src/hapy/hapy/testbed/configs/demo-topology",
+            "destination_relative_path": "demo-topology",
+            "base_branch": request.base_branch,
+            "private_branch_name": "hw_topo_gen_private_run123",
+            "commit_sha": "deadbeef",
+            "commit_message": "VLDT-None: add topology demo-topology",
+            "private_branch_pushed": True,
+            "remote_name": "origin",
+            "remote_branch_ref": "refs/heads/hw_topo_gen_private_run123",
+            "fetch_command": "git fetch origin refs/heads/hw_topo_gen_private_run123 && git checkout -b hw_topo_gen_private_run123 FETCH_HEAD",
+            "created_at": "2026-07-11T00:00:00+00:00",
+            "updated_at": "2026-07-11T00:01:00+00:00",
+            "messages": [{"level": "info", "message": "Committed and pushed private branch."}],
+        },
+    )
+
+    response = client.post("/api/runs/run123/publish-private-branch", json={"base_branch": "release_6.4"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["base_branch"] == "release_6.4"
+    assert body["private_branch_name"] == "hw_topo_gen_private_run123"
+
+
+def test_list_private_branches_route(monkeypatch):
+    monkeypatch.setattr(
+        app_main,
+        "list_private_branches",
+        lambda: {
+            "branches": [
+                {
+                    "run_id": "run123",
+                    "topology_name": "demo-topology",
+                    "reference_topology_id": "3-site",
+                    "repo_path": "/repo/velocloud.src",
+                    "destination_path": "/repo/velocloud.src/hapy/hapy/testbed/configs/demo-topology",
+                    "destination_relative_path": "demo-topology",
+                    "base_branch": "master",
+                    "private_branch_name": "hw_topo_gen_private_run123",
+                    "commit_sha": "deadbeef",
+                    "commit_message": "VLDT-None: add topology demo-topology",
+                    "private_branch_pushed": False,
+                    "remote_name": "origin",
+                    "remote_branch_ref": None,
+                    "fetch_command": None,
+                    "created_at": "2026-07-11T00:00:00+00:00",
+                    "updated_at": "2026-07-11T00:00:00+00:00",
+                }
+            ]
+        },
+    )
+
+    response = client.get("/api/hapy/private-branches")
+
+    assert response.status_code == 200
+    assert response.json()["branches"][0]["private_branch_name"] == "hw_topo_gen_private_run123"

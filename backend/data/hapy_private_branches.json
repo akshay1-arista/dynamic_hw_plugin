@@ -1,0 +1,38 @@
+[
+  {
+    "run_id": "73e5b16c7f60",
+    "topology_name": "3-site-spirent-hw-51d9e6",
+    "reference_topology_id": "3-site/spirent",
+    "repo_path": "/Users/akshay1.jain/Documents/automation/hapy_repo_for_tools/velocloud.src",
+    "destination_path": "/Users/akshay1.jain/Library/CloudStorage/GoogleDrive-akshay1.jain@arista.com/My Drive/VeloCloud-Migration/scripts/ai_tools/dynamic_hw_integration/outputs/73e5b16c7f60-51d9e6/hapy_publish/master-hw_topo_gen_private_73e5b16c7f60/hapy/hapy/testbed/configs/3-site/3-site-spirent-hw-51d9e6",
+    "destination_relative_path": "3-site/3-site-spirent-hw-51d9e6",
+    "base_branch": "master",
+    "private_branch_name": "hw_topo_gen_private_73e5b16c7f60",
+    "commit_sha": "566f27b548a591e0f3e479644b275875f75f208b",
+    "commit_message": "VLDT-None: add topology 3-site-spirent-hw-51d9e6",
+    "private_branch_pushed": true,
+    "remote_name": "origin",
+    "remote_branch_ref": "refs/heads/hw_topo_gen_private_73e5b16c7f60",
+    "fetch_command": "git fetch origin refs/heads/hw_topo_gen_private_73e5b16c7f60 && git checkout -b hw_topo_gen_private_73e5b16c7f60 FETCH_HEAD",
+    "created_at": "2026-07-10T20:07:43.312175+00:00",
+    "updated_at": "2026-07-10T20:07:49.170325+00:00"
+  },
+  {
+    "run_id": "a60d72b4db5a",
+    "topology_name": "3-site-spirent-hw-18d082",
+    "reference_topology_id": "3-site/spirent",
+    "repo_path": "/Users/akshay1.jain/Documents/automation/hapy_repo_for_tools/velocloud.src",
+    "destination_path": "/Users/akshay1.jain/Library/CloudStorage/GoogleDrive-akshay1.jain@arista.com/My Drive/VeloCloud-Migration/scripts/ai_tools/dynamic_hw_integration/outputs/a60d72b4db5a-18d082/hapy_publish/master-hw_topo_gen_private_a60d72b4db5a/hapy/hapy/testbed/configs/3-site/3-site-spirent-hw-18d082",
+    "destination_relative_path": "3-site/3-site-spirent-hw-18d082",
+    "base_branch": "master",
+    "private_branch_name": "hw_topo_gen_private_a60d72b4db5a",
+    "commit_sha": "ca63720bd73931f202d8a99f2f8e4669ec12e2cb",
+    "commit_message": "VLDT-None: add topology 3-site-spirent-hw-18d082",
+    "private_branch_pushed": true,
+    "remote_name": "origin",
+    "remote_branch_ref": "refs/heads/hw_topo_gen_private_a60d72b4db5a",
+    "fetch_command": "git fetch origin refs/heads/hw_topo_gen_private_a60d72b4db5a && git checkout -b hw_topo_gen_private_a60d72b4db5a FETCH_HEAD",
+    "created_at": "2026-07-11T08:35:20.494556+00:00",
+    "updated_at": "2026-07-11T08:35:26.365323+00:00"
+  }
+]

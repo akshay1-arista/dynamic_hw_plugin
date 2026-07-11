@@ -237,12 +237,22 @@ const inventory = {
 
 beforeEach(() => {
   window.confirm = vi.fn(() => true);
+  Object.defineProperty(navigator, 'clipboard', {
+    configurable: true,
+    value: {
+      writeText: vi.fn().mockResolvedValue(undefined)
+    }
+  });
+  let privateBranches = [];
   global.fetch = vi.fn(async (url, options = {}) => {
     if (url === '/api/reference-topologies') {
       return Response.json(references);
     }
     if (url === '/api/hardware' && !options.method) {
       return Response.json(inventory);
+    }
+    if (url === '/api/hapy/private-branches') {
+      return Response.json({ branches: privateBranches });
     }
     if (url === '/api/hardware' && options.method === 'PUT') {
       return Response.json(JSON.parse(options.body));
@@ -295,6 +305,50 @@ beforeEach(() => {
         ],
         messages: [{ level: 'info', message: 'All generated JSON files parsed successfully' }]
       });
+    }
+    if (url === '/api/runs/abc123/publish-private-branch' && options.method === 'POST') {
+      const payload = JSON.parse(options.body);
+      const response = {
+        run_id: 'abc123',
+        topology_name: '3-site-hw-a1b2c3',
+        reference_topology_id: '3-site',
+        repo_path: '/repo/velocloud.src',
+        destination_path: `/repo/velocloud.src/hapy/hapy/testbed/configs/3-site-hw-a1b2c3`,
+        destination_relative_path: '3-site-hw-a1b2c3',
+        base_branch: payload.base_branch,
+        private_branch_name: 'hw_topo_gen_private_abc123',
+        commit_sha: 'deadbeef1234',
+        commit_message: 'VLDT-None: add topology 3-site-hw-a1b2c3',
+        private_branch_pushed: true,
+        remote_name: 'origin',
+        remote_branch_ref: 'refs/heads/hw_topo_gen_private_abc123',
+        fetch_command:
+          'git fetch origin refs/heads/hw_topo_gen_private_abc123 && git checkout -b hw_topo_gen_private_abc123 FETCH_HEAD',
+        created_at: '2026-07-11T00:00:00+00:00',
+        updated_at: '2026-07-11T00:01:00+00:00',
+        messages: [{ level: 'info', message: 'Committed and pushed private branch to origin.' }]
+      };
+      privateBranches = [
+        {
+          run_id: response.run_id,
+          topology_name: response.topology_name,
+          reference_topology_id: response.reference_topology_id,
+          repo_path: response.repo_path,
+          destination_path: response.destination_path,
+          destination_relative_path: response.destination_relative_path,
+          base_branch: response.base_branch,
+          private_branch_name: response.private_branch_name,
+          commit_sha: response.commit_sha,
+          commit_message: response.commit_message,
+          private_branch_pushed: response.private_branch_pushed,
+          remote_name: response.remote_name,
+          remote_branch_ref: response.remote_branch_ref,
+          fetch_command: response.fetch_command,
+          created_at: response.created_at,
+          updated_at: response.updated_at
+        }
+      ];
+      return Response.json(response);
     }
     if (url === '/api/runs/abc123/configure-switches' && options.method === 'POST') {
       const payload = JSON.parse(options.body);
@@ -474,6 +528,33 @@ describe('App', () => {
       }
     ]);
     expect(window.confirm).toHaveBeenCalled();
+  });
+
+  test('publishes generated topology from a selected base branch and copies the branch name', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await screen.findAllByText('CHN 3800 HA Pair 8');
+    await chooseHardware(user, 'a01 680', /A01 680 Standalone/i);
+    await user.selectOptions(screen.getByLabelText('Branch'), 'branch1');
+    await user.type(screen.getByRole('combobox', { name: 'Hypervisor IP' }), '10.68.136.50');
+    await user.click(screen.getByRole('button', { name: /generate zip/i }));
+
+    await waitFor(() => expect(screen.getByText(/path resolved/i)).toBeInTheDocument());
+
+    await user.selectOptions(screen.getByLabelText('Base branch for Gerrit private branch'), 'release_6.4');
+    await user.click(screen.getByRole('button', { name: /commit and push gerrit private branch/i }));
+
+    await waitFor(() =>
+      expect(screen.getByText(/Private branch: hw_topo_gen_private_abc123/)).toBeInTheDocument()
+    );
+
+    const publishCall = global.fetch.mock.calls.find(([url]) => url === '/api/runs/abc123/publish-private-branch');
+    expect(JSON.parse(publishCall[1].body)).toEqual({ base_branch: 'release_6.4' });
+    expect(screen.getByText(/Remote ref: refs\/heads\/hw_topo_gen_private_abc123/)).toBeInTheDocument();
+    expect(screen.getByText(/pushed \/ release_6.4 \/ run abc123/i)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /copy branch name/i }));
+    expect(await screen.findByText('Copied')).toBeInTheDocument();
   });
 
   test('shows default interface matches and sends override payload when edited', async () => {

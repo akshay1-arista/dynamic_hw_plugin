@@ -56,6 +56,10 @@ export function fetchInventory() {
   return request('/api/hardware');
 }
 
+export function fetchPrivateBranches() {
+  return request('/api/hapy/private-branches');
+}
+
 export function saveInventory(inventory) {
   return request('/api/hardware', {
     method: 'PUT',
@@ -79,6 +83,13 @@ export function applyInventoryRefresh(hardwareIds) {
 
 export function generateTopology(payload) {
   return request('/api/generate', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
+export function publishPrivateBranch(runId, payload) {
+  return request(`/api/runs/${runId}/publish-private-branch`, {
     method: 'POST',
     body: JSON.stringify(payload)
   });

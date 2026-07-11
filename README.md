@@ -60,11 +60,23 @@ Optional persistent overrides and secrets can be supplied with `/etc/default/dyn
 - Generated topology folders and zip files: `outputs/<run_id>-<suffix>/`
 - Reference topologies are read from `backend/reference_topologies/` by default.
 - `REFERENCE_CONFIG_ROOT` remains available if you need to override the source path.
+- Hapy repo publishing reads `HAPY_REPO_ROOT` and copies committed topologies under
+  `hapy/hapy/testbed/configs/`.
+- For nested references such as `5-site-cluster/spirent`, the committed topology is saved under the
+  parent folder path, for example `hapy/hapy/testbed/configs/5-site-cluster/<generated-topology>`.
+- Tool-created Gerrit private branches are tracked in `backend/data/hapy_private_branches.json` by default.
+- Hapy commits and pushes run inside isolated per-run clone workspaces under `outputs/`, so different
+  users and different base branches do not share a mutable checkout.
 
 Example `.env`:
 
 ```bash
 REFERENCE_CONFIG_ROOT=backend/reference_topologies
+HAPY_REPO_ROOT=/Users/akshay1.jain/Documents/automation/hapy_repo_for_tools/velocloud.src
+# Optional override if testbed configs live somewhere else inside the repo:
+# HAPY_TESTBED_CONFIG_ROOT=/absolute/path/to/velocloud.src/hapy/hapy/testbed/configs
+# Optional override for the persisted tool branch list:
+# HAPY_PRIVATE_BRANCH_REGISTRY_PATH=backend/data/hapy_private_branches.json
 ```
 
 ## Verification

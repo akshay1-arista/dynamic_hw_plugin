@@ -593,6 +593,53 @@ button:disabled {
   gap: 10px;
 }
 
+.publishControls,
+.publishBox {
+  border: 1px solid #d7dee2;
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+}
+
+.publishControls {
+  background: #ffffff;
+}
+
+.publishField {
+  margin: 0;
+  max-width: 280px;
+}
+
+.publishBox {
+  background: #ffffff;
+}
+
+.copyRow {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.branchRegistryPanel {
+  max-width: 1440px;
+}
+
+.branchRegistryList {
+  display: grid;
+  gap: 10px;
+}
+
+.branchRegistryItem {
+  background: #f7f9fa;
+  border: 1px solid #d7dee2;
+  border-radius: 8px;
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+}
+
 .switchPreviewBox {
   background: #ffffff;
   border: 1px solid #d7dee2;

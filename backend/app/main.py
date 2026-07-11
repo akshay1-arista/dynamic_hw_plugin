@@ -10,10 +10,14 @@ from fastapi.responses import FileResponse
 from .discovery import DiscoveryError, apply_inventory_refresh, preview_inventory_refresh
 from .config import OUTPUTS_ROOT
 from .generator import GenerationError, generate_topology, resolve_run_root
+from .hapy_repo import HapyRepoError, list_private_branches, publish_run_private_branch
 from .inventory import load_inventory, save_inventory
 from .models import (
     GenerateRequest,
     GenerateResult,
+    HapyCommitRequest,
+    HapyCommitResult,
+    HapyPrivateBranchListResult,
     InventoryFile,
     InventoryRefreshRequest,
     InventoryRefreshResult,
@@ -83,6 +87,22 @@ def post_generate(request: GenerateRequest):
     try:
         return generate_topology(request)
     except (GenerationError, ValueError, FileNotFoundError) as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@app.get("/api/hapy/private-branches", response_model=HapyPrivateBranchListResult)
+def get_hapy_private_branches():
+    try:
+        return list_private_branches()
+    except (HapyRepoError, GenerationError, ValueError, FileNotFoundError) as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@app.post("/api/runs/{run_id}/publish-private-branch", response_model=HapyCommitResult)
+def post_publish_private_branch(run_id: str, request: HapyCommitRequest):
+    try:
+        return publish_run_private_branch(run_id, request)
+    except (HapyRepoError, GenerationError, ValueError, FileNotFoundError) as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
 
 

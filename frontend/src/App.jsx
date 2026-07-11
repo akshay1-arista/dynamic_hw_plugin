@@ -3,6 +3,7 @@ import {
   Archive,
   CheckCircle2,
   ChevronDown,
+  Copy,
   Download,
   Eye,
   GitBranch,
@@ -18,9 +19,11 @@ import {
 import {
   applyInventoryRefresh,
   configureSwitches,
+  fetchPrivateBranches,
   fetchInventory,
   fetchReferences,
   generateTopology,
+  publishPrivateBranch,
   previewInventoryRefresh,
   saveInventory
 } from './api.js';
@@ -34,11 +37,14 @@ const emptyMapping = {
   interface_overrides: []
 };
 
+const hapyBaseBranches = ['release_5.2', 'release_6.1', 'release_6.4', 'release_7.0', 'master'];
+
 export function App() {
   const hypervisorIpFieldId = useId();
   const hypervisorInterfaceFieldId = useId();
   const [references, setReferences] = useState([]);
   const [inventory, setInventory] = useState({ hardware: [] });
+  const [privateBranches, setPrivateBranches] = useState([]);
   const [selectedReferenceId, setSelectedReferenceId] = useState('');
   const [topologyName, setTopologyName] = useState('');
   const [hypervisorIp, setHypervisorIp] = useState('');
@@ -46,6 +52,10 @@ export function App() {
   const [branchRename, setBranchRename] = useState(false);
   const [mappings, setMappings] = useState([{ ...emptyMapping }]);
   const [result, setResult] = useState(null);
+  const [publishResult, setPublishResult] = useState(null);
+  const [publishBaseBranch, setPublishBaseBranch] = useState('master');
+  const [publishingAction, setPublishingAction] = useState('');
+  const [copyState, setCopyState] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
@@ -172,9 +182,14 @@ export function App() {
     setLoading(true);
     setError('');
     try {
-      const [referenceData, inventoryData] = await Promise.all([fetchReferences(), fetchInventory()]);
+      const [referenceData, inventoryData, privateBranchData] = await Promise.all([
+        fetchReferences(),
+        fetchInventory(),
+        fetchPrivateBranches()
+      ]);
       setReferences(referenceData);
       setInventory(inventoryData);
+      setPrivateBranches(privateBranchData.branches || []);
       const firstExisting = referenceData.find((reference) => reference.exists);
       if (firstExisting) {
         setSelectedReferenceId(firstExisting.id);
@@ -291,6 +306,7 @@ export function App() {
   async function submitGenerate() {
     setGenerating(true);
     setResult(null);
+    setPublishResult(null);
     setSwitchPreview(null);
     setError('');
     try {
@@ -354,6 +370,41 @@ export function App() {
       setError(generateError.message);
     } finally {
       setGenerating(false);
+    }
+  }
+
+  async function submitPublishPrivateBranch() {
+    if (!result?.run_id) {
+      return;
+    }
+    setPublishingAction('publish');
+    setError('');
+    try {
+      const response = await publishPrivateBranch(result.run_id, {
+        base_branch: publishBaseBranch
+      });
+      setPublishResult(response);
+      const refreshed = await fetchPrivateBranches();
+      setPrivateBranches(refreshed.branches || []);
+      setCopyState('');
+    } catch (publishError) {
+      setError(publishError.message);
+    } finally {
+      setPublishingAction('');
+    }
+  }
+
+  async function copyPrivateBranchName() {
+    if (!publishResult?.private_branch_name) {
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(publishResult.private_branch_name);
+      setCopyState('copied');
+      window.setTimeout(() => setCopyState(''), 1500);
+    } catch {
+      setCopyState('failed');
+      window.setTimeout(() => setCopyState(''), 2000);
     }
   }
 
@@ -686,6 +737,56 @@ export function App() {
                   </small>
                 ))}
               </div>
+              <div className="publishControls">
+                <label className="publishField">
+                  Base branch for Gerrit private branch
+                  <select
+                    aria-label="Base branch for Gerrit private branch"
+                    value={publishBaseBranch}
+                    onChange={(event) => setPublishBaseBranch(event.target.value)}
+                    disabled={publishingAction !== ''}
+                  >
+                    {hapyBaseBranches.map((branchName) => (
+                      <option key={branchName} value={branchName}>
+                        {branchName}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <small className="muted">
+                  This publishes one Gerrit private branch for the generated run using the selected base branch.
+                </small>
+              </div>
+              {publishResult && (
+                <div className="publishBox">
+                  <strong>Gerrit private branch details</strong>
+                  <small>Repo destination: {publishResult.destination_relative_path}</small>
+                  <small>Base branch: {publishResult.base_branch}</small>
+                  <small>Private branch: {publishResult.private_branch_name}</small>
+                  <small>Commit: {publishResult.commit_sha}</small>
+                  {publishResult.remote_branch_ref && <small>Remote ref: {publishResult.remote_branch_ref}</small>}
+                  {publishResult.fetch_command && <small>Fetch command: {publishResult.fetch_command}</small>}
+                  {publishResult.private_branch_pushed && (
+                    <div className="copyRow">
+                      <button className="secondary" onClick={copyPrivateBranchName}>
+                        <Copy size={16} />
+                        Copy branch name
+                      </button>
+                      {copyState === 'copied' && <small className="muted">Copied</small>}
+                      {copyState === 'failed' && <small className="message error">Copy failed</small>}
+                    </div>
+                  )}
+                  {publishResult.messages?.length > 0 && (
+                    <div className="messageList">
+                      {publishResult.messages.map((message, index) => (
+                        <small className={`message ${message.level}`} key={`publish-${index}`}>
+                          {message.level}: {message.message}
+                        </small>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="resultActions">
                 <a className="download" href={result.download_url}>
                   <Download size={16} />
@@ -693,8 +794,16 @@ export function App() {
                 </a>
                 <button
                   className="secondary"
+                  onClick={submitPublishPrivateBranch}
+                  disabled={publishingAction !== '' || generating}
+                >
+                  {publishingAction === 'publish' ? <Loader2 className="spin" size={16} /> : <GitBranch size={16} />}
+                  Commit And Push Gerrit Private Branch
+                </button>
+                <button
+                  className="secondary"
                   onClick={submitPreviewSwitches}
-                  disabled={!configureSwitchState.enabled || previewingSwitches || configuringSwitches}
+                  disabled={!configureSwitchState.enabled || previewingSwitches || configuringSwitches || publishingAction !== ''}
                   title={configureSwitchState.reason}
                 >
                   {previewingSwitches ? <Loader2 className="spin" size={16} /> : <Eye size={16} />}
@@ -703,7 +812,9 @@ export function App() {
                 <button
                   className="secondary"
                   onClick={submitConfigureSwitches}
-                  disabled={!configureSwitchState.enabled || configuringSwitches || previewingSwitches}
+                  disabled={
+                    !configureSwitchState.enabled || configuringSwitches || previewingSwitches || publishingAction !== ''
+                  }
                   title={configureSwitchState.reason}
                 >
                   {configuringSwitches ? <Loader2 className="spin" size={16} /> : <Server size={16} />}
@@ -751,6 +862,35 @@ export function App() {
                   )}
                 </div>
               )}
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section className="workspace lower">
+        <div className="panel wide branchRegistryPanel">
+          <div className="panelTitle">
+            <GitBranch size={18} />
+            <h2>Gerrit Private Branches</h2>
+          </div>
+          {privateBranches.length === 0 ? (
+            <p className="muted">No private branches created by the tool yet.</p>
+          ) : (
+            <div className="branchRegistryList">
+              {privateBranches.map((branch) => (
+                <div className="branchRegistryItem" key={branch.private_branch_name}>
+                  <strong>{branch.private_branch_name}</strong>
+                  <small>
+                    {branch.private_branch_pushed ? 'pushed' : 'committed only'} / {branch.base_branch} / run{' '}
+                    {branch.run_id}
+                  </small>
+                  <small>
+                    {branch.topology_name} from {branch.reference_topology_id}
+                  </small>
+                  <small>{branch.destination_relative_path}</small>
+                  {branch.remote_branch_ref && <small>{branch.remote_branch_ref}</small>}
+                </div>
+              ))}
             </div>
           )}
         </div>

@@ -1203,12 +1203,35 @@ function referenceInterfaceVlanSummary(interfaceSummary) {
   return vlans.length ? `Reference VLANs ${vlans.join(', ')}` : '';
 }
 
-function referenceInterfaceVlanPlan(interfaceSummary, port) {
+function referenceInterfaceVlanRequirements(interfaceSummary) {
   const vlans = Array.isArray(interfaceSummary?.vlans) ? interfaceSummary.vlans : [];
   const subinterfaces = Array.isArray(interfaceSummary?.subinterfaces) ? interfaceSummary.subinterfaces : [];
-  const taggedCount =
-    interfaceSummary?.mode === 'switched' ? Math.max(vlans.length - 1, 0) : subinterfaces.length;
-  const nativeCount = vlans.length || subinterfaces.length ? 1 : 0;
+  if (interfaceSummary?.mode === 'switched') {
+    return {
+      nativeCount: 1,
+      taggedCount: Math.max(vlans.length - 1, 0)
+    };
+  }
+  if (subinterfaces.length) {
+    return {
+      nativeCount: 1,
+      taggedCount: subinterfaces.length
+    };
+  }
+  if (vlans.length) {
+    return {
+      nativeCount: 1,
+      taggedCount: 0
+    };
+  }
+  return {
+    nativeCount: 0,
+    taggedCount: 0
+  };
+}
+
+function referenceInterfaceVlanPlan(interfaceSummary, port) {
+  const { nativeCount, taggedCount } = referenceInterfaceVlanRequirements(interfaceSummary);
   const totalCount = nativeCount + taggedCount;
   const inventoryVlans = Array.isArray(port?.switch_vlans)
     ? port.switch_vlans.filter((value) => Number.isInteger(value))
@@ -1243,6 +1266,91 @@ function referenceInterfaceVlanPlan(interfaceSummary, port) {
   };
 }
 
+function hardwareVlanPool(hardware) {
+  const freeVlans = Array.isArray(hardware?.free_vlans)
+    ? hardware.free_vlans.filter((value) => Number.isInteger(value) && value >= 1 && value <= 4094)
+    : [];
+  if (freeVlans.length) {
+    return freeVlans;
+  }
+  const rangeStart = hardware?.vlan_range?.start;
+  const rangeEnd = hardware?.vlan_range?.end;
+  if (!Number.isInteger(rangeStart) || !Number.isInteger(rangeEnd) || rangeStart > rangeEnd) {
+    return [];
+  }
+  const start = Math.max(rangeStart, 1);
+  const end = Math.min(rangeEnd, 4094);
+  if (start > end) {
+    return [];
+  }
+  return Array.from({ length: end - start + 1 }, (_, index) => start + index);
+}
+
+function parseVlanPreview(value) {
+  const trimmed = String(value || '').trim();
+  if (!trimmed) {
+    return [];
+  }
+  return trimmed
+    .split(',')
+    .map((token) => token.trim())
+    .filter((token) => /^\d+$/.test(token))
+    .map((token) => Number(token))
+    .filter((vlan) => vlan >= 1 && vlan <= 4094);
+}
+
+function buildAutoVlanAllocationPreview(referenceInterfaces, assignments, hardware, hardwarePortByInterface) {
+  const pool = hardwareVlanPool(hardware);
+  const preview = new Map();
+  if (!pool.length) {
+    return preview;
+  }
+
+  const assignmentByReference = new Map(
+    assignments.map((assignment) => [assignment.reference_interface, assignment])
+  );
+  const explicitReserved = new Set();
+  const dynamicPairs = [];
+
+  referenceInterfaces.forEach((interfaceSummary) => {
+    const referenceInterface = getReferenceInterfaceKey(interfaceSummary);
+    const assignment = assignmentByReference.get(referenceInterface);
+    const port = hardwarePortByInterface.get(assignment?.hardware_interface || '');
+    if (!assignment?.hardware_interface || !port) {
+      return;
+    }
+    if (assignment.switch_vlans_text?.trim()) {
+      const manualVlans = parseVlanPreview(assignment.switch_vlans_text);
+      manualVlans.forEach((vlan) => explicitReserved.add(vlan));
+      return;
+    }
+    dynamicPairs.push({ referenceInterface, interfaceSummary, port });
+  });
+
+  const available = pool.filter((vlan) => !explicitReserved.has(vlan));
+  let cursor = 0;
+
+  dynamicPairs.forEach(({ referenceInterface, interfaceSummary, port }) => {
+    const { nativeCount, taggedCount } = referenceInterfaceVlanRequirements(interfaceSummary);
+    const requiredCount = nativeCount + taggedCount;
+    if (requiredCount === 0) {
+      if (port.switch_vlans?.length || port.untagged_vlan != null || cursor >= available.length) {
+        return;
+      }
+      preview.set(referenceInterface, [available[cursor]]);
+      cursor += 1;
+      return;
+    }
+    if (cursor + requiredCount > available.length) {
+      return;
+    }
+    preview.set(referenceInterface, available.slice(cursor, cursor + requiredCount));
+    cursor += requiredCount;
+  });
+
+  return preview;
+}
+
 function hardwareInterfaceOptionLabel(port) {
   return `${port.logical_interface} / ${port.switch_active_port} / ${hardwarePortModeSummary(port)}`;
 }
@@ -1263,13 +1371,20 @@ function hardwarePortModeSummary(port) {
   return `${port.switch_vlans.length} tagged`;
 }
 
-function hardwarePortHint(port) {
+function hardwarePortHint(port, plannedVlans = []) {
   if (!port) {
     return 'This reference interface will be dropped from the generated topology.';
   }
-  const vlanSummary = port.switch_vlans?.length
-    ? `Current inventory VLANs ${port.switch_vlans.join(', ')}`
-    : 'No fixed VLAN metadata on this port';
+  const inventoryVlans = port.switch_vlans?.length
+    ? port.switch_vlans
+    : Number.isInteger(port.untagged_vlan)
+      ? [port.untagged_vlan]
+      : [];
+  const vlanSummary = inventoryVlans.length
+    ? `Current inventory VLANs ${inventoryVlans.join(', ')}`
+    : plannedVlans.length
+      ? `Will auto-assign VLAN${plannedVlans.length > 1 ? 's' : ''} ${plannedVlans.join(', ')} from hardware range`
+      : 'No hardware VLAN range available for auto-allocation';
   return `${port.logical_interface}${port.logical_name ? ` (${port.logical_name})` : ''} on ${port.switch_active_port}${port.switch_standby_port ? ` / standby ${port.switch_standby_port}` : ''}. ${vlanSummary}.`;
 }
 
@@ -1916,6 +2031,16 @@ function MappingRow({ index, mapping, mappings, reference, inventory, onChange, 
     () => new Map(hardwarePorts.map((port) => [port.logical_interface, port])),
     [hardwarePorts]
   );
+  const autoVlanAllocationPreview = useMemo(
+    () =>
+      buildAutoVlanAllocationPreview(
+        referenceInterfaces,
+        displayedInterfaceAssignments,
+        selectedHardware,
+        hardwarePortByInterface
+      ),
+    [displayedInterfaceAssignments, hardwarePortByInterface, referenceInterfaces, selectedHardware]
+  );
 
   useEffect(() => {
     if (!selectedHardware || !selectedEdge) {
@@ -2094,7 +2219,7 @@ function MappingRow({ index, mapping, mappings, reference, inventory, onChange, 
                             </option>
                           ))}
                         </select>
-                        <small>{hardwarePortHint(selectedPort)}</small>
+                        <small>{hardwarePortHint(selectedPort, autoVlanAllocationPreview.get(referenceInterface) || [])}</small>
                       </label>
                       <label className="interfaceOverrideField">
                         <span className="fieldCaption">VLAN allocation</span>

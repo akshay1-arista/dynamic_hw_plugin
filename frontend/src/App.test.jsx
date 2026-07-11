@@ -211,6 +211,8 @@ const inventory = {
       active_serial: 'DYN6801',
       standby_serial: '',
       available: true,
+      free_vlans: [200, 201, 202],
+      vlan_range: { start: 200, end: 202 },
       switch: { name: 'a02-access-switch', model: 'Dell-3048', connections: { ip: '10.68.136.80' } },
       ports: [
         {
@@ -648,6 +650,13 @@ describe('App', () => {
     expect(
       screen.getAllByText('Leave blank to auto-allocate 1 VLAN from the hardware range for the access switch.')
     ).toHaveLength(2);
+    expect(
+      screen.getByText('GE3 (INTERNET1) on gigabitethernet1/21. Will auto-assign VLAN 200 from hardware range.')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('GE4 (INTERNET2) on gigabitethernet1/22. Will auto-assign VLAN 201 from hardware range.')
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/No fixed VLAN metadata on this port/)).not.toBeInTheDocument();
   });
 
   test('prefills hypervisor interface and keeps it editable', async () => {

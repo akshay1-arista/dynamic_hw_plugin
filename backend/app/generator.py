@@ -9,8 +9,14 @@ import zipfile
 from pathlib import Path
 from typing import Any
 
+from .audit import append_audit_events
 from .config import INVENTORY_PATH, OUTPUTS_ROOT, REFERENCE_CONFIG_ROOT
-from .inventory import load_inventory, path_has_credentials, resolve_mapping_path
+from .inventory import (
+    load_inventory,
+    path_has_credentials,
+    reserve_generated_hardware,
+    resolve_mapping_path,
+)
 from .models import (
     EdgePortMapping,
     GenerateRequest,
@@ -74,6 +80,7 @@ def generate_topology(
         run_id=run_id,
         topology_name=generated_topology_name,
         reference_topology_id=request.reference_topology_id,
+        requested_by=request.requested_by,
     )
     mapping_statuses: list[GenerateMappingStatus] = []
 
@@ -203,6 +210,14 @@ def generate_topology(
     messages.extend(validation_messages)
     zip_path = _zip_topology(topology_path)
     _write_run_metadata(run_root, run_metadata)
+    _saved_inventory, reservation_events = reserve_generated_hardware(
+        [mapping.hardware_id for mapping in request.mappings],
+        request.requested_by,
+        run_id,
+        generated_topology_name,
+        inventory_path,
+    )
+    append_audit_events(reservation_events)
 
     return GenerateResult(
         run_id=run_id,
@@ -231,6 +246,16 @@ def _validate_request(request: GenerateRequest, hardware_by_id: dict[str, Hardwa
         raise GenerationError(f"Unknown hardware inventory id: {', '.join(missing)}")
     for mapping in request.mappings:
         hardware = hardware_by_id[mapping.hardware_id]
+        if not hardware.available:
+            reservation_actor = hardware.reservation.actor if hardware.reservation else None
+            reserved_by = (
+                f"{reservation_actor.name} ({reservation_actor.email})"
+                if reservation_actor
+                else "another user"
+            )
+            raise GenerationError(
+                f"{hardware.display_name} is currently reserved. Mark it available before generating again. Reserved by {reserved_by}."
+            )
         if not _topology_ports(hardware):
             raise GenerationError(f"No connected switch ports found for {hardware.id}")
 

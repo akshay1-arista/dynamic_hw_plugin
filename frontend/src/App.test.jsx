@@ -237,30 +237,133 @@ const inventory = {
   ]
 };
 
+const defaultUser = {
+  name: 'Test User',
+  email: 'test@example.com'
+};
+
 beforeEach(() => {
+  const storage = new Map();
+  Object.defineProperty(window, 'localStorage', {
+    configurable: true,
+    value: {
+      getItem: vi.fn((key) => (storage.has(key) ? storage.get(key) : null)),
+      setItem: vi.fn((key, value) => storage.set(key, String(value))),
+      removeItem: vi.fn((key) => storage.delete(key)),
+      clear: vi.fn(() => storage.clear())
+    }
+  });
   window.confirm = vi.fn(() => true);
+  window.localStorage.setItem('dynamic-topology-user', JSON.stringify(defaultUser));
   Object.defineProperty(navigator, 'clipboard', {
     configurable: true,
     value: {
       writeText: vi.fn().mockResolvedValue(undefined)
     }
   });
+  let inventoryState = JSON.parse(JSON.stringify(inventory));
   let privateBranches = [];
+  let auditTrail = [];
   global.fetch = vi.fn(async (url, options = {}) => {
     if (url === '/api/reference-topologies') {
       return Response.json(references);
     }
     if (url === '/api/hardware' && !options.method) {
-      return Response.json(inventory);
+      return Response.json(inventoryState);
     }
     if (url === '/api/hapy/private-branches') {
       return Response.json({ branches: privateBranches });
     }
+    if (url === '/api/audit-trail') {
+      return Response.json({ events: auditTrail });
+    }
     if (url === '/api/hardware' && options.method === 'PUT') {
-      return Response.json(JSON.parse(options.body));
+      const payload = JSON.parse(options.body);
+      inventoryState = payload.inventory;
+      auditTrail = [
+        {
+          id: 'audit-save',
+          action: 'inventory_saved',
+          actor: payload.requested_by,
+          target_type: 'inventory',
+          target_id: 'hardware_inventory',
+          summary: 'Saved inventory updates.',
+          details: {},
+          created_at: '2026-07-12T00:00:00+00:00'
+        },
+        ...auditTrail
+      ];
+      return Response.json(payload.inventory);
+    }
+    if (/^\/api\/hardware\/[^/]+\/availability$/.test(url) && options.method === 'POST') {
+      const hardwareId = url.split('/')[3];
+      const payload = JSON.parse(options.body);
+      inventoryState = {
+        ...inventoryState,
+        hardware: inventoryState.hardware.map((hardware) =>
+          hardware.id === hardwareId
+            ? {
+                ...hardware,
+                available: payload.available,
+                reservation: payload.available
+                  ? null
+                  : {
+                      actor: payload.requested_by,
+                      reserved_at: '2026-07-12T00:00:00+00:00',
+                      reason: 'manual-unavailable'
+                    }
+              }
+            : hardware
+        )
+      };
+      auditTrail = [
+        {
+          id: `audit-${hardwareId}`,
+          action: payload.available ? 'hardware_released' : 'hardware_marked_unavailable',
+          actor: payload.requested_by,
+          target_type: 'hardware',
+          target_id: hardwareId,
+          summary: payload.available ? 'Marked hardware as available.' : 'Marked hardware as unavailable.',
+          details: { hardware_id: hardwareId },
+          created_at: '2026-07-12T00:00:00+00:00'
+        },
+        ...auditTrail
+      ];
+      return Response.json(inventoryState);
     }
     if (url === '/api/generate') {
       const payload = JSON.parse(options.body);
+      inventoryState = {
+        ...inventoryState,
+        hardware: inventoryState.hardware.map((hardware) =>
+          payload.mappings.some((mapping) => mapping.hardware_id === hardware.id)
+            ? {
+                ...hardware,
+                available: false,
+                reservation: {
+                  actor: payload.requested_by,
+                  reserved_at: '2026-07-12T00:00:00+00:00',
+                  reason: 'topology-generation',
+                  run_id: 'abc123',
+                  topology_name: '3-site-hw-a1b2c3'
+                }
+              }
+            : hardware
+        )
+      };
+      auditTrail = [
+        {
+          id: 'audit-generate',
+          action: 'hardware_reserved',
+          actor: payload.requested_by,
+          target_type: 'hardware',
+          target_id: payload.mappings[0].hardware_id,
+          summary: 'Reserved hardware for generated topology.',
+          details: { run_id: 'abc123', topology_name: '3-site-hw-a1b2c3' },
+          created_at: '2026-07-12T00:00:00+00:00'
+        },
+        ...auditTrail
+      ];
       if (payload.mappings?.[0]?.hardware_id === 'a01-680-standalone') {
         return Response.json({
           run_id: 'abc123',
@@ -350,7 +453,54 @@ beforeEach(() => {
           updated_at: response.updated_at
         }
       ];
+      auditTrail = [
+        {
+          id: 'audit-publish',
+          action: 'private_branch_published',
+          actor: payload.requested_by,
+          target_type: 'private_branch',
+          target_id: response.private_branch_name,
+          summary: 'Pushed Gerrit private branch.',
+          details: { run_id: 'abc123' },
+          created_at: '2026-07-12T00:00:00+00:00'
+        },
+        ...auditTrail
+      ];
       return Response.json(response);
+    }
+    if (url === '/api/hapy/private-branches/delete' && options.method === 'POST') {
+      const payload = JSON.parse(options.body);
+      const deletedNames = payload.delete_all
+        ? privateBranches.map((branch) => branch.private_branch_name)
+        : payload.private_branch_names;
+      privateBranches = privateBranches.filter(
+        (branch) => !deletedNames.includes(branch.private_branch_name)
+      );
+      auditTrail = [
+        ...deletedNames.map((branchName, index) => ({
+          id: `audit-delete-${index}`,
+          action: 'private_branch_deleted',
+          actor: payload.requested_by,
+          target_type: 'private_branch',
+          target_id: branchName,
+          summary: `Deleted Gerrit private branch ${branchName}.`,
+          details: {},
+          created_at: '2026-07-12T00:00:00+00:00'
+        })),
+        ...auditTrail
+      ];
+      return Response.json({
+        results: deletedNames.map((branchName) => ({
+          private_branch_name: branchName,
+          run_id: 'abc123',
+          deleted_local_paths: ['/repo/velocloud.src'],
+          deleted_remote: true,
+          registry_removed: true,
+          success: true,
+          messages: []
+        })),
+        messages: [{ level: 'info', message: `Deleted ${deletedNames.length} Gerrit private branches.` }]
+      });
     }
     if (url === '/api/runs/abc123/configure-switches' && options.method === 'POST') {
       const payload = JSON.parse(options.body);
@@ -389,6 +539,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  window.localStorage.clear();
   vi.restoreAllMocks();
 });
 
@@ -401,6 +552,19 @@ async function chooseHardware(user, query, optionName, index = 0) {
 }
 
 describe('App', () => {
+  test('shows the homepage user form when no stored user exists', async () => {
+    window.localStorage.clear();
+    const user = userEvent.setup();
+    render(<App />);
+
+    expect(screen.getByText('User Session')).toBeInTheDocument();
+    await user.type(screen.getByLabelText('User name'), 'Another User');
+    await user.type(screen.getByLabelText('User email'), 'another@example.com');
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+
+    expect(await screen.findByText('Dynamic Topology Engine')).toBeInTheDocument();
+  });
+
   test('loads references and inventory', async () => {
     render(<App />);
     expect((await screen.findAllByText('branch2')).length).toBeGreaterThan(0);
@@ -481,12 +645,36 @@ describe('App', () => {
     const payload = JSON.parse(generateCall[1].body);
     expect(payload.hypervisor_ip).toBe('10.68.136.50');
     expect(payload.hypervisor_interface).toBe('vmnic0');
+    expect(payload.requested_by).toEqual(defaultUser);
     expect(payload.mappings[0]).not.toHaveProperty('hypervisor_ip');
     expect(payload.mappings[0]).not.toHaveProperty('hypervisor_interface');
     expect(screen.getByRole('link', { name: /download zip/i })).toHaveAttribute(
       'href',
       '/api/runs/abc123/download'
     );
+    expect(screen.getByText('By Test User')).toBeInTheDocument();
+  });
+
+  test('filters audit trail events', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await screen.findAllByText('CHN 3800 HA Pair 8');
+    await chooseHardware(user, '3800', /CHN 3800 HA Pair 8/i);
+    await user.selectOptions(screen.getByLabelText('Branch'), 'branch2');
+    await user.type(screen.getByRole('combobox', { name: 'Hypervisor IP' }), '10.68.136.50');
+    await user.click(screen.getByRole('button', { name: /generate zip/i }));
+
+    await screen.findByText('Reserved hardware for generated topology.');
+    const auditSearch = screen.getByLabelText('Search audit trail');
+    await user.type(auditSearch, '3-site-hw-a1b2c3');
+
+    expect(screen.getByText('Reserved hardware for generated topology.')).toBeInTheDocument();
+    await user.clear(auditSearch);
+    await user.type(auditSearch, 'no-match');
+
+    expect(screen.queryByText('Reserved hardware for generated topology.')).not.toBeInTheDocument();
+    expect(screen.getByText('No audit events match the current search.')).toBeInTheDocument();
   });
 
   test('previews switch config, allows edits, and applies the edited commands', async () => {
@@ -552,11 +740,58 @@ describe('App', () => {
     );
 
     const publishCall = global.fetch.mock.calls.find(([url]) => url === '/api/runs/abc123/publish-private-branch');
-    expect(JSON.parse(publishCall[1].body)).toEqual({ base_branch: 'release_6.4' });
+    expect(JSON.parse(publishCall[1].body)).toEqual({
+      base_branch: 'release_6.4',
+      requested_by: defaultUser
+    });
     expect(screen.getByText(/Remote ref: refs\/heads\/hw_topo_gen_private_abc123/)).toBeInTheDocument();
     expect(screen.getByText(/pushed \/ release_6.4 \/ run abc123/i)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /copy branch name/i }));
     expect(await screen.findByText('Copied')).toBeInTheDocument();
+  });
+
+  test('marks reserved hardware available again through the inventory toggle', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await screen.findAllByText('CHN 3800 HA Pair 8');
+    await chooseHardware(user, '3800', /CHN 3800 HA Pair 8/i);
+    await user.selectOptions(screen.getByLabelText('Branch'), 'branch2');
+    await user.type(screen.getByRole('combobox', { name: 'Hypervisor IP' }), '10.68.136.50');
+    await user.click(screen.getByRole('button', { name: /generate zip/i }));
+
+    await screen.findByText('By Test User');
+    await user.click(screen.getByRole('button', { name: /chn-3800-ha-8/i }));
+    const availabilityToggle = screen.getAllByRole('checkbox', { name: 'Available' })[0];
+    await user.click(availabilityToggle);
+
+    const availabilityCall = global.fetch.mock.calls.find(([url]) =>
+      /^\/api\/hardware\/chn-3800-8-ha\/availability$/.test(url)
+    );
+    expect(JSON.parse(availabilityCall[1].body)).toEqual({
+      available: true,
+      requested_by: defaultUser
+    });
+    await waitFor(() => expect(screen.getAllByText('Available').length).toBeGreaterThan(0));
+  });
+
+  test('deletes selected Gerrit private branches', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await screen.findAllByText('CHN 3800 HA Pair 8');
+    await chooseHardware(user, 'a01 680', /A01 680 Standalone/i);
+    await user.selectOptions(screen.getByLabelText('Branch'), 'branch1');
+    await user.type(screen.getByRole('combobox', { name: 'Hypervisor IP' }), '10.68.136.50');
+    await user.click(screen.getByRole('button', { name: /generate zip/i }));
+    await waitFor(() => expect(screen.getByText(/path resolved/i)).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: /commit and push gerrit private branch/i }));
+    await screen.findAllByText(/hw_topo_gen_private_abc123/);
+
+    await user.click(document.querySelector('.branchRegistrySelect input'));
+    await user.click(screen.getByRole('button', { name: /delete selected/i }));
+
+    await waitFor(() => expect(document.querySelector('.branchRegistrySelect input')).toBeNull());
   });
 
   test('shows default interface matches and sends override payload when edited', async () => {

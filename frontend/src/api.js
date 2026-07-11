@@ -60,10 +60,17 @@ export function fetchPrivateBranches() {
   return request('/api/hapy/private-branches');
 }
 
-export function saveInventory(inventory) {
+export function fetchAuditTrail() {
+  return request('/api/audit-trail');
+}
+
+export function saveInventory(inventory, requestedBy = null) {
   return request('/api/hardware', {
     method: 'PUT',
-    body: JSON.stringify(inventory)
+    body: JSON.stringify({
+      inventory,
+      requested_by: requestedBy
+    })
   });
 }
 
@@ -88,8 +95,25 @@ export function generateTopology(payload) {
   });
 }
 
+export function updateHardwareAvailability(hardwareId, available, requestedBy) {
+  return request(`/api/hardware/${hardwareId}/availability`, {
+    method: 'POST',
+    body: JSON.stringify({
+      available,
+      requested_by: requestedBy
+    })
+  });
+}
+
 export function publishPrivateBranch(runId, payload) {
   return request(`/api/runs/${runId}/publish-private-branch`, {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
+export function deletePrivateBranches(payload) {
+  return request('/api/hapy/private-branches/delete', {
     method: 'POST',
     body: JSON.stringify(payload)
   });

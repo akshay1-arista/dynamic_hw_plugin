@@ -7,20 +7,26 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
+from .audit import AuditTrailError, append_audit_event, list_audit_events
 from .discovery import DiscoveryError, apply_inventory_refresh, preview_inventory_refresh
 from .config import OUTPUTS_ROOT
 from .generator import GenerationError, generate_topology, resolve_run_root
-from .hapy_repo import HapyRepoError, list_private_branches, publish_run_private_branch
-from .inventory import load_inventory, save_inventory
+from .hapy_repo import HapyRepoError, delete_private_branches, list_private_branches, publish_run_private_branch
+from .inventory import load_inventory, save_inventory, update_hardware_availability
 from .models import (
+    AuditTrailResult,
     GenerateRequest,
     GenerateResult,
+    HapyPrivateBranchDeleteRequest,
+    HapyPrivateBranchDeleteResult,
     HapyCommitRequest,
     HapyCommitResult,
     HapyPrivateBranchListResult,
+    HardwareAvailabilityUpdateRequest,
     InventoryFile,
     InventoryRefreshRequest,
     InventoryRefreshResult,
+    InventoryUpdateRequest,
     SwitchConfigureRequest,
     SwitchConfigureResult,
 )
@@ -62,8 +68,40 @@ def get_hardware():
 
 
 @app.put("/api/hardware", response_model=InventoryFile)
-def put_hardware(inventory: InventoryFile):
-    return save_inventory(inventory)
+def put_hardware(request: InventoryUpdateRequest):
+    saved = save_inventory(request.inventory)
+    if request.requested_by is not None:
+        append_audit_event(
+            action="inventory_saved",
+            actor=request.requested_by,
+            target_type="inventory",
+            target_id="hardware_inventory",
+            summary="Saved inventory updates.",
+            details={"hardware_count": len(saved.hardware)},
+        )
+    return saved
+
+
+@app.post("/api/hardware/{hardware_id}/availability", response_model=InventoryFile)
+def post_hardware_availability(hardware_id: str, request: HardwareAvailabilityUpdateRequest):
+    try:
+        inventory, events = update_hardware_availability(
+            hardware_id,
+            request.available,
+            request.requested_by,
+        )
+        for event in events:
+            append_audit_event(
+                action=event.action,
+                actor=event.actor,
+                target_type=event.target_type,
+                target_id=event.target_id,
+                summary=event.summary,
+                details=event.details,
+            )
+        return inventory
+    except (ValueError, AuditTrailError) as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
 
 
 @app.post("/api/hardware/refresh-preview", response_model=InventoryRefreshResult)
@@ -98,6 +136,14 @@ def get_hapy_private_branches():
         raise HTTPException(status_code=400, detail=str(error)) from error
 
 
+@app.post("/api/hapy/private-branches/delete", response_model=HapyPrivateBranchDeleteResult)
+def post_delete_hapy_private_branches(request: HapyPrivateBranchDeleteRequest):
+    try:
+        return delete_private_branches(request)
+    except (HapyRepoError, GenerationError, ValueError, FileNotFoundError, AuditTrailError) as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
 @app.post("/api/runs/{run_id}/publish-private-branch", response_model=HapyCommitResult)
 def post_publish_private_branch(run_id: str, request: HapyCommitRequest):
     try:
@@ -124,3 +170,11 @@ def download_run(run_id: str):
     if not zip_files:
         raise HTTPException(status_code=404, detail="Run zip not found")
     return FileResponse(zip_files[0], filename=zip_files[0].name, media_type="application/zip")
+
+
+@app.get("/api/audit-trail", response_model=AuditTrailResult)
+def get_audit_trail():
+    try:
+        return list_audit_events()
+    except AuditTrailError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error

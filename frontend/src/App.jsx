@@ -19,13 +19,16 @@ import {
 import {
   applyInventoryRefresh,
   configureSwitches,
+  deletePrivateBranches,
+  fetchAuditTrail,
   fetchPrivateBranches,
   fetchInventory,
   fetchReferences,
   generateTopology,
   publishPrivateBranch,
   previewInventoryRefresh,
-  saveInventory
+  saveInventory,
+  updateHardwareAvailability
 } from './api.js';
 
 const emptyMapping = {
@@ -38,13 +41,19 @@ const emptyMapping = {
 };
 
 const hapyBaseBranches = ['release_5.2', 'release_6.1', 'release_6.4', 'release_7.0', 'master'];
+const userStorageKey = 'dynamic-topology-user';
 
 export function App() {
   const hypervisorIpFieldId = useId();
   const hypervisorInterfaceFieldId = useId();
+  const [currentUser, setCurrentUser] = useState(() => loadStoredUser());
+  const [profileName, setProfileName] = useState(() => loadStoredUser()?.name || '');
+  const [profileEmail, setProfileEmail] = useState(() => loadStoredUser()?.email || '');
   const [references, setReferences] = useState([]);
   const [inventory, setInventory] = useState({ hardware: [] });
   const [privateBranches, setPrivateBranches] = useState([]);
+  const [auditTrail, setAuditTrail] = useState([]);
+  const [selectedPrivateBranchNames, setSelectedPrivateBranchNames] = useState([]);
   const [selectedReferenceId, setSelectedReferenceId] = useState('');
   const [topologyName, setTopologyName] = useState('');
   const [hypervisorIp, setHypervisorIp] = useState('');
@@ -57,19 +66,30 @@ export function App() {
   const [publishingAction, setPublishingAction] = useState('');
   const [copyState, setCopyState] = useState('');
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(Boolean(loadStoredUser()));
   const [generating, setGenerating] = useState(false);
   const [savingInventory, setSavingInventory] = useState(false);
   const [refreshingHardwareId, setRefreshingHardwareId] = useState('');
+  const [updatingAvailabilityId, setUpdatingAvailabilityId] = useState('');
   const [configuringSwitches, setConfiguringSwitches] = useState(false);
   const [previewingSwitches, setPreviewingSwitches] = useState(false);
   const [switchPreview, setSwitchPreview] = useState(null);
   const [inventorySearch, setInventorySearch] = useState('');
+  const [auditSearch, setAuditSearch] = useState('');
   const [expandedHardwareId, setExpandedHardwareId] = useState('');
+  const [collapsedDataCards, setCollapsedDataCards] = useState({
+    inventory: false,
+    privateBranches: false,
+    auditTrail: false
+  });
 
   useEffect(() => {
+    if (!currentUser) {
+      setLoading(false);
+      return;
+    }
     loadData();
-  }, []);
+  }, [currentUser]);
 
   const selectedReference = useMemo(
     () => references.find((reference) => reference.id === selectedReferenceId),
@@ -150,6 +170,13 @@ export function App() {
     }
     return inventory.hardware.filter((hardware) => hardwareSearchText(hardware).includes(query));
   }, [inventory.hardware, inventorySearch]);
+  const filteredAuditTrail = useMemo(() => {
+    const query = auditSearch.trim().toLowerCase();
+    if (!query) {
+      return auditTrail;
+    }
+    return auditTrail.filter((event) => auditSearchText(event).includes(query));
+  }, [auditTrail, auditSearch]);
 
   const configureSwitchState = useMemo(() => {
     if (!result) {
@@ -189,21 +216,30 @@ export function App() {
     () => mappings.filter((mapping) => mapping.hardware_id && mapping.branch_name && mapping.edge_name).length,
     [mappings]
   );
+  const allPrivateBranchesSelected =
+    privateBranches.length > 0 && selectedPrivateBranchNames.length === privateBranches.length;
 
   async function loadData() {
     setLoading(true);
     setError('');
     try {
-      const [referenceData, inventoryData, privateBranchData] = await Promise.all([
+      const [referenceData, inventoryData, privateBranchData, auditData] = await Promise.all([
         fetchReferences(),
         fetchInventory(),
-        fetchPrivateBranches()
+        fetchPrivateBranches(),
+        fetchAuditTrail()
       ]);
       setReferences(referenceData);
       setInventory(inventoryData);
       setPrivateBranches(privateBranchData.branches || []);
+      setAuditTrail(auditData.events || []);
+      setSelectedPrivateBranchNames((current) =>
+        current.filter((branchName) =>
+          (privateBranchData.branches || []).some((branch) => branch.private_branch_name === branchName)
+        )
+      );
       const firstExisting = referenceData.find((reference) => reference.exists);
-      if (firstExisting) {
+      if (firstExisting && !selectedReferenceId) {
         setSelectedReferenceId(firstExisting.id);
         setTopologyName(`${firstExisting.id.replaceAll('/', '-')}-hw`);
       }
@@ -250,15 +286,6 @@ export function App() {
     setMappings((current) => current.filter((_, mappingIndex) => mappingIndex !== index));
   }
 
-  function updateHardwareAvailability(hardwareId, available) {
-    setInventory((current) => ({
-      ...current,
-      hardware: current.hardware.map((hardware) =>
-        hardware.id === hardwareId ? { ...hardware, available } : hardware
-      )
-    }));
-  }
-
   function updateHardwareVlanRange(hardwareId, boundary, value) {
     setInventory((current) => ({
       ...current,
@@ -282,16 +309,58 @@ export function App() {
     }));
   }
 
+  function submitUserProfile(event) {
+    event.preventDefault();
+    const name = profileName.trim();
+    const email = profileEmail.trim().toLowerCase();
+    if (!name || !email || !email.includes('@')) {
+      setError('Enter a valid name and email address before continuing.');
+      return;
+    }
+    const nextUser = { name, email };
+    storeUser(nextUser);
+    setCurrentUser(nextUser);
+    setError('');
+  }
+
+  function clearCurrentUser() {
+    clearStoredUser();
+    setCurrentUser(null);
+    setReferences([]);
+    setInventory({ hardware: [] });
+    setPrivateBranches([]);
+    setAuditTrail([]);
+    setSelectedPrivateBranchNames([]);
+    setLoading(false);
+  }
+
   async function persistInventory() {
     setSavingInventory(true);
     setError('');
     try {
-      const saved = await saveInventory(inventory);
+      const saved = await saveInventory(inventory, currentUser);
       setInventory(saved);
+      const auditData = await fetchAuditTrail();
+      setAuditTrail(auditData.events || []);
     } catch (saveError) {
       setError(saveError.message);
     } finally {
       setSavingInventory(false);
+    }
+  }
+
+  async function changeHardwareAvailability(hardwareId, available) {
+    setUpdatingAvailabilityId(hardwareId);
+    setError('');
+    try {
+      const updatedInventory = await updateHardwareAvailability(hardwareId, available, currentUser);
+      setInventory(updatedInventory);
+      const auditData = await fetchAuditTrail();
+      setAuditTrail(auditData.events || []);
+    } catch (availabilityError) {
+      setError(availabilityError.message);
+    } finally {
+      setUpdatingAvailabilityId('');
     }
   }
 
@@ -353,6 +422,7 @@ export function App() {
         hypervisor_ip: hypervisorIp,
         hypervisor_interface: hypervisorInterface,
         branch_rename: branchRename,
+        requested_by: currentUser,
         mappings: mappings.map((mapping) => ({
           hardware_id: mapping.hardware_id,
           branch_name: mapping.branch_name,
@@ -378,6 +448,9 @@ export function App() {
       };
       const generated = await generateTopology(payload);
       setResult(generated);
+      const [inventoryData, auditData] = await Promise.all([fetchInventory(), fetchAuditTrail()]);
+      setInventory(inventoryData);
+      setAuditTrail(auditData.events || []);
     } catch (generateError) {
       setError(generateError.message);
     } finally {
@@ -393,14 +466,67 @@ export function App() {
     setError('');
     try {
       const response = await publishPrivateBranch(result.run_id, {
-        base_branch: publishBaseBranch
+        base_branch: publishBaseBranch,
+        requested_by: currentUser
       });
       setPublishResult(response);
-      const refreshed = await fetchPrivateBranches();
+      const [refreshed, auditData] = await Promise.all([fetchPrivateBranches(), fetchAuditTrail()]);
       setPrivateBranches(refreshed.branches || []);
+      setAuditTrail(auditData.events || []);
       setCopyState('');
     } catch (publishError) {
       setError(publishError.message);
+    } finally {
+      setPublishingAction('');
+    }
+  }
+
+  function togglePrivateBranchSelection(privateBranchName) {
+    setSelectedPrivateBranchNames((current) =>
+      current.includes(privateBranchName)
+        ? current.filter((item) => item !== privateBranchName)
+        : [...current, privateBranchName]
+    );
+  }
+
+  function toggleAllPrivateBranches() {
+    setSelectedPrivateBranchNames(
+      allPrivateBranchesSelected ? [] : privateBranches.map((branch) => branch.private_branch_name)
+    );
+  }
+
+  function toggleDataCard(cardName) {
+    setCollapsedDataCards((current) => ({
+      ...current,
+      [cardName]: !current[cardName]
+    }));
+  }
+
+  async function submitDeletePrivateBranches({ deleteAll = false, branchNames = [] } = {}) {
+    const targets = deleteAll ? privateBranches.map((branch) => branch.private_branch_name) : branchNames;
+    if (!targets.length) {
+      return;
+    }
+    const prompt = deleteAll
+      ? `Delete all ${targets.length} Gerrit private branches from local and remote repos?`
+      : `Delete ${targets.length} Gerrit private branch${targets.length === 1 ? '' : 'es'} from local and remote repos?`;
+    if (!window.confirm(prompt)) {
+      return;
+    }
+    setPublishingAction('delete-branches');
+    setError('');
+    try {
+      await deletePrivateBranches({
+        delete_all: deleteAll,
+        private_branch_names: deleteAll ? [] : targets,
+        requested_by: currentUser
+      });
+      const [refreshed, auditData] = await Promise.all([fetchPrivateBranches(), fetchAuditTrail()]);
+      setPrivateBranches(refreshed.branches || []);
+      setAuditTrail(auditData.events || []);
+      setSelectedPrivateBranchNames([]);
+    } catch (deleteError) {
+      setError(deleteError.message);
     } finally {
       setPublishingAction('');
     }
@@ -514,6 +640,47 @@ export function App() {
     );
   }
 
+  if (!currentUser) {
+    return (
+      <main className="shell center">
+        <section className="identityCard">
+          <div className="panelTitle">
+            <GitBranch size={18} />
+            <div>
+              <h2>User Session</h2>
+              <p>Enter your name and email before using shared hardware reservations.</p>
+            </div>
+          </div>
+          {error && <div className="alert inlineAlert">{error}</div>}
+          <form className="identityForm" onSubmit={submitUserProfile}>
+            <label>
+              <RequiredLabel>Name</RequiredLabel>
+              <input
+                aria-label="User name"
+                value={profileName}
+                onChange={(event) => setProfileName(event.target.value)}
+                placeholder="Your name"
+              />
+            </label>
+            <label>
+              <RequiredLabel>Email</RequiredLabel>
+              <input
+                aria-label="User email"
+                type="email"
+                value={profileEmail}
+                onChange={(event) => setProfileEmail(event.target.value)}
+                placeholder="name@example.com"
+              />
+            </label>
+            <button className="primary" type="submit">
+              Continue
+            </button>
+          </form>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className="shell">
       <header className="appHeader">
@@ -526,6 +693,15 @@ export function App() {
           </div>
         </div>
         <div className="headerActions">
+          <div className="activeUserPill" aria-label="Current user">
+            <span>
+              <strong>{currentUser.name}</strong>
+              <small>{currentUser.email}</small>
+            </span>
+            <button className="secondary slimButton" onClick={clearCurrentUser} type="button">
+              Change user
+            </button>
+          </div>
           <div className="metricStrip" aria-label="Workspace summary">
             <MetricPill icon={<GitBranch size={14} />} label="References" value={existingReferenceCount} />
             <MetricPill icon={<HardDrive size={14} />} label="Available hardware" value={`${availableHardwareCount}/${inventory.hardware.length}`} />
@@ -539,93 +715,297 @@ export function App() {
 
       {error && <div className="alert">{error}</div>}
 
-      <section className="workspace primaryWorkspace">
-        <div className="panel setupPanel">
-          <div className="panelTitle">
-            <GitBranch size={18} />
-            <div>
-              <h2>Topology Setup</h2>
-              <p>Choose the virtual reference and target hypervisor context.</p>
-            </div>
-          </div>
-          <label>
-            <RequiredLabel>Topology</RequiredLabel>
-            <select
-              aria-label="Topology"
-              required
-              value={selectedReferenceId}
-              onChange={(event) => {
-                setSelectedReferenceId(event.target.value);
-                setTopologyName(`${event.target.value.replaceAll('/', '-')}-hw`);
-                setMappings([{ ...emptyMapping }]);
-              }}
-            >
-              {references.map((reference) => (
-                <option key={reference.id} value={reference.id} disabled={!reference.exists}>
-                  {reference.id}
-                  {!reference.exists ? ' unavailable' : ''}
-                </option>
+      <section className="workspace appWorkspace">
+        <div className="workspaceColumn sideColumn">
+          <CollapsiblePanel
+            className="inventoryPanel"
+            collapsed={collapsedDataCards.inventory}
+            description="Search, inspect, and mark physical hardware availability."
+            icon={<Server size={18} />}
+            onToggle={() => toggleDataCard('inventory')}
+            title="Inventory"
+          >
+            <label className="searchField">
+              Search hardware
+              <span>
+                <Search size={16} aria-hidden="true" />
+                <input
+                  value={inventorySearch}
+                  onChange={(event) => setInventorySearch(event.target.value)}
+                  placeholder="device name, short name, serial, model"
+                />
+              </span>
+            </label>
+            <div className="inventoryList">
+              {filteredHardware.map((hardware) => (
+                <div key={hardware.id} className="inventoryItem">
+                  <button
+                    className="inventorySummary"
+                    onClick={() =>
+                      setExpandedHardwareId((current) => (current === hardware.id ? '' : hardware.id))
+                    }
+                    aria-expanded={expandedHardwareId === hardware.id}
+                  >
+                    <span>
+                      <strong>{hardware.short_name || hardware.display_name}</strong>
+                      <small>{hardware.display_name}</small>
+                      <span className="inventoryBadges">
+                        <StatusBadge tone={hardware.available ? 'success' : 'neutral'}>
+                          {hardware.available ? 'Available' : 'Reserved'}
+                        </StatusBadge>
+                        {!hardware.available && hardware.reservation?.actor && (
+                          <StatusBadge tone="warning">By {hardware.reservation.actor.name}</StatusBadge>
+                        )}
+                        <StatusBadge tone={hardware.ha ? 'accent' : 'neutral'}>
+                          {hardware.ha ? 'HA' : 'Standalone'}
+                        </StatusBadge>
+                        <StatusBadge tone={hardware.path_complete ? 'success' : 'warning'}>
+                          {hardware.path_complete ? 'Path complete' : 'Path pending'}
+                        </StatusBadge>
+                      </span>
+                      <small>{hardware.model} / {hardware.ports.length} switch links</small>
+                    </span>
+                    <ChevronDown size={16} aria-hidden="true" />
+                  </button>
+                  <label className="toggle">
+                    <input
+                      type="checkbox"
+                      checked={hardware.available}
+                      disabled={updatingAvailabilityId === hardware.id}
+                      onChange={(event) => changeHardwareAvailability(hardware.id, event.target.checked)}
+                    />
+                    {updatingAvailabilityId === hardware.id ? 'Saving' : 'Available'}
+                  </label>
+                  {expandedHardwareId === hardware.id && (
+                    <HardwareDetails
+                      hardware={hardware}
+                      refreshing={refreshingHardwareId === hardware.id}
+                      onVlanRangeChange={(boundary, value) => updateHardwareVlanRange(hardware.id, boundary, value)}
+                      onRefresh={() => refreshHardwareFromLabNavigator(hardware.id)}
+                    />
+                  )}
+                </div>
               ))}
-            </select>
-          </label>
+              {filteredHardware.length === 0 && <p className="muted">No hardware matches the current search.</p>}
+            </div>
+            <button className="secondary" onClick={persistInventory} disabled={savingInventory}>
+              {savingInventory ? <Loader2 className="spin" size={16} /> : <CheckCircle2 size={16} />}
+              Save inventory
+            </button>
+          </CollapsiblePanel>
 
-          <label>
-            <RequiredLabel>Output topology name</RequiredLabel>
-            <input
-              aria-label="Output topology name"
-              required
-              value={topologyName}
-              onChange={(event) => setTopologyName(event.target.value)}
-            />
-          </label>
+          <div className="operationsGrid">
+            <CollapsiblePanel
+              className="branchRegistryPanel"
+              collapsed={collapsedDataCards.privateBranches}
+              description="Recently created private branches for generated topology runs."
+              icon={<GitBranch size={18} />}
+              onToggle={() => toggleDataCard('privateBranches')}
+              title="Gerrit Private Branches"
+            >
+              {privateBranches.length > 0 && (
+                <div className="branchBulkActions">
+                  <label className="toggle bulkSelectToggle">
+                    <input
+                      type="checkbox"
+                      checked={allPrivateBranchesSelected}
+                      onChange={toggleAllPrivateBranches}
+                    />
+                    Select all
+                  </label>
+                  <button
+                    className="secondary bulkDeleteButton"
+                    onClick={() => submitDeletePrivateBranches({ branchNames: selectedPrivateBranchNames })}
+                    disabled={publishingAction !== '' || selectedPrivateBranchNames.length === 0}
+                    type="button"
+                  >
+                    <Trash2 size={16} />
+                    Delete selected
+                  </button>
+                </div>
+              )}
+              {privateBranches.length === 0 ? (
+                <div className="emptyState">
+                  <GitBranch size={18} aria-hidden="true" />
+                  <p>No private branches created by the tool yet.</p>
+                </div>
+              ) : (
+                <div className="branchRegistryList">
+                  {privateBranches.map((branch) => (
+                    <div className="branchRegistryItem" key={branch.private_branch_name}>
+                      <label className="branchRegistrySelect">
+                        <input
+                          type="checkbox"
+                          checked={selectedPrivateBranchNames.includes(branch.private_branch_name)}
+                          onChange={() => togglePrivateBranchSelection(branch.private_branch_name)}
+                        />
+                        <span>
+                          <strong>{branch.private_branch_name}</strong>
+                          <small>
+                            {branch.private_branch_pushed ? 'pushed' : 'committed only'} / {branch.base_branch} / run{' '}
+                            {branch.run_id}
+                          </small>
+                          <small>
+                            {branch.topology_name} from {branch.reference_topology_id}
+                          </small>
+                          <small>{branch.destination_relative_path}</small>
+                          {branch.remote_branch_ref && <small>{branch.remote_branch_ref}</small>}
+                        </span>
+                      </label>
+                      <button
+                        className="iconButton dangerButton branchDeleteButton"
+                        onClick={() =>
+                          submitDeletePrivateBranches({ branchNames: [branch.private_branch_name] })
+                        }
+                        disabled={publishingAction !== ''}
+                        aria-label={`Delete ${branch.private_branch_name}`}
+                        title="Delete branch"
+                        type="button"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CollapsiblePanel>
 
-          <label htmlFor={hypervisorIpFieldId}>
-            <RequiredLabel>Hypervisor IP</RequiredLabel>
-            <SearchableTextCombobox
-              aria-label="Hypervisor IP"
-              inputId={hypervisorIpFieldId}
-              options={hypervisorIpOptions}
-              placeholder="Search and select hypervisor IP"
-              value={hypervisorIp}
-              onChange={setHypervisorIp}
-            />
-          </label>
-
-          <label htmlFor={hypervisorInterfaceFieldId}>
-            <RequiredLabel>Hypervisor interface</RequiredLabel>
-            <SearchableTextCombobox
-              aria-label="Hypervisor interface"
-              inputId={hypervisorInterfaceFieldId}
-              options={hypervisorInterfaceOptions}
-              placeholder={selectedHypervisorOption ? 'Search and select hypervisor interface' : 'vmnic0'}
-              value={hypervisorInterface}
-              onChange={setHypervisorInterface}
-            />
-          </label>
-
-          <label className="checkboxLine">
-            <input
-              type="checkbox"
-              checked={branchRename}
-              onChange={(event) => setBranchRename(event.target.checked)}
-            />
-            Rename mapped branches with hardware model suffix
-          </label>
-
-          <div className="branchList">
-            {selectedReference?.branches.map((branch) => (
-              <div key={branch.name} className="branchItem">
-                <span>
-                  <strong>{branch.name}</strong>
-                  <small>{branch.edges.length} edge{branch.edges.length === 1 ? '' : 's'}</small>
-                </span>
-                <small>{branch.edges.map((edge) => `${edge.name} (${edge.model})`).join(', ')}</small>
-              </div>
-            ))}
+            <CollapsiblePanel
+              className="auditPanel"
+              collapsed={collapsedDataCards.auditTrail}
+              description="Reservation, inventory, publish, and deletion history for shared hardware usage."
+              icon={<TriangleAlert size={18} />}
+              onToggle={() => toggleDataCard('auditTrail')}
+              title="Audit Trail"
+            >
+              {auditTrail.length === 0 ? (
+                <div className="emptyState">
+                  <TriangleAlert size={18} aria-hidden="true" />
+                  <p>No audit events recorded yet.</p>
+                </div>
+              ) : (
+                <>
+                  <label className="searchField">
+                    Search audit trail
+                    <span>
+                      <Search size={16} aria-hidden="true" />
+                      <input
+                        aria-label="Search audit trail"
+                        value={auditSearch}
+                        onChange={(event) => setAuditSearch(event.target.value)}
+                        placeholder="action, user, topology, run, hardware"
+                      />
+                    </span>
+                  </label>
+                  <div className="auditList">
+                    {filteredAuditTrail.map((event) => (
+                      <div className="auditItem" key={event.id}>
+                        <div className="auditItemHeader">
+                          <strong>{event.summary}</strong>
+                          <StatusBadge tone={auditTone(event.action)}>{formatAuditAction(event.action)}</StatusBadge>
+                        </div>
+                        <small>
+                          {event.actor.name} ({event.actor.email}) / {formatAuditTimestamp(event.created_at)}
+                        </small>
+                        {event.details?.topology_name && <small>Topology: {event.details.topology_name}</small>}
+                        {event.details?.run_id && <small>Run: {event.details.run_id}</small>}
+                      </div>
+                    ))}
+                    {filteredAuditTrail.length === 0 && <p className="muted">No audit events match the current search.</p>}
+                  </div>
+                </>
+              )}
+            </CollapsiblePanel>
           </div>
         </div>
 
-        <div className="panel wide mappingPanel">
+        <div className="workspaceColumn mainColumn">
+          <div className="panel setupPanel">
+            <div className="panelTitle">
+              <GitBranch size={18} />
+              <div>
+                <h2>Topology Setup</h2>
+                <p>Choose the virtual reference and target hypervisor context.</p>
+              </div>
+            </div>
+            <label>
+              <RequiredLabel>Topology</RequiredLabel>
+              <select
+                aria-label="Topology"
+                required
+                value={selectedReferenceId}
+                onChange={(event) => {
+                  setSelectedReferenceId(event.target.value);
+                  setTopologyName(`${event.target.value.replaceAll('/', '-')}-hw`);
+                  setMappings([{ ...emptyMapping }]);
+                }}
+              >
+                {references.map((reference) => (
+                  <option key={reference.id} value={reference.id} disabled={!reference.exists}>
+                    {reference.id}
+                    {!reference.exists ? ' unavailable' : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label>
+              <RequiredLabel>Output topology name</RequiredLabel>
+              <input
+                aria-label="Output topology name"
+                required
+                value={topologyName}
+                onChange={(event) => setTopologyName(event.target.value)}
+              />
+            </label>
+
+            <label htmlFor={hypervisorIpFieldId}>
+              <RequiredLabel>Hypervisor IP</RequiredLabel>
+              <SearchableTextCombobox
+                aria-label="Hypervisor IP"
+                inputId={hypervisorIpFieldId}
+                options={hypervisorIpOptions}
+                placeholder="Search and select hypervisor IP"
+                value={hypervisorIp}
+                onChange={setHypervisorIp}
+              />
+            </label>
+
+            <label htmlFor={hypervisorInterfaceFieldId}>
+              <RequiredLabel>Hypervisor interface</RequiredLabel>
+              <SearchableTextCombobox
+                aria-label="Hypervisor interface"
+                inputId={hypervisorInterfaceFieldId}
+                options={hypervisorInterfaceOptions}
+                placeholder={selectedHypervisorOption ? 'Search and select hypervisor interface' : 'vmnic0'}
+                value={hypervisorInterface}
+                onChange={setHypervisorInterface}
+              />
+            </label>
+
+            <label className="checkboxLine">
+              <input
+                type="checkbox"
+                checked={branchRename}
+                onChange={(event) => setBranchRename(event.target.checked)}
+              />
+              Rename mapped branches with hardware model suffix
+            </label>
+
+            <div className="branchList">
+              {selectedReference?.branches.map((branch) => (
+                <div key={branch.name} className="branchItem">
+                  <span>
+                    <strong>{branch.name}</strong>
+                    <small>{branch.edges.length} edge{branch.edges.length === 1 ? '' : 's'}</small>
+                  </span>
+                  <small>{branch.edges.map((edge) => `${edge.name} (${edge.model})`).join(', ')}</small>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="panel wide mappingPanel">
           <div className="panelTitle">
             <HardDrive size={18} />
             <div>
@@ -656,82 +1036,9 @@ export function App() {
               Generate zip
             </button>
           </div>
-        </div>
-      </section>
-
-      <section className="workspace lower secondaryWorkspace">
-        <div className="panel inventoryPanel">
-          <div className="panelTitle">
-            <Server size={18} />
-            <div>
-              <h2>Inventory</h2>
-              <p>Search, inspect, and mark physical hardware availability.</p>
-            </div>
           </div>
-          <label className="searchField">
-            Search hardware
-            <span>
-              <Search size={16} aria-hidden="true" />
-              <input
-                value={inventorySearch}
-                onChange={(event) => setInventorySearch(event.target.value)}
-                placeholder="device name, short name, serial, model"
-              />
-            </span>
-          </label>
-          <div className="inventoryList">
-            {filteredHardware.map((hardware) => (
-              <div key={hardware.id} className="inventoryItem">
-                <button
-                  className="inventorySummary"
-                  onClick={() =>
-                    setExpandedHardwareId((current) => (current === hardware.id ? '' : hardware.id))
-                  }
-                  aria-expanded={expandedHardwareId === hardware.id}
-                >
-                  <span>
-                    <strong>{hardware.short_name || hardware.display_name}</strong>
-                    <small>{hardware.display_name}</small>
-                    <span className="inventoryBadges">
-                      <StatusBadge tone={hardware.available ? 'success' : 'neutral'}>
-                        {hardware.available ? 'Available' : 'Unavailable'}
-                      </StatusBadge>
-                      <StatusBadge tone={hardware.ha ? 'accent' : 'neutral'}>{hardware.ha ? 'HA' : 'Standalone'}</StatusBadge>
-                      <StatusBadge tone={hardware.path_complete ? 'success' : 'warning'}>
-                        {hardware.path_complete ? 'Path complete' : 'Path pending'}
-                      </StatusBadge>
-                    </span>
-                    <small>{hardware.model} / {hardware.ports.length} switch links</small>
-                  </span>
-                  <ChevronDown size={16} aria-hidden="true" />
-                </button>
-                <label className="toggle">
-                  <input
-                    type="checkbox"
-                    checked={hardware.available}
-                    onChange={(event) => updateHardwareAvailability(hardware.id, event.target.checked)}
-                  />
-                  Available
-                </label>
-                {expandedHardwareId === hardware.id && (
-                  <HardwareDetails
-                    hardware={hardware}
-                    refreshing={refreshingHardwareId === hardware.id}
-                    onVlanRangeChange={(boundary, value) => updateHardwareVlanRange(hardware.id, boundary, value)}
-                    onRefresh={() => refreshHardwareFromLabNavigator(hardware.id)}
-                  />
-                )}
-              </div>
-            ))}
-            {filteredHardware.length === 0 && <p className="muted">No hardware matches the current search.</p>}
-          </div>
-          <button className="secondary" onClick={persistInventory} disabled={savingInventory}>
-            {savingInventory ? <Loader2 className="spin" size={16} /> : <CheckCircle2 size={16} />}
-            Save inventory
-          </button>
-        </div>
 
-        <div className="panel wide">
+        <div className="panel wide previewPanel">
           <div className="panelTitle">
             <CheckCircle2 size={18} />
             <div>
@@ -928,40 +1235,7 @@ export function App() {
             </div>
           )}
         </div>
-      </section>
 
-      <section className="workspace lower registryWorkspace">
-        <div className="panel wide branchRegistryPanel">
-          <div className="panelTitle">
-            <GitBranch size={18} />
-            <div>
-              <h2>Gerrit Private Branches</h2>
-              <p>Recently created private branches for generated topology runs.</p>
-            </div>
-          </div>
-          {privateBranches.length === 0 ? (
-            <div className="emptyState">
-              <GitBranch size={18} aria-hidden="true" />
-              <p>No private branches created by the tool yet.</p>
-            </div>
-          ) : (
-            <div className="branchRegistryList">
-              {privateBranches.map((branch) => (
-                <div className="branchRegistryItem" key={branch.private_branch_name}>
-                  <strong>{branch.private_branch_name}</strong>
-                  <small>
-                    {branch.private_branch_pushed ? 'pushed' : 'committed only'} / {branch.base_branch} / run{' '}
-                    {branch.run_id}
-                  </small>
-                  <small>
-                    {branch.topology_name} from {branch.reference_topology_id}
-                  </small>
-                  <small>{branch.destination_relative_path}</small>
-                  {branch.remote_branch_ref && <small>{branch.remote_branch_ref}</small>}
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       </section>
     </main>
@@ -979,6 +1253,80 @@ function formatSwitchSummary(hardware) {
   return `${switches.length} switches`;
 }
 
+function loadStoredUser() {
+  try {
+    const raw = getSafeStorage()?.getItem(userStorageKey);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function storeUser(user) {
+  getSafeStorage()?.setItem(userStorageKey, JSON.stringify(user));
+}
+
+function clearStoredUser() {
+  getSafeStorage()?.removeItem(userStorageKey);
+}
+
+function getSafeStorage() {
+  const candidate = typeof window !== 'undefined' ? window.localStorage : null;
+  if (!candidate || typeof candidate.getItem !== 'function') {
+    return null;
+  }
+  return candidate;
+}
+
+function formatAuditAction(action) {
+  return String(action || '')
+    .replaceAll('_', ' ')
+    .replace(/\b\w/g, (match) => match.toUpperCase());
+}
+
+function auditTone(action) {
+  if (['hardware_reserved', 'hardware_marked_unavailable'].includes(action)) {
+    return 'warning';
+  }
+  if (['hardware_released', 'private_branch_published'].includes(action)) {
+    return 'success';
+  }
+  if (action === 'private_branch_deleted') {
+    return 'neutral';
+  }
+  return 'accent';
+}
+
+function formatAuditTimestamp(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value || '';
+  }
+  return date.toLocaleString();
+}
+
+function auditSearchText(event) {
+  return [
+    event.id,
+    event.action,
+    formatAuditAction(event.action),
+    event.summary,
+    event.target_type,
+    event.target_id,
+    event.actor?.name,
+    event.actor?.email,
+    event.created_at,
+    formatAuditTimestamp(event.created_at),
+    event.details?.topology_name,
+    event.details?.run_id,
+    event.details?.hardware_id,
+    event.details ? JSON.stringify(event.details) : ''
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+}
+
 function hardwareSearchText(hardware) {
   const switches = hardware.switches?.length ? hardware.switches : hardware.switch ? [hardware.switch] : [];
   return [
@@ -989,6 +1337,8 @@ function hardwareSearchText(hardware) {
     hardware.model_suffix,
     hardware.active_serial,
     hardware.standby_serial,
+    hardware.reservation?.actor?.name,
+    hardware.reservation?.actor?.email,
     hardware.notes,
     ...switches.flatMap((item) => [item.name, item.connections?.ip]),
     ...hardware.ports.flatMap((port) => [
@@ -1153,7 +1503,10 @@ function editorTextToCommands(value) {
 function hardwareOptionLabel(hardware) {
   const prefix = hardware.short_name ? `${hardware.short_name} - ` : '';
   const state = hardware.ha ? 'HA' : 'standalone';
-  return `${prefix}${hardware.display_name} (${hardware.model}, ${state})`;
+  const reservation = hardware.available
+    ? 'available'
+    : `reserved by ${hardware.reservation?.actor?.name || 'unknown user'}`;
+  return `${prefix}${hardware.display_name} (${hardware.model}, ${state}, ${reservation})`;
 }
 
 function getReferenceInterfaceKey(interfaceSummary) {
@@ -1602,6 +1955,20 @@ function HardwareDetails({ hardware, refreshing, onVlanRangeChange, onRefresh })
           <small>Path status</small>
           <strong>{hardware.path_complete ? 'complete' : 'incomplete'}</strong>
         </span>
+        <span>
+          <small>Reservation</small>
+          <strong>
+            {hardware.available
+              ? 'available'
+              : hardware.reservation?.actor
+                ? `${hardware.reservation.actor.name} (${hardware.reservation.actor.email})`
+                : 'reserved'}
+          </strong>
+        </span>
+        <span>
+          <small>Reserved for</small>
+          <strong>{hardware.reservation?.topology_name || hardware.reservation?.reason || 'n/a'}</strong>
+        </span>
       </div>
 
       <div className="detailGrid">
@@ -1662,6 +2029,31 @@ function HardwareDetails({ hardware, refreshing, onVlanRangeChange, onRefresh })
       </button>
 
       {hardware.notes && <small className="notes">{hardware.notes}</small>}
+    </div>
+  );
+}
+
+function CollapsiblePanel({ children, className, collapsed, description, icon, onToggle, title }) {
+  return (
+    <div className={`panel collapsiblePanel${collapsed ? ' collapsedPanel' : ''} ${className || ''}`}>
+      <div className="panelTitle collapsiblePanelTitle">
+        {icon}
+        <div>
+          <h2>{title}</h2>
+          <p>{description}</p>
+        </div>
+        <button
+          className="iconButton collapseButton"
+          onClick={onToggle}
+          type="button"
+          aria-expanded={!collapsed}
+          aria-label={`${collapsed ? 'Expand' : 'Collapse'} ${title}`}
+          title={`${collapsed ? 'Expand' : 'Collapse'} ${title}`}
+        >
+          <ChevronDown className={collapsed ? '' : 'open'} size={16} aria-hidden="true" />
+        </button>
+      </div>
+      {!collapsed && children}
     </div>
   );
 }

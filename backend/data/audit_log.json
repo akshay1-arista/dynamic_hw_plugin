@@ -1,0 +1,191 @@
+[
+  {
+    "id": "8e855503355b",
+    "action": "hardware_marked_unavailable",
+    "actor": {
+      "name": "Akshay Jain",
+      "email": "akshay1.jain@arista.com"
+    },
+    "target_type": "hardware",
+    "target_id": "ln-a01-318-1kxfxc2",
+    "summary": "Marked chn-rnd-edge-680-1KXFXC2 as unavailable.",
+    "details": {
+      "hardware_id": "ln-a01-318-1kxfxc2",
+      "hardware_display_name": "chn-rnd-edge-680-1KXFXC2"
+    },
+    "created_at": "2026-07-11T19:53:11.257155+00:00"
+  },
+  {
+    "id": "8982e8fbb854",
+    "action": "hardware_released",
+    "actor": {
+      "name": "Akshay Jain",
+      "email": "akshay1.jain@arista.com"
+    },
+    "target_type": "hardware",
+    "target_id": "ln-a01-318-1kxfxc2",
+    "summary": "Marked chn-rnd-edge-680-1KXFXC2 as available.",
+    "details": {
+      "hardware_id": "ln-a01-318-1kxfxc2",
+      "hardware_display_name": "chn-rnd-edge-680-1KXFXC2",
+      "released_previous_reservation": {
+        "actor": {
+          "name": "Akshay Jain",
+          "email": "akshay1.jain@arista.com"
+        },
+        "reserved_at": "2026-07-11T19:53:11.218343+00:00",
+        "reason": "manual-unavailable",
+        "run_id": null,
+        "topology_name": null
+      }
+    },
+    "created_at": "2026-07-11T19:53:51.087942+00:00"
+  },
+  {
+    "id": "5328bc4fc571",
+    "action": "hardware_reserved",
+    "actor": {
+      "name": "Test User",
+      "email": "test@example.com"
+    },
+    "target_type": "hardware",
+    "target_id": "ln-ha-a01-327-dgd10q2-a01-328-16c10q2",
+    "summary": "Reserved HA Pair chn-rnd-edge-3800-DGD10Q2 + chn-rnd-edge-3800-16C10Q2 for generated topology api-3-site-3800-5db662.",
+    "details": {
+      "hardware_id": "ln-ha-a01-327-dgd10q2-a01-328-16c10q2",
+      "hardware_display_name": "HA Pair chn-rnd-edge-3800-DGD10Q2 + chn-rnd-edge-3800-16C10Q2",
+      "run_id": "ad14f99e986f",
+      "topology_name": "api-3-site-3800-5db662"
+    },
+    "created_at": "2026-07-11T19:57:25.099691+00:00"
+  },
+  {
+    "id": "80d9e462fad0",
+    "action": "hardware_reserved",
+    "actor": {
+      "name": "Test User",
+      "email": "test@example.com"
+    },
+    "target_type": "hardware",
+    "target_id": "ln-ha-a01-327-dgd10q2-a01-328-16c10q2",
+    "summary": "Reserved HA Pair chn-rnd-edge-3800-DGD10Q2 + chn-rnd-edge-3800-16C10Q2 for generated topology unit-3-site-3800-697737.",
+    "details": {
+      "hardware_id": "ln-ha-a01-327-dgd10q2-a01-328-16c10q2",
+      "hardware_display_name": "HA Pair chn-rnd-edge-3800-DGD10Q2 + chn-rnd-edge-3800-16C10Q2",
+      "run_id": "964a6b0ed6a7",
+      "topology_name": "unit-3-site-3800-697737"
+    },
+    "created_at": "2026-07-11T19:57:25.201646+00:00"
+  },
+  {
+    "id": "83b2622d5dcc",
+    "action": "hardware_reserved",
+    "actor": {
+      "name": "Test User",
+      "email": "test@example.com"
+    },
+    "target_type": "hardware",
+    "target_id": "ln-ha-a01-327-dgd10q2-a01-328-16c10q2",
+    "summary": "Reserved HA Pair chn-rnd-edge-3800-DGD10Q2 + chn-rnd-edge-3800-16C10Q2 for generated topology parse-check-8ea0e5.",
+    "details": {
+      "hardware_id": "ln-ha-a01-327-dgd10q2-a01-328-16c10q2",
+      "hardware_display_name": "HA Pair chn-rnd-edge-3800-DGD10Q2 + chn-rnd-edge-3800-16C10Q2",
+      "run_id": "13f730e6190d",
+      "topology_name": "parse-check-8ea0e5"
+    },
+    "created_at": "2026-07-11T19:57:25.302670+00:00"
+  },
+  {
+    "id": "a4b1f8ddaaaf",
+    "action": "hardware_reserved",
+    "actor": {
+      "name": "Test User",
+      "email": "test@example.com"
+    },
+    "target_type": "hardware",
+    "target_id": "ln-ha-a01-327-dgd10q2-a01-328-16c10q2",
+    "summary": "Reserved HA Pair chn-rnd-edge-3800-DGD10Q2 + chn-rnd-edge-3800-16C10Q2 for generated topology unit-3-site-3800-ef852a.",
+    "details": {
+      "hardware_id": "ln-ha-a01-327-dgd10q2-a01-328-16c10q2",
+      "hardware_display_name": "HA Pair chn-rnd-edge-3800-DGD10Q2 + chn-rnd-edge-3800-16C10Q2",
+      "run_id": "5fd7d059da02",
+      "topology_name": "unit-3-site-3800-ef852a"
+    },
+    "created_at": "2026-07-11T19:57:25.377337+00:00"
+  },
+  {
+    "id": "95754a9fe0bd",
+    "action": "hardware_reserved",
+    "actor": {
+      "name": "Test User",
+      "email": "test@example.com"
+    },
+    "target_type": "hardware",
+    "target_id": "ln-ha-a01-327-dgd10q2-a01-328-16c10q2",
+    "summary": "Reserved HA Pair chn-rnd-edge-3800-DGD10Q2 + chn-rnd-edge-3800-16C10Q2 for generated topology unit-3-site-3800-907911.",
+    "details": {
+      "hardware_id": "ln-ha-a01-327-dgd10q2-a01-328-16c10q2",
+      "hardware_display_name": "HA Pair chn-rnd-edge-3800-DGD10Q2 + chn-rnd-edge-3800-16C10Q2",
+      "run_id": "2ad34f93cb3b",
+      "topology_name": "unit-3-site-3800-907911"
+    },
+    "created_at": "2026-07-11T19:57:25.486736+00:00"
+  },
+  {
+    "id": "d2ff0c4eee22",
+    "action": "hardware_reserved",
+    "actor": {
+      "name": "Test User",
+      "email": "test@example.com"
+    },
+    "target_type": "hardware",
+    "target_id": "ln-ha-a03-515-248202197-a03-516-248202193",
+    "summary": "Reserved HA Pair chn-rnd-edge-740-8202197 + chn-rnd-edge-740-8202193 for generated topology 3-site-hw-cab934.",
+    "details": {
+      "hardware_id": "ln-ha-a03-515-248202197-a03-516-248202193",
+      "hardware_display_name": "HA Pair chn-rnd-edge-740-8202197 + chn-rnd-edge-740-8202193",
+      "run_id": "5b463fc186a1",
+      "topology_name": "3-site-hw-cab934"
+    },
+    "created_at": "2026-07-11T19:57:25.557527+00:00"
+  },
+  {
+    "id": "6f136cd7c5fa",
+    "action": "hardware_reserved",
+    "actor": {
+      "name": "Test User",
+      "email": "test@example.com"
+    },
+    "target_type": "hardware",
+    "target_id": "ln-a01-318-1kxfxc2",
+    "summary": "Reserved chn-rnd-edge-680-1KXFXC2 for generated topology standalone-caveat-73f73a.",
+    "details": {
+      "hardware_id": "ln-a01-318-1kxfxc2",
+      "hardware_display_name": "chn-rnd-edge-680-1KXFXC2",
+      "run_id": "c005774b4027",
+      "topology_name": "standalone-caveat-73f73a"
+    },
+    "created_at": "2026-07-11T19:57:25.649010+00:00"
+  },
+  {
+    "id": "48a4a40fbd03",
+    "action": "private_branch_deleted",
+    "actor": {
+      "name": "Test User",
+      "email": "test@example.com"
+    },
+    "target_type": "private_branch",
+    "target_id": "hw_topo_gen_private_run123",
+    "summary": "Deleted Gerrit private branch hw_topo_gen_private_run123.",
+    "details": {
+      "run_id": "run123",
+      "deleted_local_paths": [
+        "/private/var/folders/mf/kj8mc3y56rb4khp5lk0f1_5w0000gn/T/pytest-of-akshay1.jain/pytest-217/test_delete_private_branches_r0/velocloud.src",
+        "/private/var/folders/mf/kj8mc3y56rb4khp5lk0f1_5w0000gn/T/pytest-of-akshay1.jain/pytest-217/test_delete_private_branches_r0/outputs/run123-abc123/hapy_publish/release_6.4-hw_topo_gen_private_run123"
+      ],
+      "deleted_remote": true,
+      "remote_name": "origin"
+    },
+    "created_at": "2026-07-11T19:57:29.323445+00:00"
+  }
+]

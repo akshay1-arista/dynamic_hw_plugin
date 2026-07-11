@@ -2,8 +2,13 @@ import json
 import subprocess
 from pathlib import Path
 
-from app.hapy_repo import commit_run_to_hapy_repo, list_private_branches, publish_run_private_branch
-from app.models import HapyCommitRequest
+from app.hapy_repo import (
+    commit_run_to_hapy_repo,
+    delete_private_branches,
+    list_private_branches,
+    publish_run_private_branch,
+)
+from app.models import ActorIdentity, HapyCommitRequest, HapyPrivateBranchDeleteRequest
 
 
 def _git(cwd: Path, *args: str) -> str:
@@ -111,3 +116,38 @@ def test_publish_run_private_branch_pushes_only_private_branch_ref(tmp_path):
     assert pushed.remote_branch_ref == expected_ref
     assert expected_ref in pushed.fetch_command
     assert _git_dir(remote_root, "rev-parse", expected_ref) == pushed.commit_sha
+
+
+def test_delete_private_branches_removes_local_remote_and_registry_entries(tmp_path):
+    repo_root, remote_root, configs_root = _init_repo(tmp_path)
+    outputs_root, run_id = _build_run_outputs(tmp_path, reference_topology_id="3-site")
+    registry_path = tmp_path / "hapy_private_branches.json"
+    pushed = publish_run_private_branch(
+        run_id,
+        HapyCommitRequest(base_branch="release_6.4"),
+        outputs_root=outputs_root,
+        repo_root=repo_root,
+        configs_root=configs_root,
+        remote_name="origin",
+        registry_path=registry_path,
+    )
+    _git(repo_root, "fetch", "origin", pushed.private_branch_name)
+    _git(repo_root, "checkout", "-B", pushed.private_branch_name, f"origin/{pushed.private_branch_name}")
+    _git(repo_root, "checkout", "master")
+
+    result = delete_private_branches(
+        HapyPrivateBranchDeleteRequest(
+            private_branch_names=[pushed.private_branch_name],
+            requested_by=ActorIdentity(name="Test User", email="test@example.com"),
+        ),
+        outputs_root=outputs_root,
+        registry_path=registry_path,
+    )
+
+    assert result.results[0].private_branch_name == pushed.private_branch_name
+    assert result.results[0].deleted_remote is True
+    assert str(repo_root) in result.results[0].deleted_local_paths
+    assert list_private_branches(registry_path).branches == []
+    assert _git(repo_root, "branch", "--list", pushed.private_branch_name) == ""
+    remote_heads = _git_dir(remote_root, "for-each-ref", "--format=%(refname)", "refs/heads")
+    assert pushed.remote_branch_ref not in remote_heads

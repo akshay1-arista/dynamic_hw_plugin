@@ -10,6 +10,7 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .audit import append_audit_event
 from .config import (
     HAPY_BASE_BRANCHES,
     HAPY_GERRIT_REMOTE_NAME,
@@ -22,6 +23,9 @@ from .generator import GenerationError, resolve_run_root
 from .models import (
     HapyCommitRequest,
     HapyCommitResult,
+    HapyPrivateBranchDeleteRequest,
+    HapyPrivateBranchDeleteResult,
+    HapyPrivateBranchDeleteStatus,
     HapyPrivateBranchListResult,
     HapyPrivateBranchRecord,
     HapyPublishMetadata,
@@ -209,6 +213,20 @@ def publish_run_private_branch(
     _replace_publish(metadata, publish_metadata)
     _write_run_metadata(metadata_path, metadata)
     _upsert_registry_record(registry_path, publish_metadata)
+    if request.requested_by is not None:
+        append_audit_event(
+            action="private_branch_published",
+            actor=request.requested_by,
+            target_type="private_branch",
+            target_id=publish_metadata.private_branch_name,
+            summary=f"Pushed Gerrit private branch {publish_metadata.private_branch_name}.",
+            details={
+                "run_id": run_id,
+                "base_branch": request.base_branch,
+                "remote_name": remote_name,
+                "remote_branch_ref": remote_branch_ref,
+            },
+        )
 
     return _build_commit_result(
         publish_metadata,
@@ -227,6 +245,51 @@ def list_private_branches(
     records = _load_registry_records(registry_path)
     records.sort(key=lambda item: (item.updated_at, item.created_at, item.private_branch_name), reverse=True)
     return HapyPrivateBranchListResult(branches=records)
+
+
+def delete_private_branches(
+    request: HapyPrivateBranchDeleteRequest,
+    *,
+    outputs_root: Path = OUTPUTS_ROOT,
+    registry_path: Path = HAPY_PRIVATE_BRANCH_REGISTRY_PATH,
+) -> HapyPrivateBranchDeleteResult:
+    records = _load_registry_records(registry_path)
+    if request.delete_all:
+        targets = {record.private_branch_name for record in records}
+    else:
+        targets = set(request.private_branch_names)
+
+    missing = sorted(targets - {record.private_branch_name for record in records})
+    if missing:
+        raise HapyRepoError(f"Unknown private branch names: {', '.join(missing)}")
+
+    results: list[HapyPrivateBranchDeleteStatus] = []
+    remaining = [record for record in records if record.private_branch_name not in targets]
+    for record in records:
+        if record.private_branch_name not in targets:
+            continue
+        results.append(
+            _delete_private_branch_record(
+                record,
+                outputs_root=outputs_root,
+                actor=request.requested_by,
+            )
+        )
+
+    _replace_registry_records(registry_path, remaining)
+    for result in results:
+        result.registry_removed = result.success
+
+    deleted_count = sum(1 for result in results if result.success)
+    return HapyPrivateBranchDeleteResult(
+        results=results,
+        messages=[
+            ValidationMessage(
+                level="info",
+                message=f"Deleted {deleted_count} Gerrit private branch{'es' if deleted_count != 1 else ''}.",
+            )
+        ],
+    )
 
 
 def _resolve_repo_paths(repo_root: Path | None, configs_root: Path | None) -> tuple[Path, Path]:
@@ -404,6 +467,7 @@ def _upsert_registry_record(path: Path, publish_metadata: HapyPublishMetadata) -
         remote_name=publish_metadata.remote_name,
         remote_branch_ref=publish_metadata.remote_branch_ref,
         fetch_command=publish_metadata.fetch_command,
+        workspace_path=publish_metadata.workspace_path,
         created_at=publish_metadata.created_at,
         updated_at=publish_metadata.updated_at,
     )
@@ -458,3 +522,114 @@ def _slugify(value: str) -> str:
 
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _replace_registry_records(path: Path, records: list[HapyPrivateBranchRecord]) -> None:
+    with _locked_registry(path) as (data, _fh):
+        data[:] = [record.model_dump(mode="json") for record in records]
+
+
+def _delete_private_branch_record(
+    record: HapyPrivateBranchRecord,
+    *,
+    outputs_root: Path,
+    actor,
+) -> HapyPrivateBranchDeleteStatus:
+    deleted_local_paths: list[str] = []
+    messages: list[ValidationMessage] = []
+
+    repo_root = Path(record.repo_path).resolve()
+    if _delete_local_branch_if_present(repo_root, record.private_branch_name, record.base_branch):
+        deleted_local_paths.append(str(repo_root))
+
+    workspace_path = Path(record.workspace_path).resolve() if record.workspace_path else None
+    if workspace_path and workspace_path.exists():
+        if _delete_local_branch_if_present(workspace_path, record.private_branch_name, record.base_branch):
+            deleted_local_paths.append(str(workspace_path))
+
+    deleted_remote = _delete_remote_branch_if_present(repo_root, record.remote_name, record.private_branch_name)
+    _remove_publish_from_run_metadata(record.run_id, record.private_branch_name, outputs_root)
+
+    append_audit_event(
+        action="private_branch_deleted",
+        actor=actor,
+        target_type="private_branch",
+        target_id=record.private_branch_name,
+        summary=f"Deleted Gerrit private branch {record.private_branch_name}.",
+        details={
+            "run_id": record.run_id,
+            "deleted_local_paths": deleted_local_paths,
+            "deleted_remote": deleted_remote,
+            "remote_name": record.remote_name,
+        },
+    )
+    if not deleted_local_paths and not deleted_remote:
+        messages.append(
+            ValidationMessage(
+                level="warning",
+                message=f"No local or remote refs were found for {record.private_branch_name}; registry entry was removed.",
+            )
+        )
+    return HapyPrivateBranchDeleteStatus(
+        private_branch_name=record.private_branch_name,
+        run_id=record.run_id,
+        deleted_local_paths=deleted_local_paths,
+        deleted_remote=deleted_remote,
+        success=True,
+        messages=messages,
+    )
+
+
+def _delete_local_branch_if_present(repo_root: Path, branch_name: str, fallback_branch: str) -> bool:
+    if not repo_root.exists() or not (repo_root / ".git").exists():
+        return False
+    if not _git_ref_exists(repo_root, f"refs/heads/{branch_name}"):
+        return False
+    current_branch = _git(repo_root, "branch", "--show-current").stdout.strip()
+    if current_branch == branch_name:
+        if _git_ref_exists(repo_root, f"refs/heads/{fallback_branch}"):
+            _git(repo_root, "checkout", fallback_branch)
+        else:
+            _git(repo_root, "checkout", "--detach")
+    _git(repo_root, "branch", "-D", branch_name)
+    return True
+
+
+def _delete_remote_branch_if_present(repo_root: Path, remote_name: str, branch_name: str) -> bool:
+    if not repo_root.exists() or not (repo_root / ".git").exists():
+        return False
+    completed = subprocess.run(
+        ["git", "ls-remote", "--exit-code", "--heads", remote_name, branch_name],
+        cwd=repo_root,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if completed.returncode != 0:
+        return False
+    _git(repo_root, "push", remote_name, "--delete", branch_name)
+    return True
+
+
+def _git_ref_exists(repo_root: Path, ref_name: str) -> bool:
+    completed = subprocess.run(
+        ["git", "show-ref", "--verify", "--quiet", ref_name],
+        cwd=repo_root,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    return completed.returncode == 0
+
+
+def _remove_publish_from_run_metadata(run_id: str, private_branch_name: str, outputs_root: Path) -> None:
+    try:
+        metadata, metadata_path = _load_run_metadata(run_id, outputs_root)
+    except HapyRepoError:
+        return
+    metadata.hapy_publishes = [
+        publish
+        for publish in metadata.hapy_publishes
+        if publish.private_branch_name != private_branch_name
+    ]
+    _write_run_metadata(metadata_path, metadata)

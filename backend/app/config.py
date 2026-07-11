@@ -63,6 +63,11 @@ HAPY_PRIVATE_BRANCH_REGISTRY_PATH = _config_path(
     or DOTENV.get("HAPY_PRIVATE_BRANCH_REGISTRY_PATH", "")
     or (APP_ROOT / "backend" / "data" / "hapy_private_branches.json")
 )
+AUDIT_LOG_PATH = _config_path(
+    os.environ.get("AUDIT_LOG_PATH")
+    or DOTENV.get("AUDIT_LOG_PATH", "")
+    or (APP_ROOT / "backend" / "data" / "audit_log.json")
+)
 HAPY_BASE_BRANCHES = [
     "release_5.2",
     "release_6.1",

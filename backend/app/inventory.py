@@ -5,9 +5,13 @@ import re
 from pathlib import Path
 from typing import Any
 
+from .audit import build_audit_event
 from .config import INVENTORY_PATH
 from .models import (
+    ActorIdentity,
+    AuditEvent,
     HardwareEdge,
+    HardwareReservation,
     HardwarePathSummary,
     InventoryConnection,
     InventoryDevice,
@@ -21,12 +25,12 @@ def load_inventory(path: Path = INVENTORY_PATH) -> InventoryFile:
     with path.open() as fh:
         raw = json.load(fh)
     if "devices" in raw and "connections" in raw:
-        return build_inventory(raw["devices"], raw["connections"])
+        return build_inventory(raw["devices"], raw["connections"], raw.get("allocations"))
     return InventoryFile.model_validate(
         {
             "devices": {},
             "connections": [],
-            "allocations": [],
+            "allocations": raw.get("allocations", []),
             "hardware": raw.get("hardware", []),
         }
     )
@@ -44,7 +48,7 @@ def build_inventory(
         {
             "devices": raw_devices,
             "connections": [connection.model_dump(mode="json") for connection in connections],
-            "allocations": [],
+            "allocations": raw_allocations or [],
             "hardware": _derive_hardware(
                 raw_devices,
                 [connection.model_dump(mode="json") for connection in connections],
@@ -57,6 +61,7 @@ def save_inventory(inventory: InventoryFile, path: Path = INVENTORY_PATH) -> Inv
     path.parent.mkdir(parents=True, exist_ok=True)
     inventory.connections = _sanitize_connections(inventory.connections)
     inventory.allocations = []
+    _normalize_hardware_state(inventory)
     _apply_hardware_state(inventory)
     persisted = inventory.model_dump(mode="json", exclude={"hardware"})
     if not persisted["devices"] and inventory.hardware:
@@ -70,6 +75,93 @@ def save_inventory(inventory: InventoryFile, path: Path = INVENTORY_PATH) -> Inv
 def get_hardware_by_id(hardware_id: str, path: Path = INVENTORY_PATH) -> HardwareEdge | None:
     inventory = load_inventory(path)
     return next((item for item in inventory.hardware if item.id == hardware_id), None)
+
+
+def reserve_generated_hardware(
+    hardware_ids: list[str],
+    actor: ActorIdentity,
+    run_id: str,
+    topology_name: str,
+    path: Path = INVENTORY_PATH,
+) -> tuple[InventoryFile, list[AuditEvent]]:
+    inventory = load_inventory(path)
+    hardware_set = set(hardware_ids)
+    events: list[AuditEvent] = []
+    for hardware in inventory.hardware:
+        if hardware.id not in hardware_set:
+            continue
+        hardware.available = False
+        hardware.reservation = HardwareReservation(
+            actor=actor,
+            reserved_at=_utc_now(),
+            reason="topology-generation",
+            run_id=run_id,
+            topology_name=topology_name,
+        )
+        events.append(
+            build_audit_event(
+                action="hardware_reserved",
+                actor=actor,
+                target_type="hardware",
+                target_id=hardware.id,
+                summary=f"Reserved {hardware.display_name} for generated topology {topology_name}.",
+                details={
+                    "hardware_id": hardware.id,
+                    "hardware_display_name": hardware.display_name,
+                    "run_id": run_id,
+                    "topology_name": topology_name,
+                },
+            )
+        )
+    saved = save_inventory(inventory, path)
+    return saved, events
+
+
+def update_hardware_availability(
+    hardware_id: str,
+    available: bool,
+    actor: ActorIdentity,
+    path: Path = INVENTORY_PATH,
+) -> tuple[InventoryFile, list[AuditEvent]]:
+    inventory = load_inventory(path)
+    hardware = next((item for item in inventory.hardware if item.id == hardware_id), None)
+    if hardware is None:
+        raise ValueError(f"Unknown hardware inventory id: {hardware_id}")
+
+    previous_reservation = hardware.reservation
+    hardware.available = available
+    if available:
+        hardware.reservation = None
+        action = "hardware_released"
+        summary = f"Marked {hardware.display_name} as available."
+        details = {
+            "hardware_id": hardware.id,
+            "hardware_display_name": hardware.display_name,
+            "released_previous_reservation": previous_reservation.model_dump(mode="json") if previous_reservation else None,
+        }
+    else:
+        hardware.reservation = HardwareReservation(
+            actor=actor,
+            reserved_at=_utc_now(),
+            reason="manual-unavailable",
+        )
+        action = "hardware_marked_unavailable"
+        summary = f"Marked {hardware.display_name} as unavailable."
+        details = {
+            "hardware_id": hardware.id,
+            "hardware_display_name": hardware.display_name,
+        }
+
+    saved = save_inventory(inventory, path)
+    event = build_audit_event(
+        action=action,
+        actor=actor,
+        target_type="hardware",
+        target_id=hardware.id,
+        summary=summary,
+        details=details,
+    )
+    return saved, [event]
 
 
 def _sanitize_connections(connections: list[InventoryConnection]) -> list[InventoryConnection]:
@@ -218,6 +310,7 @@ def _apply_hardware_state(inventory: InventoryFile) -> None:
             continue
         device.available = hardware.available
         device.hypervisor_ip = hardware.hypervisor_ip
+        device.reservation = hardware.reservation
         device.vlan_range = hardware.vlan_range
 
 
@@ -251,6 +344,10 @@ def _derive_hardware(
         free_vlans = _vlan_pool(active)
         path = _derive_path_summary(active, devices, connections)
         is_ha = standby is not None
+        reservation = active.reservation or (standby.reservation if standby else None)
+        available = active.available and (standby.available if standby else True)
+        if available:
+            reservation = None
         hardware.append(
             {
                 "id": group_id,
@@ -272,7 +369,8 @@ def _derive_hardware(
                 "path_complete": bool(path and path.complete),
                 "auto_config_ready": bool(path and path.complete and _path_has_credentials(path, devices)),
                 "hypervisor_ip": active.hypervisor_ip,
-                "available": active.available and (standby.available if standby else True),
+                "available": available,
+                "reservation": reservation.model_dump(mode="json") if reservation else None,
                 "notes": _join_notes(active.notes, standby.notes if standby else None),
             }
         )
@@ -575,6 +673,12 @@ def _safe_id(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "_", value.lower()).strip("_")
 
 
+def _normalize_hardware_state(inventory: InventoryFile) -> None:
+    for hardware in inventory.hardware:
+        if hardware.available:
+            hardware.reservation = None
+
+
 def _legacy_hardware_to_graph(hardware: list[HardwareEdge]) -> dict[str, Any]:
     devices: dict[str, dict[str, Any]] = {}
     connections: list[dict[str, Any]] = []
@@ -595,6 +699,7 @@ def _legacy_hardware_to_graph(hardware: list[HardwareEdge]) -> dict[str, Any]:
             "free_vlans": item.free_vlans,
             "vlan_range": item.vlan_range.model_dump(mode="json") if item.vlan_range else None,
             "hypervisor_ip": item.hypervisor_ip,
+            "reservation": item.reservation.model_dump(mode="json") if item.reservation else None,
             "notes": item.notes,
         }
         standby_id = None
@@ -644,3 +749,9 @@ def _legacy_hardware_to_graph(hardware: list[HardwareEdge]) -> dict[str, Any]:
                     }
                 )
     return {"devices": devices, "connections": connections, "allocations": []}
+
+
+def _utc_now() -> str:
+    from datetime import datetime, timezone
+
+    return datetime.now(timezone.utc).isoformat()

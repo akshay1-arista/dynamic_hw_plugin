@@ -5,6 +5,35 @@ from typing import Any, Literal, Optional
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 
+class ActorIdentity(BaseModel):
+    name: str
+    email: str
+
+    @field_validator("name", "email")
+    @classmethod
+    def require_value(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("name and email are required")
+        return cleaned
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, value: str) -> str:
+        lowered = value.strip().lower()
+        if "@" not in lowered or lowered.startswith("@") or lowered.endswith("@"):
+            raise ValueError("email must be a valid email address")
+        return lowered
+
+
+class HardwareReservation(BaseModel):
+    actor: ActorIdentity
+    reserved_at: str
+    reason: Literal["topology-generation", "manual-unavailable"]
+    run_id: Optional[str] = None
+    topology_name: Optional[str] = None
+
+
 class VlanRange(BaseModel):
     start: int
     end: int
@@ -123,6 +152,7 @@ class HardwareEdge(BaseModel):
     auto_config_ready: bool = False
     hypervisor_ip: Optional[str] = None
     available: bool = True
+    reservation: Optional[HardwareReservation] = None
     notes: Optional[str] = None
 
     @field_validator("ports")
@@ -159,6 +189,7 @@ class InventoryDevice(BaseModel):
     switch_metadata: Optional[SwitchMetadata] = None
     lab_navigator_id: Optional[int] = None
     hypervisor_ip: Optional[str] = None
+    reservation: Optional[HardwareReservation] = None
     notes: Optional[str] = None
 
 
@@ -280,6 +311,7 @@ class GenerateRequest(BaseModel):
     hypervisor_interface: str
     branch_rename: bool = False
     mappings: list[MappingRequest]
+    requested_by: ActorIdentity
 
     @field_validator("topology_name")
     @classmethod
@@ -364,6 +396,7 @@ BaseBranchName = Literal["release_5.2", "release_6.1", "release_6.4", "release_7
 
 class HapyCommitRequest(BaseModel):
     base_branch: BaseBranchName = "master"
+    requested_by: Optional[ActorIdentity] = None
 
 
 class HapyPublishMetadata(BaseModel):
@@ -421,12 +454,53 @@ class HapyPrivateBranchRecord(BaseModel):
     remote_name: str = "origin"
     remote_branch_ref: Optional[str] = None
     fetch_command: Optional[str] = None
+    workspace_path: Optional[str] = None
     created_at: str
     updated_at: str
 
 
 class HapyPrivateBranchListResult(BaseModel):
     branches: list[HapyPrivateBranchRecord] = Field(default_factory=list)
+
+
+class HapyPrivateBranchDeleteRequest(BaseModel):
+    private_branch_names: list[str] = Field(default_factory=list)
+    delete_all: bool = False
+    requested_by: ActorIdentity
+
+    @field_validator("private_branch_names")
+    @classmethod
+    def clean_branch_names(cls, value: list[str]) -> list[str]:
+        cleaned: list[str] = []
+        seen: set[str] = set()
+        for item in value:
+            branch_name = item.strip()
+            if not branch_name or branch_name in seen:
+                continue
+            cleaned.append(branch_name)
+            seen.add(branch_name)
+        return cleaned
+
+    @model_validator(mode="after")
+    def validate_targets(self) -> "HapyPrivateBranchDeleteRequest":
+        if not self.delete_all and not self.private_branch_names:
+            raise ValueError("private_branch_names is required unless delete_all is true")
+        return self
+
+
+class HapyPrivateBranchDeleteStatus(BaseModel):
+    private_branch_name: str
+    run_id: str
+    deleted_local_paths: list[str] = Field(default_factory=list)
+    deleted_remote: bool = False
+    registry_removed: bool = False
+    success: bool = True
+    messages: list[ValidationMessage] = Field(default_factory=list)
+
+
+class HapyPrivateBranchDeleteResult(BaseModel):
+    results: list[HapyPrivateBranchDeleteStatus] = Field(default_factory=list)
+    messages: list[ValidationMessage] = Field(default_factory=list)
 
 
 class SwitchCommandPlan(BaseModel):
@@ -482,8 +556,46 @@ class RunMetadata(BaseModel):
     run_id: str
     topology_name: str
     reference_topology_id: str
+    requested_by: Optional[ActorIdentity] = None
     mappings: list[RunMappingMetadata] = Field(default_factory=list)
     hapy_publishes: list[HapyPublishMetadata] = Field(default_factory=list)
+
+
+class InventoryUpdateRequest(BaseModel):
+    inventory: InventoryFile
+    requested_by: Optional[ActorIdentity] = None
+
+
+class HardwareAvailabilityUpdateRequest(BaseModel):
+    available: bool
+    requested_by: ActorIdentity
+
+
+AuditActionName = Literal[
+    "hardware_reserved",
+    "hardware_released",
+    "hardware_marked_unavailable",
+    "inventory_saved",
+    "private_branch_published",
+    "private_branch_deleted",
+]
+
+AuditTargetType = Literal["hardware", "private_branch", "inventory"]
+
+
+class AuditEvent(BaseModel):
+    id: str
+    action: AuditActionName
+    actor: ActorIdentity
+    target_type: AuditTargetType
+    target_id: str
+    summary: str
+    details: dict[str, Any] = Field(default_factory=dict)
+    created_at: str
+
+
+class AuditTrailResult(BaseModel):
+    events: list[AuditEvent] = Field(default_factory=list)
 
 
 JsonObject = dict[str, Any]

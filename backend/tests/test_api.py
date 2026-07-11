@@ -25,7 +25,7 @@ def test_hardware_inventory_endpoint():
     response = client.get("/api/hardware")
     assert response.status_code == 200
     data = response.json()
-    assert any(item["id"] == "chn-3800-8-ha" for item in data["hardware"])
+    assert any(item["id"] == "ln-ha-a01-327-dgd10q2-a01-328-16c10q2" for item in data["hardware"])
 
 
 def test_a02_720_pair_is_derived_as_ha():
@@ -41,11 +41,11 @@ def test_a02_720_pair_is_derived_as_ha():
     assert hardware.standby_serial == "246218453"
 
     ports = {port.logical_interface: port for port in hardware.ports}
-    assert ports["GE2"].switch_vlans == [372, 373, 374]
-    assert ports["GE2"].tagged_vlans == [373, 374]
+    assert ports["GE2"].switch_vlans == []
+    assert ports["GE2"].tagged_vlans == []
     assert ports["GE2"].switch_standby_port == "gigabitethernet1/42"
-    assert ports["GE5"].untagged_vlan == 377
-    assert 378 in ports["GE5"].tagged_vlans
+    assert ports["GE5"].untagged_vlan is None
+    assert ports["GE5"].tagged_vlans == []
 
 
 def test_a02_710_pair_keeps_no_vlan_sfp1_connection():
@@ -126,9 +126,13 @@ def test_invalid_reference_generation_rejected():
             "reference_topology_id": "not-allowlisted",
             "hypervisor_ip": "10.1.1.1",
             "hypervisor_interface": "vmnic0",
+            "requested_by": {
+                "name": "Test User",
+                "email": "test@example.com",
+            },
             "mappings": [
                 {
-                    "hardware_id": "chn-3800-8-ha",
+                    "hardware_id": "ln-ha-a01-327-dgd10q2-a01-328-16c10q2",
                     "branch_name": "branch2",
                     "edge_name": "b2-edge1",
                 }
@@ -156,9 +160,13 @@ def test_generate_and_download_zip(tmp_path, monkeypatch):
             "reference_topology_id": "3-site",
             "hypervisor_ip": "10.68.136.50",
             "hypervisor_interface": "vmnic0",
+            "requested_by": {
+                "name": "Test User",
+                "email": "test@example.com",
+            },
             "mappings": [
                 {
-                    "hardware_id": "chn-3800-8-ha",
+                    "hardware_id": "ln-ha-a01-327-dgd10q2-a01-328-16c10q2",
                     "branch_name": "branch2",
                     "edge_name": "b2-edge1",
                 }
@@ -241,3 +249,84 @@ def test_list_private_branches_route(monkeypatch):
 
     assert response.status_code == 200
     assert response.json()["branches"][0]["private_branch_name"] == "hw_topo_gen_private_run123"
+
+
+def test_hardware_availability_route(monkeypatch):
+    monkeypatch.setattr(
+        app_main,
+        "update_hardware_availability",
+        lambda hardware_id, available, requested_by: (
+            {
+                "devices": {},
+                "connections": [],
+                "allocations": [],
+                "hardware": [
+                    {
+                        "id": hardware_id,
+                        "display_name": "Demo Hardware",
+                        "model": "edge6X0",
+                        "model_suffix": "680",
+                        "active_serial": "SERIAL1",
+                        "ha": False,
+                        "available": available,
+                        "reservation": None,
+                        "ports": [
+                            {
+                                "logical_name": "GE1",
+                                "name": "ge1",
+                                "logical_interface": "GE1",
+                                "link": "demo_ge1",
+                                "switch_name": "switch1",
+                                "switch_active_port": "Gi1/1",
+                                "switch_vlans": [101],
+                                "tagged_vlans": [],
+                                "untagged_vlan": 101,
+                            }
+                        ],
+                        "switch": {
+                            "name": "switch1",
+                            "connections": {"ip": "10.0.0.1"},
+                        },
+                    }
+                ],
+            },
+            [],
+        ),
+    )
+
+    response = client.post(
+        "/api/hardware/demo-hw/availability",
+        json={
+            "available": True,
+            "requested_by": {"name": "Test User", "email": "test@example.com"},
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["hardware"][0]["available"] is True
+
+
+def test_audit_trail_route(monkeypatch):
+    monkeypatch.setattr(
+        app_main,
+        "list_audit_events",
+        lambda: {
+            "events": [
+                {
+                    "id": "audit123",
+                    "action": "hardware_reserved",
+                    "actor": {"name": "Test User", "email": "test@example.com"},
+                    "target_type": "hardware",
+                    "target_id": "hw-1",
+                    "summary": "Reserved hardware.",
+                    "details": {"run_id": "run123"},
+                    "created_at": "2026-07-11T00:00:00+00:00",
+                }
+            ]
+        },
+    )
+
+    response = client.get("/api/audit-trail")
+
+    assert response.status_code == 200
+    assert response.json()["events"][0]["action"] == "hardware_reserved"

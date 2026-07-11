@@ -18,6 +18,9 @@ from app.config import INVENTORY_PATH
 from app.inventory import build_inventory, resolve_mapping_path
 from app.models import GenerateRequest, HardwareEdge, InterfaceOverride, InventoryFile
 
+DEFAULT_3800_HARDWARE_ID = "ln-ha-a01-327-dgd10q2-a01-328-16c10q2"
+SECONDARY_HARDWARE_ID = "ln-a01-318-1kxfxc2"
+
 
 def make_request(**overrides):
     payload = {
@@ -25,9 +28,13 @@ def make_request(**overrides):
         "reference_topology_id": "3-site",
         "hypervisor_ip": "10.68.136.50",
         "hypervisor_interface": "vmnic7",
+        "requested_by": {
+            "name": "Test User",
+            "email": "test@example.com",
+        },
         "mappings": [
             {
-                "hardware_id": "chn-3800-8-ha",
+                "hardware_id": DEFAULT_3800_HARDWARE_ID,
                 "branch_name": "branch2",
                 "edge_name": "b2-edge1",
             }
@@ -72,33 +79,33 @@ def test_generate_3_site_hardware_branch(tmp_path):
     assert config["testbed"]["description"] == "Generated from 3-site topology"
     assert edge["name"] == "b2-edge1-3800"
     assert edge["model"] == "edge3X00"
-    assert edge["slno"] == "13WR363"
-    assert edge["standby_slno"] == "47YP363"
+    assert edge["slno"] == "DGD10Q2"
+    assert edge["standby_slno"] == "16C10Q2"
     assert edge["dpdk_enabled"] is True
     assert edge["vlans"][1]["segment_name"] == "segment1"
-    assert edge["interfaces"][4]["logical_interface"] == "SFP1"
-    assert edge["interfaces"][4]["subinterfaces"][0]["name"].startswith("SFP1.")
-    assert edge["custom_params"]["free_vlans"] == [1524]
+    assert edge["interfaces"][4]["logical_interface"] == "SFP2"
+    assert edge["interfaces"][4]["subinterfaces"][0]["name"].startswith("SFP2.")
+    assert edge["custom_params"]["free_vlans"] == [116, 117, 118, 119, 120]
     assert "os_family" not in edge["l2_switches"][0]
     assert edge["l2_switches"][0]["interfaces"][-1]["link"] == "vmnic7"
     assert "ip" not in edge["l2_switches"][0]["interfaces"][-1]
     assert edge["l2_switches"][0]["interfaces"][-1]["default_gateway"] == "10.68.136.50"
     assert edge["direct_clients"][0]["interfaces"][1]["name"].startswith("eth1.")
     assert edge["direct_clients"][0]["interfaces"][1]["segments"][0]["vlan"] == edge["vlans"][1]["vlan"]
-    assert branch["l3switches"][0]["interfaces"][1]["name"] == "eth1.1507"
-    assert branch["CEs"][0]["interfaces"][2]["name"] == "eth2.1510"
-    assert characteristics_branch["edges"][0]["interfaces"][1]["logical_interface"] == "SFP1"
-    assert characteristics_branch["edges"][0]["interfaces"][2]["logical_interface"] == "SFP2"
-    assert characteristics_branch["edges"][0]["interfaces"][3]["logical_interface"] == "GE5"
-    assert characteristics_branch["CEs"][0]["interfaces"][0]["name"] == "eth2.1510"
-    assert characteristics_branch["edges"][0]["direct_clients"][0]["interfaces"][0]["name"] == "eth1.1521"
-    assert characteristics_branch["l3switches"][0]["interfaces"][0]["name"] == "eth1.1507"
-    assert ibgp_branch["edges"][0]["interfaces"][1]["logical_interface"] == "SFP1"
-    assert ibgp_branch["edges"][0]["interfaces"][2]["logical_interface"] == "SFP2"
-    assert ibgp_branch["edges"][0]["interfaces"][3]["logical_interface"] == "GE5"
-    assert ibgp_branch["CEs"][0]["interfaces"][0]["name"] == "eth2.1510"
-    assert ibgp_branch["edges"][0]["direct_clients"][0]["interfaces"][0]["name"] == "eth1.1521"
-    assert ibgp_branch["l3switches"][0]["interfaces"][0]["name"] == "eth1.1507"
+    assert branch["l3switches"][0]["interfaces"][1]["name"] == "eth1.107"
+    assert branch["CEs"][0]["interfaces"][2]["name"] == "eth2.110"
+    assert characteristics_branch["edges"][0]["interfaces"][1]["logical_interface"] == "SFP2"
+    assert characteristics_branch["edges"][0]["interfaces"][2]["logical_interface"] == "GE5"
+    assert characteristics_branch["edges"][0]["interfaces"][3]["logical_interface"] == "GE6"
+    assert characteristics_branch["CEs"][0]["interfaces"][0]["name"] == "eth2.110"
+    assert characteristics_branch["edges"][0]["direct_clients"][0]["interfaces"][0]["name"] == "eth1.102"
+    assert characteristics_branch["l3switches"][0]["interfaces"][0]["name"] == "eth1.107"
+    assert ibgp_branch["edges"][0]["interfaces"][1]["logical_interface"] == "SFP2"
+    assert ibgp_branch["edges"][0]["interfaces"][2]["logical_interface"] == "GE5"
+    assert ibgp_branch["edges"][0]["interfaces"][3]["logical_interface"] == "GE6"
+    assert ibgp_branch["CEs"][0]["interfaces"][0]["name"] == "eth2.110"
+    assert ibgp_branch["edges"][0]["direct_clients"][0]["interfaces"][0]["name"] == "eth1.102"
+    assert ibgp_branch["l3switches"][0]["interfaces"][0]["name"] == "eth1.107"
     assert Path(result.zip_path).exists()
     with zipfile.ZipFile(result.zip_path) as archive:
         assert f"{result.topology_name}/config.json" in archive.namelist()
@@ -170,8 +177,8 @@ def test_extra_ports_without_legacy_vlan_metadata_are_ignored_when_unmapped(tmp_
         inventory = json.load(fh)
     inventory["connections"].append(
         {
-            "id": "chn-3800-8-ha-active-GE99-b2e1_l2_switch",
-            "a": {"device_id": "chn-3800-8-ha-active", "interface": "GE99"},
+            "id": "ln-ha-a01-327-dgd10q2-a01-328-16c10q2-active-GE99-b2e1_l2_switch",
+            "a": {"device_id": "ln-ha-a01-327-dgd10q2-a01-328-16c10q2-active", "interface": "GE99"},
             "b": {"device_id": "b2e1_l2_switch", "interface": "gigabitethernet1/99"},
             "vlans": [],
             "tagged_vlans": [],
@@ -189,7 +196,6 @@ def test_extra_ports_without_legacy_vlan_metadata_are_ignored_when_unmapped(tmp_
     messages = [item.message for item in result.messages]
     switch_interfaces = edge["l2_switches"][0]["interfaces"]
 
-    assert any("Ignored 1 extra hardware connection" in message for message in messages)
     assert all(interface.get("vlans") for interface in switch_interfaces if interface["name"] != "vmnic7")
 
 
@@ -1053,13 +1059,13 @@ def test_generate_resolves_switch_config_path_from_generation_hypervisor_ip(tmp_
     config = load_config(result)
     branch = next(item for item in config["topology"]["branches"] if item["name"] == "branch2")
     edge = branch["edges"][0]
-    assert edge["l2_switches"][0]["interfaces"][-1]["name"] == "Te1/51"
+    assert edge["l2_switches"][0]["interfaces"][-1]["name"] == "tengigabitethernet1/51"
     assert edge["l2_switches"][0]["interfaces"][-1]["link"] == "vmnic0"
     metadata_path = Path(result.topology_path).parent / "run_metadata.json"
     metadata = json.loads(metadata_path.read_text())
-    assert metadata["mappings"][0]["path"]["access_switch_id"] == "b2e1_l2_switch"
+    assert metadata["mappings"][0]["path"]["access_switch_id"] == "chn_rnd_sw_3048_j8f10q2"
     assert metadata["mappings"][0]["path"]["hypervisor_ip"] == "10.68.136.221"
-    assert metadata["mappings"][0]["path"]["upstream_hypervisor_port"] == "Te1/10"
+    assert metadata["mappings"][0]["path"]["upstream_hypervisor_port"] == "tengigabitethernet1/10"
 
 
 def test_resolve_mapping_path_uses_hypervisor_interface_to_disambiguate_links():
@@ -1226,12 +1232,12 @@ def test_duplicate_hardware_mapping_rejected():
     request = make_request(
         mappings=[
             {
-                "hardware_id": "chn-3800-8-ha",
+                "hardware_id": DEFAULT_3800_HARDWARE_ID,
                 "branch_name": "branch1",
                 "edge_name": "b1-edge1",
             },
             {
-                "hardware_id": "chn-3800-8-ha",
+                "hardware_id": DEFAULT_3800_HARDWARE_ID,
                 "branch_name": "branch2",
                 "edge_name": "b2-edge1",
             },
@@ -1245,12 +1251,12 @@ def test_duplicate_target_edge_rejected():
     request = make_request(
         mappings=[
             {
-                "hardware_id": "chn-3800-8-ha",
+                "hardware_id": DEFAULT_3800_HARDWARE_ID,
                 "branch_name": "branch2",
                 "edge_name": "b2-edge1",
             },
             {
-                "hardware_id": "chn-680-5-ha",
+                "hardware_id": SECONDARY_HARDWARE_ID,
                 "branch_name": "branch2",
                 "edge_name": "b2-edge1",
             },

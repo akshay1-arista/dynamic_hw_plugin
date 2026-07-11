@@ -130,7 +130,6 @@ def _build_plans(
                     f"Run {metadata.run_id} contains an unsupported switch allocation for {port.switch_name}"
                 )
             port_state = _ensure_device_state(device_states, port_switch)
-            port_state["target_vlans"].update(vlan for vlan in port.switch_vlans if vlan is not None)
             _add_edge_port_to_state(
                 port_state,
                 hardware,
@@ -166,8 +165,6 @@ def _build_plans(
                 for vlan in _transport_vlans_for_port(port, generated_switch_links)
             }
         )
-        upstream_state["target_vlans"].update(hypervisor_transport_vlans)
-
         if path.access_uplink_port:
             _add_shared_port(
                 access_state,
@@ -244,7 +241,6 @@ def _ensure_device_state(
             "port_configs": {},
             "os9_vlans": defaultdict(lambda: {"member": set(), "untagged": set(), "tagged": set()}),
             "cleanup_ports": set(),
-            "target_vlans": set(),
         }
     return states[device.id]
 
@@ -423,12 +419,8 @@ def _render_commands(state: dict[str, object]) -> list[str]:
 def _render_os9_commands(state: dict[str, object]) -> list[str]:
     device = state["device"]
     running_config = _fetch_running_config(device)
-    cleanup_vlans = set(state["target_vlans"])
-    cleanup_vlans.update(_find_os9_cleanup_vlans(running_config, state["cleanup_ports"]))
-
-    commands: list[str] = []
-    for vlan in sorted(cleanup_vlans):
-        commands.append(f"no interface vlan {vlan}")
+    cleanup_memberships = _find_os9_cleanup_memberships(running_config, state["cleanup_ports"])
+    commands = _render_os9_cleanup_commands(cleanup_memberships)
 
     for interface_name in sorted(state["port_configs"], key=_interface_sort_key):
         config = state["port_configs"][interface_name]
@@ -608,16 +600,27 @@ def _connection_native_vlan(
     return None
 
 
-def _find_os9_cleanup_vlans(running_config: str, interfaces: set[str]) -> set[int]:
+def _find_os9_cleanup_memberships(
+    running_config: str,
+    interfaces: set[str],
+) -> dict[int, dict[str, set[str]]]:
     if not running_config or not interfaces:
-        return set()
+        return {}
     formatted_interfaces = {_format_os9_interface(interface) for interface in interfaces}
-    cleanup_vlans: set[int] = set()
+    cleanup_memberships: dict[int, dict[str, set[str]]] = {}
     for vlan, section in _iter_os9_vlan_sections(running_config):
-        existing_interfaces = _extract_os9_interfaces(section)
-        if existing_interfaces & formatted_interfaces:
-            cleanup_vlans.add(vlan)
-    return cleanup_vlans
+        existing_memberships = _extract_os9_memberships(section)
+        vlan_cleanup = {
+            command: members & formatted_interfaces
+            for command, members in existing_memberships.items()
+        }
+        # Moving a port to another untagged VLAN is the supported way to
+        # remove it from VLAN 1 on OS9, so do not emit `no untagged` there.
+        if vlan == 1:
+            vlan_cleanup["untagged"] = set()
+        if any(vlan_cleanup.values()):
+            cleanup_memberships[vlan] = vlan_cleanup
+    return cleanup_memberships
 
 
 def _iter_os9_vlan_sections(running_config: str) -> list[tuple[int, str]]:
@@ -630,14 +633,31 @@ def _iter_os9_vlan_sections(running_config: str) -> list[tuple[int, str]]:
     return sections
 
 
-def _extract_os9_interfaces(section: str) -> set[str]:
-    interfaces: set[str] = set()
+def _extract_os9_memberships(section: str) -> dict[str, set[str]]:
+    memberships = {"member": set(), "untagged": set(), "tagged": set()}
     for line in section.splitlines():
         match = re.match(r"\s*(member|untagged|tagged)\s+(.+)$", line, re.IGNORECASE)
         if not match:
             continue
-        interfaces.update(_expand_os9_interface_expression(match.group(2)))
-    return interfaces
+        memberships[match.group(1).lower()].update(_expand_os9_interface_expression(match.group(2)))
+    return memberships
+
+
+def _render_os9_cleanup_commands(cleanup_memberships: dict[int, dict[str, set[str]]]) -> list[str]:
+    commands: list[str] = []
+    for vlan in sorted(cleanup_memberships):
+        vlan_memberships = cleanup_memberships[vlan]
+        if not any(vlan_memberships.values()):
+            continue
+        commands.append(f"interface Vlan {vlan}")
+        if vlan_memberships["member"]:
+            commands.extend(_os9_member_commands("no member", vlan_memberships["member"]))
+        if vlan_memberships["untagged"]:
+            commands.extend(_os9_member_commands("no untagged", vlan_memberships["untagged"]))
+        if vlan_memberships["tagged"]:
+            commands.extend(_os9_member_commands("no tagged", vlan_memberships["tagged"]))
+        commands.append(" exit")
+    return commands
 
 
 def _expand_os9_interface_expression(expression: str) -> list[str]:

@@ -211,16 +211,25 @@ interface Vlan 103
     access_commands = next(item.commands for item in result.devices if item.device_id == "access_sw")
     upstream_commands = next(item.commands for item in result.devices if item.device_id == "upstream_sw")
 
-    assert access_commands[:4] == [
-        "no interface vlan 101",
-        "no interface vlan 102",
-        "no interface vlan 103",
-        "no interface vlan 104",
+    assert access_commands[:12] == [
+        "interface Vlan 101",
+        " no member GigabitEthernet 1/1,1/6",
+        " exit",
+        "interface Vlan 102",
+        " no untagged GigabitEthernet 1/2,1/7",
+        " exit",
+        "interface Vlan 103",
+        " no tagged GigabitEthernet 1/2,1/7",
+        " exit",
+        "interface Vlan 104",
+        " no tagged GigabitEthernet 1/2",
+        " exit",
     ]
-    vlan101_start = access_commands.index("interface Vlan 101")
-    vlan102_start = access_commands.index("interface Vlan 102")
+    vlan101_start = [index for index, command in enumerate(access_commands) if command == "interface Vlan 101"][-1]
+    vlan102_start = [index for index, command in enumerate(access_commands) if command == "interface Vlan 102"][-1]
     vlan101_block = access_commands[vlan101_start:vlan102_start]
-    vlan102_block = access_commands[vlan102_start:access_commands.index("interface Vlan 103")]
+    vlan103_start = [index for index, command in enumerate(access_commands) if command == "interface Vlan 103"][-1]
+    vlan102_block = access_commands[vlan102_start:vlan103_start]
 
     assert "interface GigabitEthernet 1/1" in access_commands
     assert ' description "Edge 3800_14DQ363_GE1"' in access_commands
@@ -231,6 +240,177 @@ interface Vlan 103
     assert " tagged TenGigabitEthernet 1/51" in vlan102_block
     assert "interface TenGigabitEthernet 1/43" in upstream_commands
     assert " tagged TenGigabitEthernet 1/9,1/43" in upstream_commands
+
+
+def test_configure_switches_os9_moves_ports_off_default_vlan_without_deleting_vlan_1(tmp_path, monkeypatch):
+    inventory = InventoryFile.model_validate(
+        {
+            "devices": {
+                "access_sw": {
+                    "id": "access_sw",
+                    "type": "switch",
+                    "display_name": "A01-PF-S3048-5",
+                    "model": "Dell-3048",
+                    "ip_address": "10.0.0.10",
+                    "switch_metadata": {
+                        "name": "A01-PF-S3048-5",
+                        "model": "Dell-3048",
+                        "os_family": "os9",
+                        "connections": {"ip": "10.0.0.10", "port": None},
+                        "credentials": {"username": "velocloud", "password": "N#1sdwan"},
+                    },
+                },
+                "upstream_sw": {
+                    "id": "upstream_sw",
+                    "type": "switch",
+                    "display_name": "A01-PF-S4048-1",
+                    "model": "Dell-4048",
+                    "ip_address": "10.0.0.11",
+                    "switch_metadata": {
+                        "name": "A01-PF-S4048-1",
+                        "model": "Dell-4048",
+                        "os_family": "os9",
+                        "connections": {"ip": "10.0.0.11", "port": None},
+                        "credentials": {"username": "velocloud", "password": "N#1sdwan"},
+                    },
+                },
+                "esxi_01": {
+                    "id": "esxi_01",
+                    "type": "hypervisor",
+                    "display_name": "esxi-01",
+                    "ip_address": "10.0.0.20",
+                },
+            },
+            "connections": [
+                {
+                    "id": "access-upstream",
+                    "a": {"device_id": "access_sw", "interface": "tengigabitethernet1/51"},
+                    "b": {"device_id": "upstream_sw", "interface": "tengigabitethernet1/43"},
+                    "vlans": [1],
+                    "tagged_vlans": [],
+                    "untagged_vlan": 1,
+                    "role": "switch-uplink",
+                },
+                {
+                    "id": "upstream-hypervisor",
+                    "a": {"device_id": "upstream_sw", "interface": "tengigabitethernet1/9"},
+                    "b": {"device_id": "esxi_01", "interface": "vmnic0"},
+                    "vlans": [1],
+                    "tagged_vlans": [],
+                    "untagged_vlan": 1,
+                    "role": "hypervisor-access",
+                },
+            ],
+            "hardware": [
+                {
+                    "id": "edge-3800",
+                    "display_name": "chn-rnd-edge-3800-DGD10Q2",
+                    "model": "edge3X00",
+                    "model_suffix": "3800",
+                    "ha": False,
+                    "active_serial": "14DQ363",
+                    "standby_serial": None,
+                    "switch": {
+                        "name": "A01-PF-S3048-5",
+                        "model": "Dell-3048",
+                        "os_family": "os9",
+                        "connections": {"ip": "10.0.0.10", "port": None},
+                        "credentials": {"username": "velocloud", "password": "N#1sdwan"},
+                    },
+                    "ports": [
+                        {
+                            "logical_name": "GE3",
+                            "name": "ge3",
+                            "logical_interface": "GE3",
+                            "link": "lan3",
+                            "switch_active_port": "gigabitethernet1/3",
+                            "switch_vlans": [1510],
+                            "tagged_vlans": [],
+                            "untagged_vlan": 1510,
+                        }
+                    ],
+                    "path": {
+                        "access_switch_id": "access_sw",
+                        "access_switch_name": "A01-PF-S3048-5",
+                        "access_switch_ip": "10.0.0.10",
+                        "access_uplink_port": "tengigabitethernet1/51",
+                        "upstream_switch_id": "upstream_sw",
+                        "upstream_switch_name": "A01-PF-S4048-1",
+                        "upstream_switch_ip": "10.0.0.11",
+                        "upstream_access_port": "tengigabitethernet1/43",
+                        "upstream_hypervisor_port": "tengigabitethernet1/9",
+                        "hypervisor_id": "esxi_01",
+                        "hypervisor_name": "esxi-01",
+                        "hypervisor_ip": "10.0.0.20",
+                        "complete": True,
+                    },
+                }
+            ],
+        }
+    )
+    run_root = tmp_path / "outputs" / "run123"
+    run_root.mkdir(parents=True)
+    (run_root / "run_metadata.json").write_text(
+        json.dumps(
+            {
+                "run_id": "run123",
+                "topology_name": "topo-1",
+                "reference_topology_id": "1-site",
+                "mappings": [
+                    {
+                        "hardware_id": "edge-3800",
+                        "branch_name": "branch1",
+                        "edge_name": "edge1",
+                        "path": inventory.hardware[0].path.model_dump(mode="json"),
+                        "allocations": [
+                            {
+                                "reference_interface": "GE3",
+                                "logical_interface": "GE3",
+                                "link": "lan3",
+                                "switch_name": "A01-PF-S3048-5",
+                                "switch_active_port": "gigabitethernet1/3",
+                                "switch_vlans": [1510],
+                                "tagged_vlans": [],
+                                "untagged_vlan": 1510,
+                                "segment_vlans": {},
+                            }
+                        ],
+                    }
+                ],
+            }
+        )
+    )
+
+    monkeypatch.setattr("app.switch_config.load_inventory", lambda _path: inventory)
+    monkeypatch.setattr(
+        "app.switch_config._fetch_running_config",
+        lambda device: (
+            """
+interface Vlan 1
+ untagged GigabitEthernet 1/3
+ tagged TenGigabitEthernet 1/51
+ no shutdown
+"""
+            if device.id == "access_sw"
+            else ""
+        ),
+    )
+
+    result = configure_switches_for_run(
+        "run123",
+        SwitchConfigureRequest(dry_run=True),
+        inventory_path=tmp_path / "inventory.json",
+        outputs_root=tmp_path / "outputs",
+    )
+
+    access_commands = next(item.commands for item in result.devices if item.device_id == "access_sw")
+
+    assert "no interface vlan 1" not in access_commands
+    assert " no untagged GigabitEthernet 1/3" not in access_commands
+    assert access_commands[0] == "interface GigabitEthernet 1/3"
+    vlan1510_start = access_commands.index("interface Vlan 1510")
+    vlan1510_block = access_commands[vlan1510_start:]
+    assert " untagged GigabitEthernet 1/3" in vlan1510_block
 
 
 def test_configure_switches_builds_os10_plans_and_preserves_existing_shared_trunks(tmp_path, monkeypatch):

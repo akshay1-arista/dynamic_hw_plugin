@@ -1,6 +1,6 @@
 backend/.pytest_cache/
 .env
-frontend/dist/
+.DS_Store
 frontend/node_modules/
 outputs/
 logs/

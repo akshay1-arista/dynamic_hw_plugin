@@ -109,22 +109,11 @@ small {
 }
 
 .brandMark {
-  align-items: center;
-  background: var(--text);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: var(--radius);
-  box-shadow: 0 12px 24px rgba(17, 24, 39, 0.2);
-  color: #ffffff;
-  display: inline-flex;
+  display: block;
   flex: 0 0 auto;
-  height: 56px;
-  justify-content: center;
-  position: relative;
-  width: 56px;
-}
-
-.brandMark svg {
-  stroke-width: 2.2;
+  height: 80px;
+  object-fit: contain;
+  width: auto;
 }
 
 .brandChip {

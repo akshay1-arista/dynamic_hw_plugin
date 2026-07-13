@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useState } from 'react';
+import headerLogo from './assets/header-logo.png';
 import {
   Archive,
   CheckCircle2,
@@ -676,11 +677,6 @@ export function App() {
       <header className="appHeader">
         <div className="brandCluster">
           <BrandMark />
-          <div className="brandCopy">
-            <span className="eyebrow">Dynamic hardware topology generation</span>
-            <h1>Dynamic Topology Engine</h1>
-            <p>Generate hardware-backed topology folders from virtual references, inventory, and switch paths.</p>
-          </div>
         </div>
         <div className="headerActions">
           <div className="activeUserPill" aria-label="Current user">
@@ -2032,12 +2028,7 @@ function CollapsiblePanel({ children, className, collapsed, description, icon, o
 
 function BrandMark() {
   return (
-    <span className="brandMark" aria-hidden="true">
-      <GitBranch size={24} />
-      <span className="brandChip">
-        <HardDrive size={13} />
-      </span>
-    </span>
+    <img src={headerLogo} alt="Dynamic Topology Engine" className="brandMark" />
   );
 }
 

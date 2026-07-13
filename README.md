@@ -41,6 +41,8 @@ It will:
 
 If the deployment host does not have `npm`, the script reuses committed or prebuilt assets from `frontend/dist`. In both modes the frontend is served by a small Python static server that proxies `/api` to the backend, so Node is not required at runtime.
 
+If `npm` exists but the host `node` version is older than `20.19.0`, the script also falls back to `frontend/dist` when it is already present. If `frontend/dist` is missing, deployment stops with a clear upgrade requirement instead of failing later inside `vite build`.
+
 Set `PUBLIC_HOST` when the app is accessed through a server IP or DNS name:
 
 ```bash

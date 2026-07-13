@@ -21,6 +21,7 @@ FRONTEND_ORIGIN="${FRONTEND_ORIGIN:-http://${PUBLIC_HOST}:${FRONTEND_PORT}}"
 CORS_ALLOWED_ORIGINS="${CORS_ALLOWED_ORIGINS:-$FRONTEND_ORIGIN}"
 TEMPLATE_DIR="$ROOT_DIR/deploy/systemd"
 FRONTEND_DIST_DIR="${FRONTEND_DIST_DIR:-$ROOT_DIR/frontend/dist}"
+FRONTEND_NODE_MIN_VERSION="${FRONTEND_NODE_MIN_VERSION:-20.19.0}"
 AUTO_INSTALL_SYSTEM_DEPS="${AUTO_INSTALL_SYSTEM_DEPS:-1}"
 PACKAGE_MANAGER="${PACKAGE_MANAGER:-}"
 TMP_DIR="$(mktemp -d)"
@@ -144,6 +145,59 @@ import venv
 PY
 }
 
+normalize_semver() {
+  local version="${1#v}"
+  local major minor patch
+
+  IFS='.' read -r major minor patch <<<"$version"
+  major="${major:-0}"
+  minor="${minor:-0}"
+  patch="${patch:-0}"
+
+  printf '%d %d %d\n' "$major" "$minor" "$patch"
+}
+
+node_version() {
+  if ! command_exists node; then
+    return 1
+  fi
+
+  node --version 2>/dev/null
+}
+
+node_version_ready() {
+  local current required
+  local current_major current_minor current_patch
+  local required_major required_minor required_patch
+
+  current="$(node_version)" || return 1
+  required="$FRONTEND_NODE_MIN_VERSION"
+
+  read -r current_major current_minor current_patch <<<"$(normalize_semver "$current")"
+  read -r required_major required_minor required_patch <<<"$(normalize_semver "$required")"
+
+  if (( current_major > required_major )); then
+    return 0
+  fi
+  if (( current_major < required_major )); then
+    return 1
+  fi
+  if (( current_minor > required_minor )); then
+    return 0
+  fi
+  if (( current_minor < required_minor )); then
+    return 1
+  fi
+  if (( current_patch >= required_patch )); then
+    return 0
+  fi
+  return 1
+}
+
+frontend_can_build_locally() {
+  command_exists npm && node_version_ready
+}
+
 append_unique() {
   local value="$1"
   shift
@@ -254,7 +308,7 @@ prepare_backend() {
 }
 
 prepare_frontend() {
-  if command -v npm >/dev/null 2>&1; then
+  if frontend_can_build_locally; then
     echo "frontend: installing packages"
     (
       cd "$ROOT_DIR/frontend"
@@ -273,13 +327,23 @@ prepare_frontend() {
     return
   fi
 
+  if command_exists npm && ! node_version_ready; then
+    echo "frontend: local node $(node_version) is too old; need >= $FRONTEND_NODE_MIN_VERSION for this Vite build"
+  fi
+
   if [[ -f "$FRONTEND_DIST_DIR/index.html" ]]; then
-    echo "frontend: npm not found; using prebuilt assets from $FRONTEND_DIST_DIR"
+    echo "frontend: using prebuilt assets from $FRONTEND_DIST_DIR"
     return
   fi
 
-  echo "frontend: npm not found and no prebuilt assets exist at $FRONTEND_DIST_DIR" >&2
-  echo "frontend: install npm or commit/build frontend/dist before deploying" >&2
+  if ! command_exists npm; then
+    echo "frontend: npm not found and no prebuilt assets exist at $FRONTEND_DIST_DIR" >&2
+    echo "frontend: install npm or commit/build frontend/dist before deploying" >&2
+    exit 1
+  fi
+
+  echo "frontend: local node $(node_version) does not satisfy the required version >= $FRONTEND_NODE_MIN_VERSION" >&2
+  echo "frontend: upgrade node on the host or commit/build frontend/dist before deploying" >&2
   exit 1
 }
 

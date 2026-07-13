@@ -759,9 +759,9 @@ export function App() {
                         <StatusBadge tone={hardware.ha ? 'accent' : 'neutral'}>
                           {hardware.ha ? 'HA' : 'Standalone'}
                         </StatusBadge>
-                        <StatusBadge tone={hardware.path_complete ? 'success' : 'warning'}>
-                          {hardware.path_complete ? 'Path complete' : 'Path pending'}
-                        </StatusBadge>
+                        {hardware.path_complete && (
+                          <StatusBadge tone="success">Path complete</StatusBadge>
+                        )}
                       </span>
                       <small>{hardware.model} / {hardware.ports.length} switch links</small>
                     </span>

@@ -583,7 +583,7 @@ describe('App', () => {
     expect(screen.queryByRole('option', { name: /CHN 3800 HA Pair 8/i })).not.toBeInTheDocument();
   });
 
-  test('selects hypervisor ip from inventory and prefills a matching interface', async () => {
+  test('selects hypervisor ip from inventory without prefilling an interface', async () => {
     const user = userEvent.setup();
     render(<App />);
 
@@ -595,7 +595,10 @@ describe('App', () => {
     );
 
     expect(hypervisorIpInput).toHaveValue('10.68.137.162');
-    expect(screen.getByRole('combobox', { name: 'Hypervisor interface' })).toHaveValue('eno1np0');
+    expect(screen.getByRole('combobox', { name: 'Hypervisor interface' })).toHaveValue('');
+    expect(
+      screen.queryByText(/Rename mapped branches with hardware model suffix/i)
+    ).not.toBeInTheDocument();
   });
 
   test('filters hypervisor interface choices for the selected hypervisor', async () => {
@@ -634,6 +637,7 @@ describe('App', () => {
     await chooseHardware(user, '3800', /CHN 3800 HA Pair 8/i);
     await user.selectOptions(screen.getByLabelText('Branch'), 'branch2');
     await user.type(screen.getByRole('combobox', { name: 'Hypervisor IP' }), '10.68.136.50');
+    await user.type(screen.getByRole('combobox', { name: 'Hypervisor interface' }), 'vmnic0');
 
     expect(screen.getByText('branch2 -> branch2')).toBeInTheDocument();
     expect(screen.getByText('b2-edge1 -> b2-edge1-3800')).toBeInTheDocument();
@@ -646,6 +650,7 @@ describe('App', () => {
     expect(payload.hypervisor_ip).toBe('10.68.136.50');
     expect(payload.hypervisor_interface).toBe('vmnic0');
     expect(payload.requested_by).toEqual(defaultUser);
+    expect(payload).not.toHaveProperty('branch_rename');
     expect(payload.mappings[0]).not.toHaveProperty('hypervisor_ip');
     expect(payload.mappings[0]).not.toHaveProperty('hypervisor_interface');
     expect(screen.getByRole('link', { name: /download zip/i })).toHaveAttribute(
@@ -663,6 +668,7 @@ describe('App', () => {
     await chooseHardware(user, '3800', /CHN 3800 HA Pair 8/i);
     await user.selectOptions(screen.getByLabelText('Branch'), 'branch2');
     await user.type(screen.getByRole('combobox', { name: 'Hypervisor IP' }), '10.68.136.50');
+    await user.type(screen.getByRole('combobox', { name: 'Hypervisor interface' }), 'vmnic0');
     await user.click(screen.getByRole('button', { name: /generate zip/i }));
 
     await screen.findByText('Reserved hardware for generated topology.');
@@ -685,6 +691,7 @@ describe('App', () => {
     await chooseHardware(user, 'a01 680', /A01 680 Standalone/i);
     await user.selectOptions(screen.getByLabelText('Branch'), 'branch1');
     await user.type(screen.getByRole('combobox', { name: 'Hypervisor IP' }), '10.68.136.50');
+    await user.type(screen.getByRole('combobox', { name: 'Hypervisor interface' }), 'vmnic0');
     await user.click(screen.getByRole('button', { name: /generate zip/i }));
 
     await waitFor(() => expect(screen.getByText(/path resolved/i)).toBeInTheDocument());
@@ -728,6 +735,7 @@ describe('App', () => {
     await chooseHardware(user, 'a01 680', /A01 680 Standalone/i);
     await user.selectOptions(screen.getByLabelText('Branch'), 'branch1');
     await user.type(screen.getByRole('combobox', { name: 'Hypervisor IP' }), '10.68.136.50');
+    await user.type(screen.getByRole('combobox', { name: 'Hypervisor interface' }), 'vmnic0');
     await user.click(screen.getByRole('button', { name: /generate zip/i }));
 
     await waitFor(() => expect(screen.getByText(/path resolved/i)).toBeInTheDocument());
@@ -758,6 +766,7 @@ describe('App', () => {
     await chooseHardware(user, '3800', /CHN 3800 HA Pair 8/i);
     await user.selectOptions(screen.getByLabelText('Branch'), 'branch2');
     await user.type(screen.getByRole('combobox', { name: 'Hypervisor IP' }), '10.68.136.50');
+    await user.type(screen.getByRole('combobox', { name: 'Hypervisor interface' }), 'vmnic0');
     await user.click(screen.getByRole('button', { name: /generate zip/i }));
 
     await screen.findByText('By Test User');
@@ -783,6 +792,7 @@ describe('App', () => {
     await chooseHardware(user, 'a01 680', /A01 680 Standalone/i);
     await user.selectOptions(screen.getByLabelText('Branch'), 'branch1');
     await user.type(screen.getByRole('combobox', { name: 'Hypervisor IP' }), '10.68.136.50');
+    await user.type(screen.getByRole('combobox', { name: 'Hypervisor interface' }), 'vmnic0');
     await user.click(screen.getByRole('button', { name: /generate zip/i }));
     await waitFor(() => expect(screen.getByText(/path resolved/i)).toBeInTheDocument());
     await user.click(screen.getByRole('button', { name: /commit and push gerrit private branch/i }));
@@ -813,6 +823,7 @@ describe('App', () => {
     expect(firstInterface).toHaveValue('GE1');
     expect(secondInterface).toHaveValue('');
     await user.type(screen.getByRole('combobox', { name: 'Hypervisor IP' }), '10.68.136.50');
+    await user.type(screen.getByRole('combobox', { name: 'Hypervisor interface' }), 'vmnic0');
     await user.click(screen.getByRole('button', { name: /generate zip/i }));
 
     const generateCall = global.fetch.mock.calls.find(([url]) => url === '/api/generate');
@@ -860,6 +871,7 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: /optional interface mapping/i }));
     await user.type(screen.getByLabelText('Switch VLANs for GE1'), '2200, 2201');
     await user.type(screen.getByRole('combobox', { name: 'Hypervisor IP' }), '10.68.136.50');
+    await user.type(screen.getByRole('combobox', { name: 'Hypervisor interface' }), 'vmnic0');
     await user.click(screen.getByRole('button', { name: /generate zip/i }));
 
     const generateCall = global.fetch.mock.calls.find(([url]) => url === '/api/generate');
@@ -894,14 +906,13 @@ describe('App', () => {
     expect(screen.queryByText(/No fixed VLAN metadata on this port/)).not.toBeInTheDocument();
   });
 
-  test('prefills hypervisor interface and keeps it editable', async () => {
+  test('leaves hypervisor interface empty and keeps it editable', async () => {
     const user = userEvent.setup();
     render(<App />);
 
     const input = await screen.findByRole('combobox', { name: 'Hypervisor interface' });
-    expect(input).toHaveValue('vmnic0');
+    expect(input).toHaveValue('');
 
-    await user.clear(input);
     await user.type(input, 'vmnic7');
 
     expect(input).toHaveValue('vmnic7');

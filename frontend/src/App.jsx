@@ -57,8 +57,7 @@ export function App() {
   const [selectedReferenceId, setSelectedReferenceId] = useState('');
   const [topologyName, setTopologyName] = useState('');
   const [hypervisorIp, setHypervisorIp] = useState('');
-  const [hypervisorInterface, setHypervisorInterface] = useState('vmnic0');
-  const [branchRename, setBranchRename] = useState(false);
+  const [hypervisorInterface, setHypervisorInterface] = useState('');
   const [mappings, setMappings] = useState([{ ...emptyMapping }]);
   const [result, setResult] = useState(null);
   const [publishResult, setPublishResult] = useState(null);
@@ -123,21 +122,15 @@ export function App() {
   }, [selectedHypervisorOption, hypervisorOptions]);
 
   useEffect(() => {
-    if (!selectedHypervisorOption?.interfaces?.length) {
+    if (!selectedHypervisorOption?.interfaces?.length || !hypervisorInterface.trim()) {
       return;
     }
     const normalizedCurrent = hypervisorInterface.trim().toLowerCase();
-    if (
-      normalizedCurrent &&
-      selectedHypervisorOption.interfaces.some(
-        (interfaceName) => interfaceName.toLowerCase() === normalizedCurrent
-      )
-    ) {
-      return;
-    }
-    const preferredInterface = pickPreferredHypervisorInterface(selectedHypervisorOption.interfaces);
-    if (preferredInterface) {
-      setHypervisorInterface(preferredInterface);
+    const matchesSelectedHypervisor = selectedHypervisorOption.interfaces.some(
+      (interfaceName) => interfaceName.toLowerCase() === normalizedCurrent
+    );
+    if (!matchesSelectedHypervisor) {
+      setHypervisorInterface('');
     }
   }, [selectedHypervisorOption, hypervisorInterface]);
 
@@ -148,9 +141,7 @@ export function App() {
         if (!hardware || !mapping.branch_name || !mapping.edge_name) {
           return null;
         }
-        const branchName =
-          mapping.target_branch_name ||
-          (branchRename ? `${mapping.branch_name}-${hardware.model_suffix}` : mapping.branch_name);
+        const branchName = mapping.target_branch_name || mapping.branch_name;
         const edgeName = mapping.target_edge_name || `${mapping.edge_name}-${hardware.model_suffix}`;
         return {
           hardware: hardware.display_name,
@@ -161,7 +152,7 @@ export function App() {
         };
       })
       .filter(Boolean);
-  }, [branchRename, inventory.hardware, mappings]);
+  }, [inventory.hardware, mappings]);
 
   const filteredHardware = useMemo(() => {
     const query = inventorySearch.trim().toLowerCase();
@@ -421,7 +412,6 @@ export function App() {
         reference_topology_id: selectedReferenceId,
         hypervisor_ip: hypervisorIp,
         hypervisor_interface: hypervisorInterface,
-        branch_rename: branchRename,
         requested_by: currentUser,
         mappings: mappings.map((mapping) => ({
           hardware_id: mapping.hardware_id,
@@ -977,19 +967,10 @@ export function App() {
                 aria-label="Hypervisor interface"
                 inputId={hypervisorInterfaceFieldId}
                 options={hypervisorInterfaceOptions}
-                placeholder={selectedHypervisorOption ? 'Search and select hypervisor interface' : 'vmnic0'}
+                placeholder="Search and select hypervisor interface"
                 value={hypervisorInterface}
                 onChange={setHypervisorInterface}
               />
-            </label>
-
-            <label className="checkboxLine">
-              <input
-                type="checkbox"
-                checked={branchRename}
-                onChange={(event) => setBranchRename(event.target.checked)}
-              />
-              Rename mapped branches with hardware model suffix
             </label>
 
             <div className="branchList">
@@ -1478,15 +1459,6 @@ function compareHypervisorInterfaceNames(left, right) {
     return leftRank - rightRank;
   }
   return left.localeCompare(right, undefined, { numeric: true, sensitivity: 'base' });
-}
-
-function pickPreferredHypervisorInterface(interfaces) {
-  return (
-    interfaces.find((interfaceName) => interfaceName.toLowerCase() === 'vmnic0') ||
-    interfaces.find((interfaceName) => !isManagementHypervisorInterface(interfaceName)) ||
-    interfaces[0] ||
-    ''
-  );
 }
 
 function commandsToEditorText(commands) {

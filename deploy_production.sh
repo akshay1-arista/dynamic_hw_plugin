@@ -16,10 +16,13 @@ BACKEND_SERVICE_NAME="${BACKEND_SERVICE_NAME:-dynamic-hw-topology-backend}"
 FRONTEND_SERVICE_NAME="${FRONTEND_SERVICE_NAME:-dynamic-hw-topology-frontend}"
 SERVICE_USER="${SERVICE_USER:-${SUDO_USER:-$USER}}"
 SERVICE_GROUP="${SERVICE_GROUP:-$(id -gn "$SERVICE_USER")}"
-API_BASE_URL="${API_BASE_URL:-http://${PUBLIC_HOST}:${BACKEND_PORT}}"
+API_BASE_URL="${API_BASE_URL:-}"
 FRONTEND_ORIGIN="${FRONTEND_ORIGIN:-http://${PUBLIC_HOST}:${FRONTEND_PORT}}"
 CORS_ALLOWED_ORIGINS="${CORS_ALLOWED_ORIGINS:-$FRONTEND_ORIGIN}"
 TEMPLATE_DIR="$ROOT_DIR/deploy/systemd"
+FRONTEND_DIST_DIR="${FRONTEND_DIST_DIR:-$ROOT_DIR/frontend/dist}"
+AUTO_INSTALL_SYSTEM_DEPS="${AUTO_INSTALL_SYSTEM_DEPS:-1}"
+PACKAGE_MANAGER="${PACKAGE_MANAGER:-}"
 TMP_DIR="$(mktemp -d)"
 
 cleanup() {
@@ -34,6 +37,10 @@ require_command() {
     echo "Missing required command: $command_name" >&2
     exit 1
   fi
+}
+
+command_exists() {
+  command -v "$1" >/dev/null 2>&1
 }
 
 require_root() {
@@ -82,6 +89,164 @@ wait_for_url() {
   return 1
 }
 
+detect_package_manager() {
+  if [[ -n "$PACKAGE_MANAGER" ]]; then
+    return 0
+  fi
+
+  if command_exists apt-get; then
+    PACKAGE_MANAGER="apt-get"
+    return 0
+  fi
+
+  if command_exists dnf; then
+    PACKAGE_MANAGER="dnf"
+    return 0
+  fi
+
+  echo "Unable to auto-install system dependencies: supported package managers are apt-get and dnf." >&2
+  return 1
+}
+
+install_system_packages() {
+  local packages=("$@")
+
+  if [[ "${#packages[@]}" -eq 0 ]]; then
+    return 0
+  fi
+
+  detect_package_manager
+
+  case "$PACKAGE_MANAGER" in
+    apt-get)
+      echo "system: installing packages via apt-get: ${packages[*]}"
+      DEBIAN_FRONTEND=noninteractive apt-get update
+      DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "${packages[@]}"
+      ;;
+    dnf)
+      echo "system: installing packages via dnf: ${packages[*]}"
+      dnf install -y "${packages[@]}"
+      ;;
+    *)
+      echo "Unsupported package manager: $PACKAGE_MANAGER" >&2
+      return 1
+      ;;
+  esac
+}
+
+python_venv_ready() {
+  if ! command_exists "$PYTHON_BIN"; then
+    return 1
+  fi
+
+  "$PYTHON_BIN" - <<'PY' >/dev/null 2>&1
+import venv
+PY
+}
+
+append_unique() {
+  local value="$1"
+  shift
+  local existing
+  for existing in "$@"; do
+    if [[ "$existing" == "$value" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+bootstrap_system_dependencies() {
+  local packages=()
+  local frontend_needs_build=0
+
+  if [[ "$AUTO_INSTALL_SYSTEM_DEPS" != "1" ]]; then
+    echo "system: auto-install disabled; using host-provided dependencies"
+    return 0
+  fi
+
+  if ! command_exists systemctl; then
+    echo "Missing required command: systemctl" >&2
+    echo "This deployment script requires a systemd-based host." >&2
+    exit 1
+  fi
+
+  if ! command_exists install; then
+    if ! append_unique coreutils "${packages[@]}"; then
+      packages+=("coreutils")
+    fi
+  fi
+
+  if ! command_exists curl; then
+    if ! append_unique curl "${packages[@]}"; then
+      packages+=("curl")
+    fi
+  fi
+
+  if ! command_exists lsof; then
+    if ! append_unique lsof "${packages[@]}"; then
+      packages+=("lsof")
+    fi
+  fi
+
+  if ! command_exists "$PYTHON_BIN"; then
+    if [[ "$PYTHON_BIN" != "python3" ]]; then
+      echo "Missing required command: $PYTHON_BIN" >&2
+      echo "Auto-install only supports the default PYTHON_BIN=python3." >&2
+      exit 1
+    fi
+
+    if ! append_unique python3 "${packages[@]}"; then
+      packages+=("python3")
+    fi
+  fi
+
+  if [[ ! -f "$FRONTEND_DIST_DIR/index.html" ]] && ! command_exists npm; then
+    frontend_needs_build=1
+    if ! append_unique nodejs "${packages[@]}"; then
+      packages+=("nodejs")
+    fi
+    if ! append_unique npm "${packages[@]}"; then
+      packages+=("npm")
+    fi
+  fi
+
+  if ! python_venv_ready; then
+    case "${PACKAGE_MANAGER:-auto}" in
+      apt-get|auto)
+        if ! append_unique python3-venv "${packages[@]}"; then
+          packages+=("python3-venv")
+        fi
+        ;;
+      dnf)
+        if ! append_unique python3 "${packages[@]}"; then
+          packages+=("python3")
+        fi
+        ;;
+    esac
+  fi
+
+  if [[ "${#packages[@]}" -gt 0 ]]; then
+    install_system_packages "${packages[@]}"
+  fi
+
+  require_command "$PYTHON_BIN"
+  require_command curl
+  require_command lsof
+  require_command install
+  require_command systemctl
+
+  if ! python_venv_ready; then
+    echo "Python venv support is still unavailable after installing dependencies." >&2
+    exit 1
+  fi
+
+  if [[ "$frontend_needs_build" -eq 1 ]] && ! command_exists npm; then
+    echo "Frontend build is required, but npm is still unavailable after dependency installation." >&2
+    exit 1
+  fi
+}
+
 prepare_backend() {
   echo "backend: preparing virtual environment"
   "$PYTHON_BIN" -m venv "$VENV_DIR"
@@ -89,19 +254,33 @@ prepare_backend() {
 }
 
 prepare_frontend() {
-  echo "frontend: installing packages"
-  (
-    cd "$ROOT_DIR/frontend"
-    npm ci
-  )
-}
+  if command -v npm >/dev/null 2>&1; then
+    echo "frontend: installing packages"
+    (
+      cd "$ROOT_DIR/frontend"
+      npm ci
+    )
 
-build_frontend() {
-  echo "frontend: building with API base $API_BASE_URL"
-  (
-    cd "$ROOT_DIR/frontend"
-    VITE_API_BASE_URL="$API_BASE_URL" npm run build
-  )
+    if [[ -n "$API_BASE_URL" ]]; then
+      echo "frontend: building with API base $API_BASE_URL"
+    else
+      echo "frontend: building with same-origin /api proxy"
+    fi
+    (
+      cd "$ROOT_DIR/frontend"
+      VITE_API_BASE_URL="$API_BASE_URL" npm run build
+    )
+    return
+  fi
+
+  if [[ -f "$FRONTEND_DIST_DIR/index.html" ]]; then
+    echo "frontend: npm not found; using prebuilt assets from $FRONTEND_DIST_DIR"
+    return
+  fi
+
+  echo "frontend: npm not found and no prebuilt assets exist at $FRONTEND_DIST_DIR" >&2
+  echo "frontend: install npm or commit/build frontend/dist before deploying" >&2
+  exit 1
 }
 
 render_template() {
@@ -119,6 +298,7 @@ render_template() {
   FRONTEND_HOST_VALUE="$FRONTEND_HOST" \
   FRONTEND_PORT_VALUE="$FRONTEND_PORT" \
   PUBLIC_HOST_VALUE="$PUBLIC_HOST" \
+  HEALTHCHECK_HOST_VALUE="$HEALTHCHECK_HOST" \
   CORS_ALLOWED_ORIGINS_VALUE="$CORS_ALLOWED_ORIGINS" \
   BACKEND_SERVICE_NAME_VALUE="$BACKEND_SERVICE_NAME" \
   FRONTEND_SERVICE_NAME_VALUE="$FRONTEND_SERVICE_NAME" \
@@ -138,6 +318,7 @@ for key, value in {
     "__FRONTEND_HOST__": os.environ["FRONTEND_HOST_VALUE"],
     "__FRONTEND_PORT__": os.environ["FRONTEND_PORT_VALUE"],
     "__PUBLIC_HOST__": os.environ["PUBLIC_HOST_VALUE"],
+    "__HEALTHCHECK_HOST__": os.environ["HEALTHCHECK_HOST_VALUE"],
     "__CORS_ALLOWED_ORIGINS__": os.environ["CORS_ALLOWED_ORIGINS_VALUE"],
     "__BACKEND_SERVICE_NAME__": os.environ["BACKEND_SERVICE_NAME_VALUE"],
     "__FRONTEND_SERVICE_NAME__": os.environ["FRONTEND_SERVICE_NAME_VALUE"],
@@ -191,16 +372,9 @@ print_summary() {
 }
 
 require_root
-require_command "$PYTHON_BIN"
-require_command npm
-require_command curl
-require_command lsof
-require_command install
-require_command systemctl
-
+bootstrap_system_dependencies
 prepare_backend
 prepare_frontend
-build_frontend
 install_service_units
 restart_services
 print_summary

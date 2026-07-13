@@ -8,10 +8,12 @@ Type=simple
 User=__SERVICE_USER__
 Group=__SERVICE_GROUP__
 Environment="APP_ROOT=__APP_ROOT__"
+Environment="FRONTEND_DIST_DIR=__APP_ROOT__/frontend/dist"
 Environment="FRONTEND_HOST=__FRONTEND_HOST__"
 Environment="FRONTEND_PORT=__FRONTEND_PORT__"
+Environment="BACKEND_PROXY_ORIGIN=http://__HEALTHCHECK_HOST__:__BACKEND_PORT__"
 EnvironmentFile=-__ENV_FILE__
-ExecStart=/bin/bash -lc 'cd "$APP_ROOT/frontend" && exec npm exec vite preview -- --host "$FRONTEND_HOST" --port "$FRONTEND_PORT"'
+ExecStart=/bin/bash -lc 'cd "$APP_ROOT" && exec "__VENV_DIR__/bin/python" deploy/frontend_server.py'
 Restart=always
 RestartSec=5
 TimeoutStopSec=30

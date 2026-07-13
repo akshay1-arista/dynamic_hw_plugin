@@ -31,17 +31,26 @@ sudo ./deploy_production.sh
 
 It will:
 
+- auto-install missing host packages on supported distros (`apt-get` and `dnf`) unless `AUTO_INSTALL_SYSTEM_DEPS=0`
 - create or refresh `.venv-production`
 - install backend dependencies from `backend/requirements.txt`
-- run `npm ci` and `npm run build`
+- run `npm ci` and `npm run build` when `npm` is available
 - install `systemd` services for the frontend and backend
 - enable and restart the frontend on `5400`
 - enable and restart the backend on `5401`
 
-By default it builds the UI against `http://127.0.0.1:5401`. Override `PUBLIC_HOST` when the app is accessed through a server IP or DNS name:
+If the deployment host does not have `npm`, the script reuses committed or prebuilt assets from `frontend/dist`. In both modes the frontend is served by a small Python static server that proxies `/api` to the backend, so Node is not required at runtime.
+
+Set `PUBLIC_HOST` when the app is accessed through a server IP or DNS name:
 
 ```bash
 sudo PUBLIC_HOST=your-server-name ./deploy_production.sh
+```
+
+If you need to bake a different backend origin into the UI bundle instead of using the built-in `/api` proxy, set `API_BASE_URL` explicitly:
+
+```bash
+sudo API_BASE_URL=https://your-api.example.com PUBLIC_HOST=your-server-name ./deploy_production.sh
 ```
 
 The services restart automatically on crash and on reboot. After deployment:

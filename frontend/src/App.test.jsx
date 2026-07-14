@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { App } from './App.jsx';
@@ -562,7 +562,7 @@ describe('App', () => {
     await user.type(screen.getByLabelText('User email'), 'another@example.com');
     await user.click(screen.getByRole('button', { name: 'Continue' }));
 
-    expect(await screen.findByText('Dynamic Topology Engine')).toBeInTheDocument();
+    expect(await screen.findByRole('img', { name: 'Dynamic Topology Engine' })).toBeInTheDocument();
   });
 
   test('loads references and inventory', async () => {
@@ -627,6 +627,33 @@ describe('App', () => {
     expect(screen.getByText('47YP363')).toBeInTheDocument();
     expect(screen.getByText(/LAN2 GE2/)).toBeInTheDocument();
     expect(screen.getByText('reference inventory entry')).toBeInTheDocument();
+  });
+
+  test('filters inventory by available and reserved quick filters', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await screen.findAllByText('CHN 3800 HA Pair 8');
+    await chooseHardware(user, '3800', /CHN 3800 HA Pair 8/i);
+    await user.selectOptions(screen.getByLabelText('Branch'), 'branch2');
+    await user.type(screen.getByRole('combobox', { name: 'Hypervisor IP' }), '10.68.136.50');
+    await user.type(screen.getByRole('combobox', { name: 'Hypervisor interface' }), 'vmnic0');
+    await user.click(screen.getByRole('button', { name: /generate zip/i }));
+
+    await screen.findByText('By Test User');
+    const inventoryPanel = screen.getByRole('heading', { name: 'Inventory' }).closest('.panel');
+
+    await user.click(screen.getByRole('button', { name: 'Reserved' }));
+    expect(within(inventoryPanel).getAllByText('CHN 3800 HA Pair 8').length).toBeGreaterThan(0);
+    expect(within(inventoryPanel).queryByText('A01 680 Standalone')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Available' }));
+    expect(within(inventoryPanel).queryByText('CHN 3800 HA Pair 8')).not.toBeInTheDocument();
+    expect(within(inventoryPanel).getByText('A01 680 Standalone')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'All' }));
+    expect(within(inventoryPanel).getAllByText('CHN 3800 HA Pair 8').length).toBeGreaterThan(0);
+    expect(within(inventoryPanel).getByText('A01 680 Standalone')).toBeInTheDocument();
   });
 
   test('adds mapping preview and generates download result', async () => {

@@ -75,6 +75,7 @@ export function App() {
   const [previewingSwitches, setPreviewingSwitches] = useState(false);
   const [switchPreview, setSwitchPreview] = useState(null);
   const [inventorySearch, setInventorySearch] = useState('');
+  const [inventoryAvailabilityFilter, setInventoryAvailabilityFilter] = useState('all');
   const [auditSearch, setAuditSearch] = useState('');
   const [expandedHardwareId, setExpandedHardwareId] = useState('');
   const [collapsedDataCards, setCollapsedDataCards] = useState({
@@ -157,11 +158,16 @@ export function App() {
 
   const filteredHardware = useMemo(() => {
     const query = inventorySearch.trim().toLowerCase();
-    if (!query) {
-      return inventory.hardware;
-    }
-    return inventory.hardware.filter((hardware) => hardwareSearchText(hardware).includes(query));
-  }, [inventory.hardware, inventorySearch]);
+    return inventory.hardware.filter((hardware) => {
+      const matchesAvailability =
+        inventoryAvailabilityFilter === 'all' ||
+        (inventoryAvailabilityFilter === 'available' ? hardware.available : !hardware.available);
+      if (!matchesAvailability) {
+        return false;
+      }
+      return !query || hardwareSearchText(hardware).includes(query);
+    });
+  }, [inventory.hardware, inventoryAvailabilityFilter, inventorySearch]);
   const filteredAuditTrail = useMemo(() => {
     const query = auditSearch.trim().toLowerCase();
     if (!query) {
@@ -722,6 +728,29 @@ export function App() {
                 />
               </span>
             </label>
+            <div className="quickFilterRow" aria-label="Inventory quick filters" role="group">
+              <button
+                className={`quickFilterButton ${inventoryAvailabilityFilter === 'all' ? 'active' : ''}`}
+                onClick={() => setInventoryAvailabilityFilter('all')}
+                type="button"
+              >
+                All
+              </button>
+              <button
+                className={`quickFilterButton ${inventoryAvailabilityFilter === 'available' ? 'active' : ''}`}
+                onClick={() => setInventoryAvailabilityFilter('available')}
+                type="button"
+              >
+                Available
+              </button>
+              <button
+                className={`quickFilterButton ${inventoryAvailabilityFilter === 'reserved' ? 'active' : ''}`}
+                onClick={() => setInventoryAvailabilityFilter('reserved')}
+                type="button"
+              >
+                Reserved
+              </button>
+            </div>
             <div className="inventoryList">
               {filteredHardware.map((hardware) => (
                 <div key={hardware.id} className="inventoryItem">

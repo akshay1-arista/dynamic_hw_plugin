@@ -685,6 +685,27 @@ button:disabled {
   width: 100%;
 }
 
+.quickFilterRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: -2px 0 14px;
+}
+
+.quickFilterButton {
+  background: var(--surface-subtle);
+  border: 1px solid var(--border);
+  color: var(--text-soft);
+  min-height: 34px;
+  padding: 7px 12px;
+}
+
+.quickFilterButton.active {
+  background: var(--primary-soft);
+  border-color: #b9ded8;
+  color: var(--primary-strong);
+}
+
 .combobox {
   position: relative;
 }

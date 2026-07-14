@@ -3459,7 +3459,7 @@
                 "device_type": "SPIRENT",
                 "model": "virtual_regular",
                 "connections": {
-                    "ip": "10.68.141.161",
+                    "ip": "[[ spirent_chassis_ip ]]",
                     "port": 22
                 },
                 "credentials": {
@@ -3470,9 +3470,9 @@
                     "lab_server": "10.68.141.201",
                     "aion_info": {
                         "server": "https://arista.aion.viavisolutions.com",
-                        "username": "dheenadayalan.l@arista.com",
-                        "password": "Velocloud123",
-                        "workspace": "Arista Networks workspace"
+                        "username": "[[ spirent_aion_user ]]",
+                        "password": "[[ spirent_aion_password ]]",
+                        "workspace": "[[ spirent_aion_workspace ]]"
                     }
                 },
                 "interfaces": [
@@ -3480,8 +3480,8 @@
                         "name": "mgmt",
                         "type": "management",
                         "link": "mgmt",
-                        "ip": "10.68.141.161",
-                        "default_gateway": "10.68.136.1",
+                        "ip": "[[ spirent_chassis_ip ]]",
+                        "default_gateway": "[[ spirent_chassis_gw ]]",
                         "netmask": "255.255.248.0"
                     },
                     {

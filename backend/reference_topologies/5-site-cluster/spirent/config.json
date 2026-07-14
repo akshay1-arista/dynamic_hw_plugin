@@ -1764,7 +1764,6 @@
                                     "link_type": "private"
                                 },
                                 "type": "private",
-                                "wan_overlay": "disabled",
                                 "subinterfaces": [
                                     {
                                         "name": "GE5.100",

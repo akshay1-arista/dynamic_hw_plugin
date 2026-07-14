@@ -7980,9 +7980,9 @@
                     "lab_server": "10.68.141.201",
                     "aion_info": {
                         "server": "https://arista.aion.viavisolutions.com",
-                        "username": "dheenadayalan.l@arista.com",
-                        "password": "Velocloud123",
-                        "workspace": "Arista Networks workspace"
+                        "username": "[[ spirent_aion_user ]]",
+                        "password": "[[ spirent_aion_password ]]",
+                        "workspace": "[[ spirent_aion_workspace ]]"
                     }
                 },
                 "interfaces": [

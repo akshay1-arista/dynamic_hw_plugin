@@ -145,7 +145,7 @@
       "model_suffix": "640",
       "serial_number": "4RWFXC2",
       "ip_address": null,
-      "available": true,
+      "available": false,
       "ha_group_id": "ln-ha-a01-319-4rwfxc2-a01-320-g7xfxc2",
       "ha_role": "active",
       "dpdk_enabled": null,
@@ -178,7 +178,16 @@
       "switch_metadata": null,
       "lab_navigator_id": 319,
       "hypervisor_ip": null,
-      "reservation": null,
+      "reservation": {
+        "actor": {
+          "name": "Akshay Jain",
+          "email": "akshay1.jain@arista.com"
+        },
+        "reserved_at": "2026-07-14T08:02:23.269552+00:00",
+        "reason": "topology-generation",
+        "run_id": "850d61c4b291",
+        "topology_name": "5-site-cluster-spirent-hw-9d2bce"
+      },
       "notes": "Imported as HA pair from Lab Navigator active device ln-a01-319-4rwfxc2 and standby device ln-a01-320-g7xfxc2 based on matching VLAN profile. Imported from Lab Navigator rack A01, device id 319. Omitted 4 ports without VLAN-backed switch connections. Imported from Lab Navigator rack A01, device id 320. Omitted 4 ports without VLAN-backed switch connections. HA-paired in local inventory with chn-rnd-edge-640-G7XFXC2."
     },
     "ln-ha-a01-319-4rwfxc2-a01-320-g7xfxc2-standby": {
@@ -190,7 +199,7 @@
       "model_suffix": "640",
       "serial_number": "G7XFXC2",
       "ip_address": null,
-      "available": true,
+      "available": false,
       "ha_group_id": "ln-ha-a01-319-4rwfxc2-a01-320-g7xfxc2",
       "ha_role": "standby",
       "dpdk_enabled": null,
@@ -223,7 +232,16 @@
       "switch_metadata": null,
       "lab_navigator_id": 320,
       "hypervisor_ip": null,
-      "reservation": null,
+      "reservation": {
+        "actor": {
+          "name": "Akshay Jain",
+          "email": "akshay1.jain@arista.com"
+        },
+        "reserved_at": "2026-07-14T08:02:23.269552+00:00",
+        "reason": "topology-generation",
+        "run_id": "850d61c4b291",
+        "topology_name": "5-site-cluster-spirent-hw-9d2bce"
+      },
       "notes": "Imported as HA pair from Lab Navigator active device ln-a01-319-4rwfxc2 and standby device ln-a01-320-g7xfxc2 based on matching VLAN profile. Imported from Lab Navigator rack A01, device id 319. Omitted 4 ports without VLAN-backed switch connections. Imported from Lab Navigator rack A01, device id 320. Omitted 4 ports without VLAN-backed switch connections. HA-paired in local inventory with chn-rnd-edge-640-4RWFXC2."
     },
     "chn_rnd_sw_3048_j8vsg02": {
@@ -339,7 +357,7 @@
       "model_suffix": "3800",
       "serial_number": "DGD10Q2",
       "ip_address": null,
-      "available": true,
+      "available": false,
       "ha_group_id": "ln-ha-a01-327-dgd10q2-a01-328-16c10q2",
       "ha_role": "active",
       "dpdk_enabled": null,
@@ -372,7 +390,16 @@
       "switch_metadata": null,
       "lab_navigator_id": 327,
       "hypervisor_ip": null,
-      "reservation": null,
+      "reservation": {
+        "actor": {
+          "name": "Akshay Jain",
+          "email": "akshay1.jain@arista.com"
+        },
+        "reserved_at": "2026-07-14T08:02:23.269608+00:00",
+        "reason": "topology-generation",
+        "run_id": "850d61c4b291",
+        "topology_name": "5-site-cluster-spirent-hw-9d2bce"
+      },
       "notes": "Imported from Lab Navigator rack A01, device id 327. HA-paired in local inventory with chn-rnd-edge-3800-16C10Q2."
     },
     "ln-ha-a01-327-dgd10q2-a01-328-16c10q2-standby": {
@@ -384,7 +411,7 @@
       "model_suffix": "3800",
       "serial_number": "16C10Q2",
       "ip_address": null,
-      "available": true,
+      "available": false,
       "ha_group_id": "ln-ha-a01-327-dgd10q2-a01-328-16c10q2",
       "ha_role": "standby",
       "dpdk_enabled": null,
@@ -417,7 +444,16 @@
       "switch_metadata": null,
       "lab_navigator_id": 328,
       "hypervisor_ip": null,
-      "reservation": null,
+      "reservation": {
+        "actor": {
+          "name": "Akshay Jain",
+          "email": "akshay1.jain@arista.com"
+        },
+        "reserved_at": "2026-07-14T08:02:23.269608+00:00",
+        "reason": "topology-generation",
+        "run_id": "850d61c4b291",
+        "topology_name": "5-site-cluster-spirent-hw-9d2bce"
+      },
       "notes": "Imported from Lab Navigator rack A01, device id 328. HA-paired in local inventory with chn-rnd-edge-3800-DGD10Q2."
     },
     "chn_rnd_sw_3048_j8f10q2": {
@@ -587,7 +623,7 @@
       "model_suffix": "540",
       "serial_number": "VC05400003126",
       "ip_address": null,
-      "available": true,
+      "available": false,
       "ha_group_id": "ln-ha-a01-331-vc05400003126-a01-332-vc05400007099",
       "ha_role": "active",
       "dpdk_enabled": null,
@@ -620,7 +656,16 @@
       "switch_metadata": null,
       "lab_navigator_id": 331,
       "hypervisor_ip": null,
-      "reservation": null,
+      "reservation": {
+        "actor": {
+          "name": "Akshay Jain",
+          "email": "akshay1.jain@arista.com"
+        },
+        "reserved_at": "2026-07-14T08:02:23.269620+00:00",
+        "reason": "topology-generation",
+        "run_id": "850d61c4b291",
+        "topology_name": "5-site-cluster-spirent-hw-9d2bce"
+      },
       "notes": "Imported as HA pair from Lab Navigator active device ln-a01-331-vc05400003126 and standby device ln-a01-332-vc05400007099 based on matching VLAN profile. Imported from Lab Navigator rack A01, device id 331. Omitted 9 ports without VLAN-backed switch connections. Imported from Lab Navigator rack A01, device id 332. Omitted 9 ports without VLAN-backed switch connections. HA-paired in local inventory with chn-rnd-edge-540-0007099."
     },
     "ln-ha-a01-331-vc05400003126-a01-332-vc05400007099-standby": {
@@ -632,7 +677,7 @@
       "model_suffix": "540",
       "serial_number": "VC05400007099",
       "ip_address": null,
-      "available": true,
+      "available": false,
       "ha_group_id": "ln-ha-a01-331-vc05400003126-a01-332-vc05400007099",
       "ha_role": "standby",
       "dpdk_enabled": null,
@@ -665,7 +710,16 @@
       "switch_metadata": null,
       "lab_navigator_id": 332,
       "hypervisor_ip": null,
-      "reservation": null,
+      "reservation": {
+        "actor": {
+          "name": "Akshay Jain",
+          "email": "akshay1.jain@arista.com"
+        },
+        "reserved_at": "2026-07-14T08:02:23.269620+00:00",
+        "reason": "topology-generation",
+        "run_id": "850d61c4b291",
+        "topology_name": "5-site-cluster-spirent-hw-9d2bce"
+      },
       "notes": "Imported as HA pair from Lab Navigator active device ln-a01-331-vc05400003126 and standby device ln-a01-332-vc05400007099 based on matching VLAN profile. Imported from Lab Navigator rack A01, device id 331. Omitted 9 ports without VLAN-backed switch connections. Imported from Lab Navigator rack A01, device id 332. Omitted 9 ports without VLAN-backed switch connections. HA-paired in local inventory with chn-rnd-edge-540-0003126."
     },
     "ln-ha-a01-333-vc05200000142-a01-334-vc05200003323-active": {
@@ -899,7 +953,7 @@
       "model_suffix": "610",
       "serial_number": "GQ25V43",
       "ip_address": null,
-      "available": true,
+      "available": false,
       "ha_group_id": "ln-ha-a01-341-gq25v43-a01-342-cs5npk2",
       "ha_role": "active",
       "dpdk_enabled": null,
@@ -932,7 +986,16 @@
       "switch_metadata": null,
       "lab_navigator_id": 341,
       "hypervisor_ip": null,
-      "reservation": null,
+      "reservation": {
+        "actor": {
+          "name": "Akshay Jain",
+          "email": "akshay1.jain@arista.com"
+        },
+        "reserved_at": "2026-07-14T08:02:23.269630+00:00",
+        "reason": "topology-generation",
+        "run_id": "850d61c4b291",
+        "topology_name": "5-site-cluster-spirent-hw-9d2bce"
+      },
       "notes": "Imported as HA pair from Lab Navigator active device ln-a01-341-gq25v43 and standby device ln-a01-342-cs5npk2 based on matching VLAN profile. Imported from Lab Navigator rack A01, device id 341. Omitted 5 ports without VLAN-backed switch connections. Imported from Lab Navigator rack A01, device id 342. Omitted 5 ports without VLAN-backed switch connections. HA-paired in local inventory with chn-rnd-edge-610-CS5NPK2."
     },
     "ln-ha-a01-341-gq25v43-a01-342-cs5npk2-standby": {
@@ -944,7 +1007,7 @@
       "model_suffix": "610",
       "serial_number": "CS5NPK2",
       "ip_address": null,
-      "available": true,
+      "available": false,
       "ha_group_id": "ln-ha-a01-341-gq25v43-a01-342-cs5npk2",
       "ha_role": "standby",
       "dpdk_enabled": null,
@@ -977,7 +1040,16 @@
       "switch_metadata": null,
       "lab_navigator_id": 342,
       "hypervisor_ip": null,
-      "reservation": null,
+      "reservation": {
+        "actor": {
+          "name": "Akshay Jain",
+          "email": "akshay1.jain@arista.com"
+        },
+        "reserved_at": "2026-07-14T08:02:23.269630+00:00",
+        "reason": "topology-generation",
+        "run_id": "850d61c4b291",
+        "topology_name": "5-site-cluster-spirent-hw-9d2bce"
+      },
       "notes": "Imported as HA pair from Lab Navigator active device ln-a01-341-gq25v43 and standby device ln-a01-342-cs5npk2 based on matching VLAN profile. Imported from Lab Navigator rack A01, device id 341. Omitted 5 ports without VLAN-backed switch connections. Imported from Lab Navigator rack A01, device id 342. Omitted 5 ports without VLAN-backed switch connections. HA-paired in local inventory with chn-rnd-edge-610-GQ25V43."
     },
     "chn_rnd_sw_3048_6g900q2": {
@@ -1508,7 +1580,7 @@
       "model_suffix": "720",
       "serial_number": "246218457",
       "ip_address": null,
-      "available": true,
+      "available": false,
       "ha_group_id": "ln-ha-a02-312-246218457-a02-313-246218453",
       "ha_role": "active",
       "dpdk_enabled": null,
@@ -1541,7 +1613,16 @@
       "switch_metadata": null,
       "lab_navigator_id": 312,
       "hypervisor_ip": null,
-      "reservation": null,
+      "reservation": {
+        "actor": {
+          "name": "Akshay Jain",
+          "email": "akshay1.jain@arista.com"
+        },
+        "reserved_at": "2026-07-14T08:02:23.269639+00:00",
+        "reason": "topology-generation",
+        "run_id": "850d61c4b291",
+        "topology_name": "5-site-cluster-spirent-hw-9d2bce"
+      },
       "notes": "Manually updated as HA pair from supplied connection table. Active device ln-a02-312-246218457 and standby device ln-a02-313-246218453 use matching VLAN profiles. GE6 and SFP2 are not connected. Imported from Lab Navigator rack A02, device id 312. HA-paired in local inventory with chn-rnd-edge-720-6218453."
     },
     "ln-a02-313-246218453": {
@@ -1553,7 +1634,7 @@
       "model_suffix": "720",
       "serial_number": "246218453",
       "ip_address": null,
-      "available": true,
+      "available": false,
       "ha_group_id": "ln-ha-a02-312-246218457-a02-313-246218453",
       "ha_role": "standby",
       "dpdk_enabled": null,
@@ -1586,7 +1667,16 @@
       "switch_metadata": null,
       "lab_navigator_id": 313,
       "hypervisor_ip": null,
-      "reservation": null,
+      "reservation": {
+        "actor": {
+          "name": "Akshay Jain",
+          "email": "akshay1.jain@arista.com"
+        },
+        "reserved_at": "2026-07-14T08:02:23.269639+00:00",
+        "reason": "topology-generation",
+        "run_id": "850d61c4b291",
+        "topology_name": "5-site-cluster-spirent-hw-9d2bce"
+      },
       "notes": "Manually updated as HA pair from supplied connection table. Active device ln-a02-312-246218457 and standby device ln-a02-313-246218453 use matching VLAN profiles. GE6 and SFP2 are not connected. Imported from Lab Navigator rack A02, device id 313. HA-paired in local inventory with chn-rnd-edge-720-6218457."
     },
     "ln-a02-343-gsea187565": {
@@ -2550,6 +2640,216 @@
       "hypervisor_ip": null,
       "reservation": null,
       "notes": "Imported from Lab Navigator rack A02, device id 853. HA-paired in local inventory with chn-rnd-edge-610-4D25PK2."
+    },
+    "ln_a01_851_edge_150q363": {
+      "id": "ln_a01_851_edge_150q363",
+      "type": "edge",
+      "display_name": "chn-rnd-edge-3800-150Q363",
+      "short_name": null,
+      "model": "edge3X00",
+      "model_suffix": "3800",
+      "serial_number": "150Q363",
+      "ip_address": null,
+      "available": false,
+      "ha_group_id": "user-ha-chn_rnd_edge_3800_150q363-chn_rnd_edge_3800_f4z00q2",
+      "ha_role": "active",
+      "dpdk_enabled": null,
+      "free_vlans": [],
+      "vlan_range": null,
+      "switch_metadata": null,
+      "lab_navigator_id": 851,
+      "hypervisor_ip": null,
+      "reservation": null,
+      "notes": "Imported from Lab Navigator rack A01, device id 851. HA-paired in local inventory with chn-rnd-edge-3800-F4Z00Q2."
+    },
+    "ln_a01_782_edge_f4z00q2": {
+      "id": "ln_a01_782_edge_f4z00q2",
+      "type": "edge",
+      "display_name": "chn-rnd-edge-3800-F4Z00Q2",
+      "short_name": null,
+      "model": "edge3X00",
+      "model_suffix": "3800",
+      "serial_number": "F4Z00Q2",
+      "ip_address": null,
+      "available": false,
+      "ha_group_id": "user-ha-chn_rnd_edge_3800_150q363-chn_rnd_edge_3800_f4z00q2",
+      "ha_role": "standby",
+      "dpdk_enabled": null,
+      "free_vlans": [],
+      "vlan_range": null,
+      "switch_metadata": null,
+      "lab_navigator_id": 782,
+      "hypervisor_ip": null,
+      "reservation": null,
+      "notes": "Imported from Lab Navigator rack A01, device id 782. HA-paired in local inventory with chn-rnd-edge-3800-150Q363."
+    },
+    "ln_rack_849_edge_246218429": {
+      "id": "ln_rack_849_edge_246218429",
+      "type": "edge",
+      "display_name": "chn-rnd-edge-740-6218429",
+      "short_name": null,
+      "model": "edge7X0",
+      "model_suffix": "740",
+      "serial_number": "246218429",
+      "ip_address": null,
+      "available": true,
+      "ha_group_id": "user-ha-chn_rnd_edge_740_6218429-chn_rnd_edge_740_6218430",
+      "ha_role": "active",
+      "dpdk_enabled": null,
+      "free_vlans": [],
+      "vlan_range": null,
+      "switch_metadata": null,
+      "lab_navigator_id": 849,
+      "hypervisor_ip": null,
+      "reservation": null,
+      "notes": "Imported from Lab Navigator rack , device id 849. HA-paired in local inventory with chn-rnd-edge-740-6218430."
+    },
+    "ln_rack_850_edge_246218430": {
+      "id": "ln_rack_850_edge_246218430",
+      "type": "edge",
+      "display_name": "chn-rnd-edge-740-6218430",
+      "short_name": null,
+      "model": "edge7X0",
+      "model_suffix": "740",
+      "serial_number": "246218430",
+      "ip_address": null,
+      "available": true,
+      "ha_group_id": "user-ha-chn_rnd_edge_740_6218429-chn_rnd_edge_740_6218430",
+      "ha_role": "standby",
+      "dpdk_enabled": null,
+      "free_vlans": [],
+      "vlan_range": null,
+      "switch_metadata": null,
+      "lab_navigator_id": 850,
+      "hypervisor_ip": null,
+      "reservation": null,
+      "notes": "Imported from Lab Navigator rack , device id 850. HA-paired in local inventory with chn-rnd-edge-740-6218429."
+    },
+    "ln_a01_854_edge_6c6npk2": {
+      "id": "ln_a01_854_edge_6c6npk2",
+      "type": "edge",
+      "display_name": "chn-rnd-edge-610-6C6NPK2",
+      "short_name": null,
+      "model": "edge6X0",
+      "model_suffix": "610",
+      "serial_number": "6C6NPK2",
+      "ip_address": null,
+      "available": false,
+      "ha_group_id": "user-ha-chn_rnd_edge_610_6c6npk2-chn_rnd_edge_610_1b6npk2",
+      "ha_role": "active",
+      "dpdk_enabled": null,
+      "free_vlans": [],
+      "vlan_range": null,
+      "switch_metadata": null,
+      "lab_navigator_id": 854,
+      "hypervisor_ip": null,
+      "reservation": null,
+      "notes": "Imported from Lab Navigator rack A01, device id 854. HA-paired in local inventory with chn-rnd-edge-610-1B6NPK2."
+    },
+    "ln_a01_855_edge_1b6npk2": {
+      "id": "ln_a01_855_edge_1b6npk2",
+      "type": "edge",
+      "display_name": "chn-rnd-edge-610-1B6NPK2",
+      "short_name": null,
+      "model": "edge6X0",
+      "model_suffix": "610",
+      "serial_number": "1B6NPK2",
+      "ip_address": null,
+      "available": false,
+      "ha_group_id": "user-ha-chn_rnd_edge_610_6c6npk2-chn_rnd_edge_610_1b6npk2",
+      "ha_role": "standby",
+      "dpdk_enabled": null,
+      "free_vlans": [],
+      "vlan_range": null,
+      "switch_metadata": null,
+      "lab_navigator_id": 855,
+      "hypervisor_ip": null,
+      "reservation": null,
+      "notes": "Imported from Lab Navigator rack A01, device id 855. HA-paired in local inventory with chn-rnd-edge-610-6C6NPK2."
+    },
+    "ln_a01_856_edge_gtt6v43": {
+      "id": "ln_a01_856_edge_gtt6v43",
+      "type": "edge",
+      "display_name": "chn-rnd-edge-640-GTT6V43",
+      "short_name": null,
+      "model": "edge6X0",
+      "model_suffix": "640",
+      "serial_number": "GTT6V43",
+      "ip_address": null,
+      "available": false,
+      "ha_group_id": "user-ha-chn_rnd_edge_640_gtt6v43-chn_rnd_edge_640_f4v6v43",
+      "ha_role": "active",
+      "dpdk_enabled": null,
+      "free_vlans": [],
+      "vlan_range": null,
+      "switch_metadata": null,
+      "lab_navigator_id": 856,
+      "hypervisor_ip": null,
+      "reservation": null,
+      "notes": "Imported from Lab Navigator rack A01, device id 856. HA-paired in local inventory with chn-rnd-edge-640-F4V6V43."
+    },
+    "ln_a01_857_edge_f4v6v43": {
+      "id": "ln_a01_857_edge_f4v6v43",
+      "type": "edge",
+      "display_name": "chn-rnd-edge-640-F4V6V43",
+      "short_name": null,
+      "model": "edge6X0",
+      "model_suffix": "640",
+      "serial_number": "F4V6V43",
+      "ip_address": null,
+      "available": true,
+      "ha_group_id": "user-ha-chn_rnd_edge_640_gtt6v43-chn_rnd_edge_640_f4v6v43",
+      "ha_role": "standby",
+      "dpdk_enabled": null,
+      "free_vlans": [],
+      "vlan_range": null,
+      "switch_metadata": null,
+      "lab_navigator_id": 857,
+      "hypervisor_ip": null,
+      "reservation": null,
+      "notes": "Imported from Lab Navigator rack A01, device id 857. HA-paired in local inventory with chn-rnd-edge-640-GTT6V43."
+    },
+    "ln_rack_484_edge_246208335": {
+      "id": "ln_rack_484_edge_246208335",
+      "type": "edge",
+      "display_name": "chn-rnd-edge-7105-6208335",
+      "short_name": null,
+      "model": "VeloCloud-7105g",
+      "model_suffix": "7105g",
+      "serial_number": "246208335",
+      "ip_address": null,
+      "available": true,
+      "ha_group_id": "user-ha-chn_rnd_edge_7105_6208335-chn_rnd_edge_7105_6208321",
+      "ha_role": "active",
+      "dpdk_enabled": null,
+      "free_vlans": [],
+      "vlan_range": null,
+      "switch_metadata": null,
+      "lab_navigator_id": 484,
+      "hypervisor_ip": null,
+      "reservation": null,
+      "notes": "Imported from Lab Navigator rack , device id 484. HA-paired in local inventory with chn-rnd-edge-7105-6208321."
+    },
+    "ln_rack_485_edge_246208321": {
+      "id": "ln_rack_485_edge_246208321",
+      "type": "edge",
+      "display_name": "chn-rnd-edge-7105-6208321",
+      "short_name": null,
+      "model": "VeloCloud-7105g",
+      "model_suffix": "7105g",
+      "serial_number": "246208321",
+      "ip_address": null,
+      "available": true,
+      "ha_group_id": "user-ha-chn_rnd_edge_7105_6208335-chn_rnd_edge_7105_6208321",
+      "ha_role": "standby",
+      "dpdk_enabled": null,
+      "free_vlans": [],
+      "vlan_range": null,
+      "switch_metadata": null,
+      "lab_navigator_id": 485,
+      "hypervisor_ip": null,
+      "reservation": null,
+      "notes": "Imported from Lab Navigator rack , device id 485. HA-paired in local inventory with chn-rnd-edge-7105-6208335."
     }
   },
   "connections": [
@@ -3402,134 +3702,6 @@
       "notes": null
     },
     {
-      "id": "ln-ha-a01-333-vc05200000142-a01-334-vc05200003323-active-GE1-chn_rnd_sw_3048_73v00q2",
-      "a": {
-        "device_id": "ln-ha-a01-333-vc05200000142-a01-334-vc05200003323-active",
-        "interface": "GE1"
-      },
-      "b": {
-        "device_id": "chn_rnd_sw_3048_73v00q2",
-        "interface": "gigabitethernet1/23"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": null,
-      "notes": null
-    },
-    {
-      "id": "ln-ha-a01-333-vc05200000142-a01-334-vc05200003323-standby-GE1-chn_rnd_sw_3048_73v00q2",
-      "a": {
-        "device_id": "ln-ha-a01-333-vc05200000142-a01-334-vc05200003323-standby",
-        "interface": "GE1"
-      },
-      "b": {
-        "device_id": "chn_rnd_sw_3048_73v00q2",
-        "interface": "gigabitethernet1/27"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": null,
-      "notes": null
-    },
-    {
-      "id": "ln-ha-a01-333-vc05200000142-a01-334-vc05200003323-active-GE2-chn_rnd_sw_3048_73v00q2",
-      "a": {
-        "device_id": "ln-ha-a01-333-vc05200000142-a01-334-vc05200003323-active",
-        "interface": "GE2"
-      },
-      "b": {
-        "device_id": "chn_rnd_sw_3048_73v00q2",
-        "interface": "gigabitethernet1/24"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": null,
-      "notes": null
-    },
-    {
-      "id": "ln-ha-a01-333-vc05200000142-a01-334-vc05200003323-standby-GE2-chn_rnd_sw_3048_73v00q2",
-      "a": {
-        "device_id": "ln-ha-a01-333-vc05200000142-a01-334-vc05200003323-standby",
-        "interface": "GE2"
-      },
-      "b": {
-        "device_id": "chn_rnd_sw_3048_73v00q2",
-        "interface": "gigabitethernet1/28"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": null,
-      "notes": null
-    },
-    {
-      "id": "ln-ha-a01-333-vc05200000142-a01-334-vc05200003323-active-LAN1-chn_rnd_sw_3048_73v00q2",
-      "a": {
-        "device_id": "ln-ha-a01-333-vc05200000142-a01-334-vc05200003323-active",
-        "interface": "LAN1"
-      },
-      "b": {
-        "device_id": "chn_rnd_sw_3048_73v00q2",
-        "interface": "gigabitethernet1/21"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": null,
-      "notes": null
-    },
-    {
-      "id": "ln-ha-a01-333-vc05200000142-a01-334-vc05200003323-standby-LAN1-chn_rnd_sw_3048_73v00q2",
-      "a": {
-        "device_id": "ln-ha-a01-333-vc05200000142-a01-334-vc05200003323-standby",
-        "interface": "LAN1"
-      },
-      "b": {
-        "device_id": "chn_rnd_sw_3048_73v00q2",
-        "interface": "gigabitethernet1/25"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": null,
-      "notes": null
-    },
-    {
-      "id": "ln-ha-a01-333-vc05200000142-a01-334-vc05200003323-active-LAN2-chn_rnd_sw_3048_73v00q2",
-      "a": {
-        "device_id": "ln-ha-a01-333-vc05200000142-a01-334-vc05200003323-active",
-        "interface": "LAN2"
-      },
-      "b": {
-        "device_id": "chn_rnd_sw_3048_73v00q2",
-        "interface": "gigabitethernet1/22"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": null,
-      "notes": null
-    },
-    {
-      "id": "ln-ha-a01-333-vc05200000142-a01-334-vc05200003323-standby-LAN2-chn_rnd_sw_3048_73v00q2",
-      "a": {
-        "device_id": "ln-ha-a01-333-vc05200000142-a01-334-vc05200003323-standby",
-        "interface": "LAN2"
-      },
-      "b": {
-        "device_id": "chn_rnd_sw_3048_73v00q2",
-        "interface": "gigabitethernet1/26"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": null,
-      "notes": null
-    },
-    {
       "id": "ln-ha-a01-335-vc05100000127-a01-336-vco5100000124-active-GE1-chn_rnd_sw_3048_73v00q2",
       "a": {
         "device_id": "ln-ha-a01-335-vc05100000127-a01-336-vco5100000124-active",
@@ -3672,178 +3844,6 @@
       ],
       "tagged_vlans": [],
       "untagged_vlan": 1,
-      "role": null,
-      "notes": null
-    },
-    {
-      "id": "ln-ha-a01-337-vce08400000028-a01-338-vce08400000448-standby-GE1-chn_rnd_sw_3048_73v00q2",
-      "a": {
-        "device_id": "ln-ha-a01-337-vce08400000028-a01-338-vce08400000448-standby",
-        "interface": "GE1"
-      },
-      "b": {
-        "device_id": "chn_rnd_sw_3048_73v00q2",
-        "interface": "gigabitethernet1/16"
-      },
-      "vlans": [
-        1
-      ],
-      "tagged_vlans": [],
-      "untagged_vlan": 1,
-      "role": null,
-      "notes": null
-    },
-    {
-      "id": "ln-ha-a01-337-vce08400000028-a01-338-vce08400000448-active-GE2-chn_rnd_sw_3048_73v00q2",
-      "a": {
-        "device_id": "ln-ha-a01-337-vce08400000028-a01-338-vce08400000448-active",
-        "interface": "GE2"
-      },
-      "b": {
-        "device_id": "chn_rnd_sw_3048_73v00q2",
-        "interface": "gigabitethernet1/12"
-      },
-      "vlans": [
-        202,
-        203,
-        204
-      ],
-      "tagged_vlans": [
-        203,
-        204
-      ],
-      "untagged_vlan": 202,
-      "role": null,
-      "notes": null
-    },
-    {
-      "id": "ln-ha-a01-337-vce08400000028-a01-338-vce08400000448-standby-GE2-chn_rnd_sw_3048_73v00q2",
-      "a": {
-        "device_id": "ln-ha-a01-337-vce08400000028-a01-338-vce08400000448-standby",
-        "interface": "GE2"
-      },
-      "b": {
-        "device_id": "chn_rnd_sw_3048_73v00q2",
-        "interface": "gigabitethernet1/17"
-      },
-      "vlans": [
-        202,
-        203,
-        204
-      ],
-      "tagged_vlans": [
-        203,
-        204
-      ],
-      "untagged_vlan": 202,
-      "role": null,
-      "notes": null
-    },
-    {
-      "id": "ln-ha-a01-337-vce08400000028-a01-338-vce08400000448-active-GE3-chn_rnd_sw_3048_73v00q2",
-      "a": {
-        "device_id": "ln-ha-a01-337-vce08400000028-a01-338-vce08400000448-active",
-        "interface": "GE3"
-      },
-      "b": {
-        "device_id": "chn_rnd_sw_3048_73v00q2",
-        "interface": "gigabitethernet1/15"
-      },
-      "vlans": [
-        207
-      ],
-      "tagged_vlans": [],
-      "untagged_vlan": 207,
-      "role": null,
-      "notes": null
-    },
-    {
-      "id": "ln-ha-a01-337-vce08400000028-a01-338-vce08400000448-standby-GE3-chn_rnd_sw_3048_73v00q2",
-      "a": {
-        "device_id": "ln-ha-a01-337-vce08400000028-a01-338-vce08400000448-standby",
-        "interface": "GE3"
-      },
-      "b": {
-        "device_id": "chn_rnd_sw_3048_73v00q2",
-        "interface": "gigabitethernet1/20"
-      },
-      "vlans": [
-        207
-      ],
-      "tagged_vlans": [],
-      "untagged_vlan": 207,
-      "role": null,
-      "notes": null
-    },
-    {
-      "id": "ln-ha-a01-337-vce08400000028-a01-338-vce08400000448-active-GE5-chn_rnd_sw_3048_73v00q2",
-      "a": {
-        "device_id": "ln-ha-a01-337-vce08400000028-a01-338-vce08400000448-active",
-        "interface": "GE5"
-      },
-      "b": {
-        "device_id": "chn_rnd_sw_3048_73v00q2",
-        "interface": "gigabitethernet1/13"
-      },
-      "vlans": [
-        205
-      ],
-      "tagged_vlans": [],
-      "untagged_vlan": 205,
-      "role": null,
-      "notes": null
-    },
-    {
-      "id": "ln-ha-a01-337-vce08400000028-a01-338-vce08400000448-standby-GE5-chn_rnd_sw_3048_73v00q2",
-      "a": {
-        "device_id": "ln-ha-a01-337-vce08400000028-a01-338-vce08400000448-standby",
-        "interface": "GE5"
-      },
-      "b": {
-        "device_id": "chn_rnd_sw_3048_73v00q2",
-        "interface": "gigabitethernet1/18"
-      },
-      "vlans": [
-        205
-      ],
-      "tagged_vlans": [],
-      "untagged_vlan": 205,
-      "role": null,
-      "notes": null
-    },
-    {
-      "id": "ln-ha-a01-337-vce08400000028-a01-338-vce08400000448-active-GE6-chn_rnd_sw_3048_73v00q2",
-      "a": {
-        "device_id": "ln-ha-a01-337-vce08400000028-a01-338-vce08400000448-active",
-        "interface": "GE6"
-      },
-      "b": {
-        "device_id": "chn_rnd_sw_3048_73v00q2",
-        "interface": "gigabitethernet1/14"
-      },
-      "vlans": [
-        206
-      ],
-      "tagged_vlans": [],
-      "untagged_vlan": 206,
-      "role": null,
-      "notes": null
-    },
-    {
-      "id": "ln-ha-a01-337-vce08400000028-a01-338-vce08400000448-standby-GE6-chn_rnd_sw_3048_73v00q2",
-      "a": {
-        "device_id": "ln-ha-a01-337-vce08400000028-a01-338-vce08400000448-standby",
-        "interface": "GE6"
-      },
-      "b": {
-        "device_id": "chn_rnd_sw_3048_73v00q2",
-        "interface": "gigabitethernet1/19"
-      },
-      "vlans": [
-        206
-      ],
-      "tagged_vlans": [],
-      "untagged_vlan": 206,
       "role": null,
       "notes": null
     },
@@ -4024,22 +4024,6 @@
       "notes": null
     },
     {
-      "id": "ln-ha-a02-314-236254370-a02-315-236254372-standby-GE1-chn_rnd_sw_3048_fctd9z2",
-      "a": {
-        "device_id": "ln-ha-a02-314-236254370-a02-315-236254372-standby",
-        "interface": "GE1"
-      },
-      "b": {
-        "device_id": "chn_rnd_sw_3048_fctd9z2",
-        "interface": "gigabitethernet1/21"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": null,
-      "notes": null
-    },
-    {
       "id": "ln-ha-a02-314-236254370-a02-315-236254372-active-GE2-chn_rnd_sw_3048_fctd9z2",
       "a": {
         "device_id": "ln-ha-a02-314-236254370-a02-315-236254372-active",
@@ -4048,22 +4032,6 @@
       "b": {
         "device_id": "chn_rnd_sw_3048_fctd9z2",
         "interface": "gigabitethernet1/17"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": null,
-      "notes": null
-    },
-    {
-      "id": "ln-ha-a02-314-236254370-a02-315-236254372-standby-GE2-chn_rnd_sw_3048_fctd9z2",
-      "a": {
-        "device_id": "ln-ha-a02-314-236254370-a02-315-236254372-standby",
-        "interface": "GE2"
-      },
-      "b": {
-        "device_id": "chn_rnd_sw_3048_fctd9z2",
-        "interface": "gigabitethernet1/22"
       },
       "vlans": [],
       "tagged_vlans": [],
@@ -4088,22 +4056,6 @@
       "notes": null
     },
     {
-      "id": "ln-ha-a02-314-236254370-a02-315-236254372-standby-GE3-chn_rnd_sw_3048_fctd9z2",
-      "a": {
-        "device_id": "ln-ha-a02-314-236254370-a02-315-236254372-standby",
-        "interface": "GE3"
-      },
-      "b": {
-        "device_id": "chn_rnd_sw_3048_fctd9z2",
-        "interface": "gigabitethernet1/23"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": null,
-      "notes": null
-    },
-    {
       "id": "ln-ha-a02-314-236254370-a02-315-236254372-active-GE4-chn_rnd_sw_3048_fctd9z2",
       "a": {
         "device_id": "ln-ha-a02-314-236254370-a02-315-236254372-active",
@@ -4112,22 +4064,6 @@
       "b": {
         "device_id": "chn_rnd_sw_3048_fctd9z2",
         "interface": "gigabitethernet1/19"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": null,
-      "notes": null
-    },
-    {
-      "id": "ln-ha-a02-314-236254370-a02-315-236254372-standby-GE4-chn_rnd_sw_3048_fctd9z2",
-      "a": {
-        "device_id": "ln-ha-a02-314-236254370-a02-315-236254372-standby",
-        "interface": "GE4"
-      },
-      "b": {
-        "device_id": "chn_rnd_sw_3048_fctd9z2",
-        "interface": "gigabitethernet1/24"
       },
       "vlans": [],
       "tagged_vlans": [],
@@ -4150,102 +4086,6 @@
       "untagged_vlan": null,
       "role": null,
       "notes": "Imported from Lab Navigator connection id 2989; VLAN metadata was empty."
-    },
-    {
-      "id": "ln-ha-a02-314-236254370-a02-315-236254372-standby-SFP1-chn_rnd_sw_3048_fctd9z2",
-      "a": {
-        "device_id": "ln-ha-a02-314-236254370-a02-315-236254372-standby",
-        "interface": "SFP1"
-      },
-      "b": {
-        "device_id": "chn_rnd_sw_3048_fctd9z2",
-        "interface": "gigabitethernet1/25"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": null,
-      "notes": "Imported from Lab Navigator connection id 3125; VLAN metadata was empty."
-    },
-    {
-      "id": "ln-a01-318-1kxfxc2-GE1-chn_rnd_sw_3048_j8f10q2",
-      "a": {
-        "device_id": "ln-a01-318-1kxfxc2",
-        "interface": "GE1"
-      },
-      "b": {
-        "device_id": "chn_rnd_sw_3048_j8f10q2",
-        "interface": "gigabitethernet1/11"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": null,
-      "notes": null
-    },
-    {
-      "id": "ln-a01-318-1kxfxc2-GE2-chn_rnd_sw_3048_j8f10q2",
-      "a": {
-        "device_id": "ln-a01-318-1kxfxc2",
-        "interface": "GE2"
-      },
-      "b": {
-        "device_id": "chn_rnd_sw_3048_j8f10q2",
-        "interface": "gigabitethernet1/12"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": null,
-      "notes": null
-    },
-    {
-      "id": "ln-a01-318-1kxfxc2-GE3-chn_rnd_sw_3048_j8f10q2",
-      "a": {
-        "device_id": "ln-a01-318-1kxfxc2",
-        "interface": "GE3"
-      },
-      "b": {
-        "device_id": "chn_rnd_sw_3048_j8f10q2",
-        "interface": "gigabitethernet1/15"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": null,
-      "notes": null
-    },
-    {
-      "id": "ln-a01-318-1kxfxc2-GE5-chn_rnd_sw_3048_j8f10q2",
-      "a": {
-        "device_id": "ln-a01-318-1kxfxc2",
-        "interface": "GE5"
-      },
-      "b": {
-        "device_id": "chn_rnd_sw_3048_j8f10q2",
-        "interface": "gigabitethernet1/13"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": null,
-      "notes": null
-    },
-    {
-      "id": "ln-a01-318-1kxfxc2-GE6-chn_rnd_sw_3048_j8f10q2",
-      "a": {
-        "device_id": "ln-a01-318-1kxfxc2",
-        "interface": "GE6"
-      },
-      "b": {
-        "device_id": "chn_rnd_sw_3048_j8f10q2",
-        "interface": "gigabitethernet1/14"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": null,
-      "notes": null
     },
     {
       "id": "ln-a01-321-90wfxc2-GE1-chn_rnd_sw_3048_j8vsg02",
@@ -4824,38 +4664,6 @@
       "notes": null
     },
     {
-      "id": "ln-a02-345-2437000011-GE1-chn_rnd_sw_3048_j8f10q2",
-      "a": {
-        "device_id": "ln-a02-345-2437000011",
-        "interface": "GE1"
-      },
-      "b": {
-        "device_id": "chn_rnd_sw_3048_j8f10q2",
-        "interface": "gigabitethernet1/31"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": null,
-      "notes": null
-    },
-    {
-      "id": "ln-a02-345-2437000011-GE2-chn_rnd_sw_3048_j8f10q2",
-      "a": {
-        "device_id": "ln-a02-345-2437000011",
-        "interface": "GE2"
-      },
-      "b": {
-        "device_id": "chn_rnd_sw_3048_j8f10q2",
-        "interface": "gigabitethernet1/32"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": null,
-      "notes": null
-    },
-    {
       "id": "ln-a02-345-2437000011-SFP1-chn_rnd_sw_3048_j8f10q2",
       "a": {
         "device_id": "ln-a02-345-2437000011",
@@ -4888,38 +4696,6 @@
       "notes": null
     },
     {
-      "id": "ln-a02-346-2437000010-GE1-chn_rnd_sw_3048_j8f10q2",
-      "a": {
-        "device_id": "ln-a02-346-2437000010",
-        "interface": "GE1"
-      },
-      "b": {
-        "device_id": "chn_rnd_sw_3048_j8f10q2",
-        "interface": "gigabitethernet1/33"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": null,
-      "notes": null
-    },
-    {
-      "id": "ln-a02-346-2437000010-GE2-chn_rnd_sw_3048_j8f10q2",
-      "a": {
-        "device_id": "ln-a02-346-2437000010",
-        "interface": "GE2"
-      },
-      "b": {
-        "device_id": "chn_rnd_sw_3048_j8f10q2",
-        "interface": "gigabitethernet1/34"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": null,
-      "notes": null
-    },
-    {
       "id": "ln_ln_ha_a01_327_dgd10q2_a01_328_16c10q2_active_ge5_chn_rnd_sw_3048_j8f10q2_gigabitethernet1_30",
       "a": {
         "device_id": "ln-ha-a01-327-dgd10q2-a01-328-16c10q2-active",
@@ -4936,22 +4712,6 @@
       "notes": "Imported from Lab Navigator wiremap."
     },
     {
-      "id": "ln_ln_a02_316_edge_246208325_ge1_chn_rnd_sw_3048_fctd9z2_gigabitethernet1_26",
-      "a": {
-        "device_id": "ln_a02_316_edge_246208325",
-        "interface": "GE1"
-      },
-      "b": {
-        "device_id": "chn_rnd_sw_3048_fctd9z2",
-        "interface": "gigabitethernet1/26"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": "edge-access",
-      "notes": "Imported from Lab Navigator wiremap."
-    },
-    {
       "id": "ln_ln_a02_316_edge_246208325_sfp1_chn_rnd_sw_3048_fctd9z2_gigabitethernet1_30",
       "a": {
         "device_id": "ln_a02_316_edge_246208325",
@@ -4960,38 +4720,6 @@
       "b": {
         "device_id": "chn_rnd_sw_3048_fctd9z2",
         "interface": "gigabitethernet1/30"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": "edge-access",
-      "notes": "Imported from Lab Navigator wiremap."
-    },
-    {
-      "id": "ln_ln_a02_316_edge_246208325_ge2_chn_rnd_sw_3048_fctd9z2_gigabitethernet1_27",
-      "a": {
-        "device_id": "ln_a02_316_edge_246208325",
-        "interface": "GE2"
-      },
-      "b": {
-        "device_id": "chn_rnd_sw_3048_fctd9z2",
-        "interface": "gigabitethernet1/27"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": "edge-access",
-      "notes": "Imported from Lab Navigator wiremap."
-    },
-    {
-      "id": "ln_ln_a02_316_edge_246208325_ge3_chn_rnd_sw_3048_fctd9z2_gigabitethernet1_28",
-      "a": {
-        "device_id": "ln_a02_316_edge_246208325",
-        "interface": "GE3"
-      },
-      "b": {
-        "device_id": "chn_rnd_sw_3048_fctd9z2",
-        "interface": "gigabitethernet1/28"
       },
       "vlans": [],
       "tagged_vlans": [],
@@ -8749,6 +8477,701 @@
       "tagged_vlans": [],
       "untagged_vlan": null,
       "role": "switch-uplink",
+      "notes": "Imported from Lab Navigator wiremap."
+    },
+    {
+      "id": "ln_ln_a01_851_edge_150q363_ge1_chn_rnd_sw_3048_73v00q2_gigabitethernet1_16",
+      "a": {
+        "device_id": "ln_a01_851_edge_150q363",
+        "interface": "GE1"
+      },
+      "b": {
+        "device_id": "chn_rnd_sw_3048_73v00q2",
+        "interface": "gigabitethernet1/16"
+      },
+      "vlans": [
+        1
+      ],
+      "tagged_vlans": [],
+      "untagged_vlan": 1,
+      "role": "edge-access",
+      "notes": "Imported from Lab Navigator wiremap."
+    },
+    {
+      "id": "ln_ln_a01_851_edge_150q363_ge2_chn_rnd_sw_3048_73v00q2_gigabitethernet1_17",
+      "a": {
+        "device_id": "ln_a01_851_edge_150q363",
+        "interface": "GE2"
+      },
+      "b": {
+        "device_id": "chn_rnd_sw_3048_73v00q2",
+        "interface": "gigabitethernet1/17"
+      },
+      "vlans": [
+        202,
+        203,
+        204
+      ],
+      "tagged_vlans": [
+        203,
+        204
+      ],
+      "untagged_vlan": 202,
+      "role": "edge-access",
+      "notes": "Imported from Lab Navigator wiremap."
+    },
+    {
+      "id": "ln_ln_a01_851_edge_150q363_ge3_chn_rnd_sw_3048_73v00q2_gigabitethernet1_18",
+      "a": {
+        "device_id": "ln_a01_851_edge_150q363",
+        "interface": "GE3"
+      },
+      "b": {
+        "device_id": "chn_rnd_sw_3048_73v00q2",
+        "interface": "gigabitethernet1/18"
+      },
+      "vlans": [
+        205
+      ],
+      "tagged_vlans": [],
+      "untagged_vlan": 205,
+      "role": "edge-access",
+      "notes": "Imported from Lab Navigator wiremap."
+    },
+    {
+      "id": "ln_ln_a01_851_edge_150q363_ge4_chn_rnd_sw_3048_73v00q2_gigabitethernet1_19",
+      "a": {
+        "device_id": "ln_a01_851_edge_150q363",
+        "interface": "GE4"
+      },
+      "b": {
+        "device_id": "chn_rnd_sw_3048_73v00q2",
+        "interface": "gigabitethernet1/19"
+      },
+      "vlans": [
+        206
+      ],
+      "tagged_vlans": [],
+      "untagged_vlan": 206,
+      "role": "edge-access",
+      "notes": "Imported from Lab Navigator wiremap."
+    },
+    {
+      "id": "ln_ln_a01_851_edge_150q363_ge5_chn_rnd_sw_3048_73v00q2_gigabitethernet1_20",
+      "a": {
+        "device_id": "ln_a01_851_edge_150q363",
+        "interface": "GE5"
+      },
+      "b": {
+        "device_id": "chn_rnd_sw_3048_73v00q2",
+        "interface": "gigabitethernet1/20"
+      },
+      "vlans": [
+        207
+      ],
+      "tagged_vlans": [],
+      "untagged_vlan": 207,
+      "role": "edge-access",
+      "notes": "Imported from Lab Navigator wiremap."
+    },
+    {
+      "id": "ln_ln_a01_782_edge_f4z00q2_ge1_chn_rnd_sw_3048_73v00q2_gigabitethernet1_12",
+      "a": {
+        "device_id": "ln_a01_782_edge_f4z00q2",
+        "interface": "GE1"
+      },
+      "b": {
+        "device_id": "chn_rnd_sw_3048_73v00q2",
+        "interface": "gigabitethernet1/12"
+      },
+      "vlans": [
+        202,
+        203,
+        204
+      ],
+      "tagged_vlans": [
+        203,
+        204
+      ],
+      "untagged_vlan": 202,
+      "role": "edge-access",
+      "notes": "Imported from Lab Navigator wiremap."
+    },
+    {
+      "id": "ln_ln_a01_782_edge_f4z00q2_ge2_chn_rnd_sw_3048_73v00q2_gigabitethernet1_13",
+      "a": {
+        "device_id": "ln_a01_782_edge_f4z00q2",
+        "interface": "GE2"
+      },
+      "b": {
+        "device_id": "chn_rnd_sw_3048_73v00q2",
+        "interface": "gigabitethernet1/13"
+      },
+      "vlans": [
+        205
+      ],
+      "tagged_vlans": [],
+      "untagged_vlan": 205,
+      "role": "edge-access",
+      "notes": "Imported from Lab Navigator wiremap."
+    },
+    {
+      "id": "ln_ln_a01_782_edge_f4z00q2_ge3_chn_rnd_sw_3048_73v00q2_gigabitethernet1_14",
+      "a": {
+        "device_id": "ln_a01_782_edge_f4z00q2",
+        "interface": "GE3"
+      },
+      "b": {
+        "device_id": "chn_rnd_sw_3048_73v00q2",
+        "interface": "gigabitethernet1/14"
+      },
+      "vlans": [
+        206
+      ],
+      "tagged_vlans": [],
+      "untagged_vlan": 206,
+      "role": "edge-access",
+      "notes": "Imported from Lab Navigator wiremap."
+    },
+    {
+      "id": "ln_ln_a01_782_edge_f4z00q2_ge4_chn_rnd_sw_3048_73v00q2_gigabitethernet1_15",
+      "a": {
+        "device_id": "ln_a01_782_edge_f4z00q2",
+        "interface": "GE4"
+      },
+      "b": {
+        "device_id": "chn_rnd_sw_3048_73v00q2",
+        "interface": "gigabitethernet1/15"
+      },
+      "vlans": [
+        207
+      ],
+      "tagged_vlans": [],
+      "untagged_vlan": 207,
+      "role": "edge-access",
+      "notes": "Imported from Lab Navigator wiremap."
+    },
+    {
+      "id": "ln_ln_rack_849_edge_246218429_ge1_chn_rnd_sw_3048_j8f10q2_gigabitethernet1_31",
+      "a": {
+        "device_id": "ln_rack_849_edge_246218429",
+        "interface": "GE1"
+      },
+      "b": {
+        "device_id": "chn_rnd_sw_3048_j8f10q2",
+        "interface": "gigabitethernet1/31"
+      },
+      "vlans": [
+        131
+      ],
+      "tagged_vlans": [],
+      "untagged_vlan": 131,
+      "role": "edge-access",
+      "notes": "Imported from Lab Navigator wiremap."
+    },
+    {
+      "id": "ln_ln_rack_849_edge_246218429_ge2_chn_rnd_sw_3048_j8f10q2_gigabitethernet1_32",
+      "a": {
+        "device_id": "ln_rack_849_edge_246218429",
+        "interface": "GE2"
+      },
+      "b": {
+        "device_id": "chn_rnd_sw_3048_j8f10q2",
+        "interface": "gigabitethernet1/32"
+      },
+      "vlans": [
+        132
+      ],
+      "tagged_vlans": [],
+      "untagged_vlan": 132,
+      "role": "edge-access",
+      "notes": "Imported from Lab Navigator wiremap."
+    },
+    {
+      "id": "ln_ln_rack_849_edge_246218429_ge3_chn_rnd_sw_3048_j8f10q2_gigabitethernet1_33",
+      "a": {
+        "device_id": "ln_rack_849_edge_246218429",
+        "interface": "GE3"
+      },
+      "b": {
+        "device_id": "chn_rnd_sw_3048_j8f10q2",
+        "interface": "gigabitethernet1/33"
+      },
+      "vlans": [
+        135
+      ],
+      "tagged_vlans": [],
+      "untagged_vlan": 135,
+      "role": "edge-access",
+      "notes": "Imported from Lab Navigator wiremap."
+    },
+    {
+      "id": "ln_ln_rack_849_edge_246218429_ge4_chn_rnd_sw_3048_j8f10q2_gigabitethernet1_34",
+      "a": {
+        "device_id": "ln_rack_849_edge_246218429",
+        "interface": "GE4"
+      },
+      "b": {
+        "device_id": "chn_rnd_sw_3048_j8f10q2",
+        "interface": "gigabitethernet1/34"
+      },
+      "vlans": [
+        136
+      ],
+      "tagged_vlans": [],
+      "untagged_vlan": 136,
+      "role": "edge-access",
+      "notes": "Imported from Lab Navigator wiremap."
+    },
+    {
+      "id": "ln_ln_rack_849_edge_246218429_ge5_chn_rnd_sw_3048_j8f10q2_gigabitethernet1_35",
+      "a": {
+        "device_id": "ln_rack_849_edge_246218429",
+        "interface": "GE5"
+      },
+      "b": {
+        "device_id": "chn_rnd_sw_3048_j8f10q2",
+        "interface": "gigabitethernet1/35"
+      },
+      "vlans": [
+        137
+      ],
+      "tagged_vlans": [],
+      "untagged_vlan": 137,
+      "role": "edge-access",
+      "notes": "Imported from Lab Navigator wiremap."
+    },
+    {
+      "id": "ln_ln_rack_850_edge_246218430_ge1_chn_rnd_sw_3048_j8f10q2_gigabitethernet1_11",
+      "a": {
+        "device_id": "ln_rack_850_edge_246218430",
+        "interface": "GE1"
+      },
+      "b": {
+        "device_id": "chn_rnd_sw_3048_j8f10q2",
+        "interface": "gigabitethernet1/11"
+      },
+      "vlans": [
+        111
+      ],
+      "tagged_vlans": [],
+      "untagged_vlan": 111,
+      "role": "edge-access",
+      "notes": "Imported from Lab Navigator wiremap."
+    },
+    {
+      "id": "ln_ln_rack_850_edge_246218430_ge2_chn_rnd_sw_3048_j8f10q2_gigabitethernet1_12",
+      "a": {
+        "device_id": "ln_rack_850_edge_246218430",
+        "interface": "GE2"
+      },
+      "b": {
+        "device_id": "chn_rnd_sw_3048_j8f10q2",
+        "interface": "gigabitethernet1/12"
+      },
+      "vlans": [
+        112,
+        113,
+        114
+      ],
+      "tagged_vlans": [
+        113,
+        114
+      ],
+      "untagged_vlan": 112,
+      "role": "edge-access",
+      "notes": "Imported from Lab Navigator wiremap."
+    },
+    {
+      "id": "ln_ln_rack_850_edge_246218430_ge3_chn_rnd_sw_3048_j8f10q2_gigabitethernet1_13",
+      "a": {
+        "device_id": "ln_rack_850_edge_246218430",
+        "interface": "GE3"
+      },
+      "b": {
+        "device_id": "chn_rnd_sw_3048_j8f10q2",
+        "interface": "gigabitethernet1/13"
+      },
+      "vlans": [
+        115
+      ],
+      "tagged_vlans": [],
+      "untagged_vlan": 115,
+      "role": "edge-access",
+      "notes": "Imported from Lab Navigator wiremap."
+    },
+    {
+      "id": "ln_ln_rack_850_edge_246218430_ge4_chn_rnd_sw_3048_j8f10q2_gigabitethernet1_14",
+      "a": {
+        "device_id": "ln_rack_850_edge_246218430",
+        "interface": "GE4"
+      },
+      "b": {
+        "device_id": "chn_rnd_sw_3048_j8f10q2",
+        "interface": "gigabitethernet1/14"
+      },
+      "vlans": [
+        116
+      ],
+      "tagged_vlans": [],
+      "untagged_vlan": 116,
+      "role": "edge-access",
+      "notes": "Imported from Lab Navigator wiremap."
+    },
+    {
+      "id": "ln_ln_rack_850_edge_246218430_ge5_chn_rnd_sw_3048_j8f10q2_gigabitethernet1_15",
+      "a": {
+        "device_id": "ln_rack_850_edge_246218430",
+        "interface": "GE5"
+      },
+      "b": {
+        "device_id": "chn_rnd_sw_3048_j8f10q2",
+        "interface": "gigabitethernet1/15"
+      },
+      "vlans": [
+        1
+      ],
+      "tagged_vlans": [],
+      "untagged_vlan": 1,
+      "role": "edge-access",
+      "notes": "Imported from Lab Navigator wiremap."
+    },
+    {
+      "id": "ln_ln_a01_856_edge_gtt6v43_ge1_chn_rnd_sw_3048_73v00q2_gigabitethernet1_21",
+      "a": {
+        "device_id": "ln_a01_856_edge_gtt6v43",
+        "interface": "GE1"
+      },
+      "b": {
+        "device_id": "chn_rnd_sw_3048_73v00q2",
+        "interface": "gigabitethernet1/21"
+      },
+      "vlans": [
+        221
+      ],
+      "tagged_vlans": [],
+      "untagged_vlan": 221,
+      "role": "edge-access",
+      "notes": "Imported from Lab Navigator wiremap."
+    },
+    {
+      "id": "ln_ln_a01_856_edge_gtt6v43_ge2_chn_rnd_sw_3048_73v00q2_gigabitethernet1_22",
+      "a": {
+        "device_id": "ln_a01_856_edge_gtt6v43",
+        "interface": "GE2"
+      },
+      "b": {
+        "device_id": "chn_rnd_sw_3048_73v00q2",
+        "interface": "gigabitethernet1/22"
+      },
+      "vlans": [
+        222,
+        223,
+        224
+      ],
+      "tagged_vlans": [
+        223,
+        224
+      ],
+      "untagged_vlan": 222,
+      "role": "edge-access",
+      "notes": "Imported from Lab Navigator wiremap."
+    },
+    {
+      "id": "ln_ln_a01_856_edge_gtt6v43_ge3_chn_rnd_sw_3048_73v00q2_gigabitethernet1_23",
+      "a": {
+        "device_id": "ln_a01_856_edge_gtt6v43",
+        "interface": "GE3"
+      },
+      "b": {
+        "device_id": "chn_rnd_sw_3048_73v00q2",
+        "interface": "gigabitethernet1/23"
+      },
+      "vlans": [
+        225
+      ],
+      "tagged_vlans": [],
+      "untagged_vlan": 225,
+      "role": "edge-access",
+      "notes": "Imported from Lab Navigator wiremap."
+    },
+    {
+      "id": "ln_ln_a01_856_edge_gtt6v43_ge4_chn_rnd_sw_3048_73v00q2_gigabitethernet1_24",
+      "a": {
+        "device_id": "ln_a01_856_edge_gtt6v43",
+        "interface": "GE4"
+      },
+      "b": {
+        "device_id": "chn_rnd_sw_3048_73v00q2",
+        "interface": "gigabitethernet1/24"
+      },
+      "vlans": [
+        226
+      ],
+      "tagged_vlans": [],
+      "untagged_vlan": 226,
+      "role": "edge-access",
+      "notes": "Imported from Lab Navigator wiremap."
+    },
+    {
+      "id": "ln_ln_a01_856_edge_gtt6v43_ge5_chn_rnd_sw_3048_73v00q2_gigabitethernet1_25",
+      "a": {
+        "device_id": "ln_a01_856_edge_gtt6v43",
+        "interface": "GE5"
+      },
+      "b": {
+        "device_id": "chn_rnd_sw_3048_73v00q2",
+        "interface": "gigabitethernet1/25"
+      },
+      "vlans": [
+        221
+      ],
+      "tagged_vlans": [],
+      "untagged_vlan": 221,
+      "role": "edge-access",
+      "notes": "Imported from Lab Navigator wiremap."
+    },
+    {
+      "id": "ln_ln_a01_857_edge_f4v6v43_ge1_chn_rnd_sw_3048_73v00q2_gigabitethernet1_26",
+      "a": {
+        "device_id": "ln_a01_857_edge_f4v6v43",
+        "interface": "GE1"
+      },
+      "b": {
+        "device_id": "chn_rnd_sw_3048_73v00q2",
+        "interface": "gigabitethernet1/26"
+      },
+      "vlans": [
+        222,
+        223,
+        224
+      ],
+      "tagged_vlans": [
+        223,
+        224
+      ],
+      "untagged_vlan": 222,
+      "role": "edge-access",
+      "notes": "Imported from Lab Navigator wiremap."
+    },
+    {
+      "id": "ln_ln_a01_857_edge_f4v6v43_ge2_chn_rnd_sw_3048_73v00q2_gigabitethernet1_27",
+      "a": {
+        "device_id": "ln_a01_857_edge_f4v6v43",
+        "interface": "GE2"
+      },
+      "b": {
+        "device_id": "chn_rnd_sw_3048_73v00q2",
+        "interface": "gigabitethernet1/27"
+      },
+      "vlans": [
+        225
+      ],
+      "tagged_vlans": [],
+      "untagged_vlan": 225,
+      "role": "edge-access",
+      "notes": "Imported from Lab Navigator wiremap."
+    },
+    {
+      "id": "ln_ln_a01_857_edge_f4v6v43_ge3_chn_rnd_sw_3048_73v00q2_gigabitethernet1_28",
+      "a": {
+        "device_id": "ln_a01_857_edge_f4v6v43",
+        "interface": "GE3"
+      },
+      "b": {
+        "device_id": "chn_rnd_sw_3048_73v00q2",
+        "interface": "gigabitethernet1/28"
+      },
+      "vlans": [
+        226
+      ],
+      "tagged_vlans": [],
+      "untagged_vlan": 226,
+      "role": "edge-access",
+      "notes": "Imported from Lab Navigator wiremap."
+    },
+    {
+      "id": "ln_ln_a01_857_edge_f4v6v43_ge4_chn_rnd_sw_3048_73v00q2_gigabitethernet1_29",
+      "a": {
+        "device_id": "ln_a01_857_edge_f4v6v43",
+        "interface": "GE4"
+      },
+      "b": {
+        "device_id": "chn_rnd_sw_3048_73v00q2",
+        "interface": "gigabitethernet1/29"
+      },
+      "vlans": [
+        10,
+        11,
+        12,
+        13
+      ],
+      "tagged_vlans": [
+        11,
+        12,
+        13
+      ],
+      "untagged_vlan": 10,
+      "role": "edge-access",
+      "notes": "Imported from Lab Navigator wiremap."
+    },
+    {
+      "id": "ln_ln_a01_857_edge_f4v6v43_ge5_chn_rnd_sw_3048_73v00q2_gigabitethernet1_30",
+      "a": {
+        "device_id": "ln_a01_857_edge_f4v6v43",
+        "interface": "GE5"
+      },
+      "b": {
+        "device_id": "chn_rnd_sw_3048_73v00q2",
+        "interface": "gigabitethernet1/30"
+      },
+      "vlans": [
+        1
+      ],
+      "tagged_vlans": [],
+      "untagged_vlan": 1,
+      "role": "edge-access",
+      "notes": "Imported from Lab Navigator wiremap."
+    },
+    {
+      "id": "ln_ln_rack_484_edge_246208335_ge1_chn_rnd_sw_3048_fctd9z2_gigabitethernet1_21",
+      "a": {
+        "device_id": "ln_rack_484_edge_246208335",
+        "interface": "GE1"
+      },
+      "b": {
+        "device_id": "chn_rnd_sw_3048_fctd9z2",
+        "interface": "gigabitethernet1/21"
+      },
+      "vlans": [
+        391
+      ],
+      "tagged_vlans": [],
+      "untagged_vlan": 391,
+      "role": "edge-access",
+      "notes": "Imported from Lab Navigator wiremap."
+    },
+    {
+      "id": "ln_ln_rack_484_edge_246208335_ge2_chn_rnd_sw_3048_fctd9z2_gigabitethernet1_22",
+      "a": {
+        "device_id": "ln_rack_484_edge_246208335",
+        "interface": "GE2"
+      },
+      "b": {
+        "device_id": "chn_rnd_sw_3048_fctd9z2",
+        "interface": "gigabitethernet1/22"
+      },
+      "vlans": [
+        392,
+        393,
+        394
+      ],
+      "tagged_vlans": [
+        393,
+        394
+      ],
+      "untagged_vlan": 392,
+      "role": "edge-access",
+      "notes": "Imported from Lab Navigator wiremap."
+    },
+    {
+      "id": "ln_ln_rack_484_edge_246208335_ge3_chn_rnd_sw_3048_fctd9z2_gigabitethernet1_23",
+      "a": {
+        "device_id": "ln_rack_484_edge_246208335",
+        "interface": "GE3"
+      },
+      "b": {
+        "device_id": "chn_rnd_sw_3048_fctd9z2",
+        "interface": "gigabitethernet1/23"
+      },
+      "vlans": [
+        395
+      ],
+      "tagged_vlans": [],
+      "untagged_vlan": 395,
+      "role": "edge-access",
+      "notes": "Imported from Lab Navigator wiremap."
+    },
+    {
+      "id": "ln_ln_rack_484_edge_246208335_ge4_chn_rnd_sw_3048_fctd9z2_gigabitethernet1_24",
+      "a": {
+        "device_id": "ln_rack_484_edge_246208335",
+        "interface": "GE4"
+      },
+      "b": {
+        "device_id": "chn_rnd_sw_3048_fctd9z2",
+        "interface": "gigabitethernet1/24"
+      },
+      "vlans": [
+        396
+      ],
+      "tagged_vlans": [],
+      "untagged_vlan": 396,
+      "role": "edge-access",
+      "notes": "Imported from Lab Navigator wiremap."
+    },
+    {
+      "id": "ln_ln_rack_485_edge_246208321_ge1_chn_rnd_sw_3048_fctd9z2_gigabitethernet1_25",
+      "a": {
+        "device_id": "ln_rack_485_edge_246208321",
+        "interface": "GE1"
+      },
+      "b": {
+        "device_id": "chn_rnd_sw_3048_fctd9z2",
+        "interface": "gigabitethernet1/25"
+      },
+      "vlans": [],
+      "tagged_vlans": [],
+      "untagged_vlan": null,
+      "role": "edge-access",
+      "notes": "Imported from Lab Navigator wiremap."
+    },
+    {
+      "id": "ln_ln_rack_485_edge_246208321_ge2_chn_rnd_sw_3048_fctd9z2_gigabitethernet1_26",
+      "a": {
+        "device_id": "ln_rack_485_edge_246208321",
+        "interface": "GE2"
+      },
+      "b": {
+        "device_id": "chn_rnd_sw_3048_fctd9z2",
+        "interface": "gigabitethernet1/26"
+      },
+      "vlans": [],
+      "tagged_vlans": [],
+      "untagged_vlan": null,
+      "role": "edge-access",
+      "notes": "Imported from Lab Navigator wiremap."
+    },
+    {
+      "id": "ln_ln_rack_485_edge_246208321_ge3_chn_rnd_sw_3048_fctd9z2_gigabitethernet1_27",
+      "a": {
+        "device_id": "ln_rack_485_edge_246208321",
+        "interface": "GE3"
+      },
+      "b": {
+        "device_id": "chn_rnd_sw_3048_fctd9z2",
+        "interface": "gigabitethernet1/27"
+      },
+      "vlans": [],
+      "tagged_vlans": [],
+      "untagged_vlan": null,
+      "role": "edge-access",
+      "notes": "Imported from Lab Navigator wiremap."
+    },
+    {
+      "id": "ln_ln_rack_485_edge_246208321_ge4_chn_rnd_sw_3048_fctd9z2_gigabitethernet1_28",
+      "a": {
+        "device_id": "ln_rack_485_edge_246208321",
+        "interface": "GE4"
+      },
+      "b": {
+        "device_id": "chn_rnd_sw_3048_fctd9z2",
+        "interface": "gigabitethernet1/28"
+      },
+      "vlans": [],
+      "tagged_vlans": [],
+      "untagged_vlan": null,
+      "role": "edge-access",
       "notes": "Imported from Lab Navigator wiremap."
     }
   ],

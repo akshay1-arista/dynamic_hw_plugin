@@ -64,6 +64,8 @@ export function App() {
   const [publishResult, setPublishResult] = useState(null);
   const [publishBaseBranch, setPublishBaseBranch] = useState('master');
   const [publishingAction, setPublishingAction] = useState('');
+  const [deletingPrivateBranchNames, setDeletingPrivateBranchNames] = useState([]);
+  const [privateBranchFeedback, setPrivateBranchFeedback] = useState(null);
   const [copyState, setCopyState] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(Boolean(loadStoredUser()));
@@ -216,6 +218,7 @@ export function App() {
   );
   const allPrivateBranchesSelected =
     privateBranches.length > 0 && selectedPrivateBranchNames.length === privateBranches.length;
+  const deletingPrivateBranches = publishingAction === 'delete-branches';
 
   async function loadData() {
     setLoading(true);
@@ -329,6 +332,8 @@ export function App() {
     setPrivateBranches([]);
     setAuditTrail([]);
     setSelectedPrivateBranchNames([]);
+    setDeletingPrivateBranchNames([]);
+    setPrivateBranchFeedback(null);
     setLoading(false);
   }
 
@@ -511,9 +516,17 @@ export function App() {
       return;
     }
     setPublishingAction('delete-branches');
+    setDeletingPrivateBranchNames(targets);
+    setPrivateBranchFeedback({
+      level: 'info',
+      message:
+        targets.length === 1
+          ? `Deleting Gerrit private branch ${targets[0]}...`
+          : `Deleting ${targets.length} Gerrit private branches...`
+    });
     setError('');
     try {
-      await deletePrivateBranches({
+      const response = await deletePrivateBranches({
         delete_all: deleteAll,
         private_branch_names: deleteAll ? [] : targets,
         requested_by: currentUser
@@ -522,10 +535,23 @@ export function App() {
       setPrivateBranches(refreshed.branches || []);
       setAuditTrail(auditData.events || []);
       setSelectedPrivateBranchNames([]);
+      const deletedNames = (response.results || [])
+        .filter((item) => item.success)
+        .map((item) => item.private_branch_name);
+      setPrivateBranchFeedback({
+        level: 'success',
+        message:
+          deletedNames.length === 1
+            ? `Deleted Gerrit private branch ${deletedNames[0]}.`
+            : response.messages?.[0]?.message ||
+              `Deleted ${deletedNames.length} Gerrit private branch${deletedNames.length === 1 ? '' : 'es'}.`
+      });
     } catch (deleteError) {
+      setPrivateBranchFeedback(null);
       setError(deleteError.message);
     } finally {
       setPublishingAction('');
+      setDeletingPrivateBranchNames([]);
     }
   }
 
@@ -832,11 +858,17 @@ export function App() {
                     className="secondary bulkDeleteButton"
                     onClick={() => submitDeletePrivateBranches({ branchNames: selectedPrivateBranchNames })}
                     disabled={publishingAction !== '' || selectedPrivateBranchNames.length === 0}
+                    aria-label={deletingPrivateBranches ? 'Deleting selected branches' : 'Delete selected'}
                     type="button"
                   >
-                    <Trash2 size={16} />
-                    Delete selected
+                    {deletingPrivateBranches ? <Loader2 className="spin" size={16} /> : <Trash2 size={16} />}
+                    {deletingPrivateBranches ? 'Deleting...' : 'Delete selected'}
                   </button>
+                </div>
+              )}
+              {privateBranchFeedback && (
+                <div className="messageList branchFeedback" role="status" aria-live="polite">
+                  <small className={`message ${privateBranchFeedback.level}`}>{privateBranchFeedback.message}</small>
                 </div>
               )}
               {privateBranches.length === 0 ? (
@@ -873,11 +905,23 @@ export function App() {
                           submitDeletePrivateBranches({ branchNames: [branch.private_branch_name] })
                         }
                         disabled={publishingAction !== ''}
-                        aria-label={`Delete ${branch.private_branch_name}`}
-                        title="Delete branch"
+                        aria-label={
+                          deletingPrivateBranchNames.includes(branch.private_branch_name)
+                            ? `Deleting ${branch.private_branch_name}`
+                            : `Delete ${branch.private_branch_name}`
+                        }
+                        title={
+                          deletingPrivateBranchNames.includes(branch.private_branch_name)
+                            ? 'Deleting branch'
+                            : 'Delete branch'
+                        }
                         type="button"
                       >
-                        <Trash2 size={16} />
+                        {deletingPrivateBranchNames.includes(branch.private_branch_name) ? (
+                          <Loader2 className="spin" size={16} />
+                        ) : (
+                          <Trash2 size={16} />
+                        )}
                       </button>
                     </div>
                   ))}

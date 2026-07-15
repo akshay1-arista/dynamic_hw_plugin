@@ -242,7 +242,10 @@ const defaultUser = {
   email: 'test@example.com'
 };
 
+let deleteRequestBarrier = null;
+
 beforeEach(() => {
+  deleteRequestBarrier = null;
   const storage = new Map();
   Object.defineProperty(window, 'localStorage', {
     configurable: true,
@@ -469,6 +472,9 @@ beforeEach(() => {
       return Response.json(response);
     }
     if (url === '/api/hapy/private-branches/delete' && options.method === 'POST') {
+      if (deleteRequestBarrier) {
+        await deleteRequestBarrier;
+      }
       const payload = JSON.parse(options.body);
       const deletedNames = payload.delete_all
         ? privateBranches.map((branch) => branch.private_branch_name)
@@ -825,9 +831,24 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: /commit and push gerrit private branch/i }));
     await screen.findAllByText(/hw_topo_gen_private_abc123/);
 
+    let releaseDelete;
+    deleteRequestBarrier = new Promise((resolve) => {
+      releaseDelete = resolve;
+    });
+
     await user.click(document.querySelector('.branchRegistrySelect input'));
     await user.click(screen.getByRole('button', { name: /delete selected/i }));
 
+    expect(await screen.findByText('Deleting Gerrit private branch hw_topo_gen_private_abc123...')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /deleting hw_topo_gen_private_abc123/i })).toBeDisabled();
+
+    releaseDelete();
+
+    expect(
+      await within(screen.getByRole('status')).findByText(
+        'Deleted Gerrit private branch hw_topo_gen_private_abc123.'
+      )
+    ).toBeInTheDocument();
     await waitFor(() => expect(document.querySelector('.branchRegistrySelect input')).toBeNull());
   });
 

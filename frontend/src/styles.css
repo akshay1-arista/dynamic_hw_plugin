@@ -548,6 +548,12 @@ button:disabled {
   color: var(--red);
 }
 
+.message.success {
+  background: var(--green-soft);
+  border-left-color: var(--green);
+  color: var(--green);
+}
+
 .branchItem,
 .inventoryItem,
 .resultBox {
@@ -1141,6 +1147,10 @@ button:disabled {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  margin-bottom: 14px;
+}
+
+.branchFeedback {
   margin-bottom: 14px;
 }
 

@@ -53,42 +53,50 @@ class LabNavigatorClient:
         api_key: str = LAB_NAVIGATOR_API_KEY,
         timeout: float = 30.0,
     ) -> None:
-        if not api_key:
-            raise DiscoveryError("LN_PROD_API_KEY is required for Lab Navigator discovery")
+        normalized_api_key = api_key.strip()
+        headers = {"Authorization": f"Bearer {normalized_api_key}"} if normalized_api_key else {}
         self.base_url = base_url.rstrip("/")
         self.client = httpx.Client(
             base_url=self.base_url,
             timeout=timeout,
-            headers={"Authorization": f"Bearer {api_key}"},
+            headers=headers,
         )
 
     def close(self) -> None:
         self.client.close()
 
+    def _get_json(self, path: str, *, params: dict[str, Any] | None = None) -> dict[str, Any]:
+        try:
+            response = self.client.get(path, params=params)
+            response.raise_for_status()
+        except httpx.HTTPStatusError as error:
+            status = error.response.status_code
+            if status in (401, 403) and "Authorization" not in self.client.headers:
+                raise DiscoveryError(
+                    "Lab Navigator rejected anonymous discovery; configure LN_PROD_API_KEY for this deployment"
+                ) from error
+            raise DiscoveryError(f"Lab Navigator request failed with HTTP {status} for {path}") from error
+        except httpx.RequestError as error:
+            raise DiscoveryError(f"Lab Navigator request failed for {path}: {error}") from error
+        try:
+            return response.json()
+        except ValueError as error:
+            raise DiscoveryError(f"Lab Navigator returned invalid JSON for {path}") from error
+
     def search(self, query: str) -> list[dict[str, Any]]:
-        response = self.client.get("/api/search", params={"q": query})
-        response.raise_for_status()
-        return response.json().get("devices", [])
+        return self._get_json("/api/search", params={"q": query}).get("devices", [])
 
     def list_inventory(self, filters: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        response = self.client.get("/api/inventory", params={"filters": json.dumps(filters)})
-        response.raise_for_status()
-        return response.json().get("devices", [])
+        return self._get_json("/api/inventory", params={"filters": json.dumps(filters)}).get("devices", [])
 
     def get_wiremap(self, device_id: int) -> dict[str, Any]:
-        response = self.client.get(f"/api/device/{device_id}/wiremap")
-        response.raise_for_status()
-        return response.json()
+        return self._get_json(f"/api/device/{device_id}/wiremap")
 
     def get_esxi_device_macs(self, device_id: int) -> Any:
-        response = self.client.get(f"/api/esxi/device-macs/{device_id}")
-        response.raise_for_status()
-        return response.json()
+        return self._get_json(f"/api/esxi/device-macs/{device_id}")
 
     def get_server_nics(self, device_id: int) -> Any:
-        response = self.client.get(f"/api/server/device-nics/{device_id}")
-        response.raise_for_status()
-        return response.json()
+        return self._get_json(f"/api/server/device-nics/{device_id}")
 
 
 def preview_inventory_refresh(

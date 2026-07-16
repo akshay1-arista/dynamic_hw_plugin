@@ -1,6 +1,9 @@
 import json
 
-from app.discovery import apply_inventory_refresh, preview_inventory_refresh
+import httpx
+import pytest
+
+from app.discovery import DiscoveryError, LabNavigatorClient, apply_inventory_refresh, preview_inventory_refresh
 from app.models import InventoryRefreshRequest
 
 
@@ -157,3 +160,27 @@ def test_inventory_refresh_apply_persists_graph_updates(tmp_path):
     assert "agg_sw" in device_ids
     assert "esxi_01" in device_ids
     assert result.inventory.hardware[0].auto_config_ready is True
+
+
+def test_lab_navigator_client_allows_anonymous_reads():
+    client = LabNavigatorClient(api_key="")
+    try:
+        assert "Authorization" not in client.client.headers
+    finally:
+        client.close()
+
+
+def test_lab_navigator_client_reports_anonymous_auth_rejection():
+    client = LabNavigatorClient(api_key="", base_url="https://lab-navigator.example.com")
+    client.close()
+    client.client = httpx.Client(
+        base_url=client.base_url,
+        transport=httpx.MockTransport(
+            lambda request: httpx.Response(401, request=request, json={"detail": "unauthorized"})
+        ),
+    )
+    try:
+        with pytest.raises(DiscoveryError, match="configure LN_PROD_API_KEY"):
+            client.search("access-sw")
+    finally:
+        client.close()

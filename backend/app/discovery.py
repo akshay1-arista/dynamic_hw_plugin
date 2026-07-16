@@ -165,7 +165,7 @@ def apply_inventory_refresh(
     try:
         _log(logging.INFO, "Inventory refresh apply requested for hardware_ids=%s", request.hardware_ids)
         preview = preview_inventory_refresh(request, inventory_path=inventory_path, client=client)
-        saved = save_inventory(preview.inventory, inventory_path)
+        saved = save_inventory(preview.inventory, inventory_path, preserve_local_state=True)
         _log(
             logging.INFO,
             "Inventory refresh apply completed for hardware_ids=%s changes=%d saved_devices=%d saved_connections=%d",

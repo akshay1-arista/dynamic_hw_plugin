@@ -59,6 +59,7 @@ def test_a02_710_pair_keeps_no_vlan_sfp1_connection():
     ports = {port.logical_interface: port for port in hardware.ports}
     assert ports["SFP1"].switch_active_port == "gigabitethernet1/20"
     assert ports["SFP1"].switch_vlans == []
+    assert ports["SFP1"].tagged_vlans == []
     assert ports["SFP1"].untagged_vlan is None
 
 

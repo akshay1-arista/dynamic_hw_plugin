@@ -1,4 +1,6 @@
-from app.inventory import build_inventory, reserve_generated_hardware, update_hardware_availability
+import json
+
+from app.inventory import build_inventory, load_inventory, reserve_generated_hardware, save_inventory, update_hardware_availability
 
 
 def test_build_inventory_sanitizes_conflicting_remote_interface_connections():
@@ -294,3 +296,156 @@ def test_reserve_generated_hardware_and_release_round_trip(tmp_path):
     assert released_inventory.hardware[0].available is True
     assert released_inventory.hardware[0].reservation is None
     assert release_events[0].action == "hardware_released"
+
+    state_path = tmp_path / "inventory.local.json"
+    assert not state_path.exists()
+
+
+def test_save_inventory_moves_local_state_to_sidecar(tmp_path):
+    inventory_path = tmp_path / "inventory.json"
+    inventory_path.write_text(
+        """
+{
+  "devices": {
+    "edge-1": {
+      "id": "edge-1",
+      "type": "edge",
+      "display_name": "Edge 1",
+      "model": "edge6X0",
+      "model_suffix": "680",
+      "serial_number": "SERIAL1",
+      "ha_group_id": "edge-1",
+      "ha_role": "active",
+      "available": false,
+      "reservation": {
+        "actor": {
+          "name": "Test User",
+          "email": "test@example.com"
+        },
+        "reserved_at": "2026-07-16T00:00:00+00:00",
+        "reason": "topology-generation",
+        "run_id": "run123",
+        "topology_name": "demo-topology"
+      }
+    },
+    "switch-1": {
+      "id": "switch-1",
+      "type": "switch",
+      "display_name": "Switch 1",
+      "model": "Dell-3048",
+      "ip_address": "10.0.0.1"
+    }
+  },
+  "connections": [
+    {
+      "id": "edge-1-ge1-switch-1",
+      "a": {"device_id": "edge-1", "interface": "GE1"},
+      "b": {"device_id": "switch-1", "interface": "Gi1/1"},
+      "role": "edge-access"
+    }
+  ],
+  "allocations": []
+}
+""".strip()
+    )
+
+    inventory = load_inventory(inventory_path)
+    saved = save_inventory(inventory, inventory_path)
+
+    persisted = json.loads(inventory_path.read_text())
+    edge = persisted["devices"]["edge-1"]
+    assert "available" not in edge
+    assert "reservation" not in edge
+
+    state_path = tmp_path / "inventory.local.json"
+    state = json.loads(state_path.read_text())
+    assert state["hardware"]["edge-1"]["available"] is False
+    assert state["hardware"]["edge-1"]["reservation"]["run_id"] == "run123"
+
+    assert saved.hardware[0].available is False
+    assert saved.hardware[0].reservation is not None
+
+
+def test_save_inventory_can_preserve_existing_local_state(tmp_path):
+    inventory_path = tmp_path / "inventory.json"
+    inventory_path.write_text(
+        """
+{
+  "devices": {
+    "edge-1": {
+      "id": "edge-1",
+      "type": "edge",
+      "display_name": "Edge 1",
+      "model": "edge6X0",
+      "model_suffix": "680",
+      "serial_number": "SERIAL1",
+      "ha_group_id": "edge-1",
+      "ha_role": "active"
+    },
+    "switch-1": {
+      "id": "switch-1",
+      "type": "switch",
+      "display_name": "Switch 1",
+      "model": "Dell-3048",
+      "ip_address": "10.0.0.1"
+    }
+  },
+  "connections": [
+    {
+      "id": "edge-1-ge1-switch-1",
+      "a": {"device_id": "edge-1", "interface": "GE1"},
+      "b": {"device_id": "switch-1", "interface": "Gi1/1"},
+      "role": "edge-access"
+    }
+  ],
+  "allocations": []
+}
+""".strip()
+    )
+
+    inventory = load_inventory(inventory_path)
+    inventory.hardware[0].available = False
+    inventory.hardware[0].reservation = {
+        "actor": {"name": "Test User", "email": "test@example.com"},
+        "reserved_at": "2026-07-16T00:00:00+00:00",
+        "reason": "topology-generation",
+        "run_id": "run123",
+        "topology_name": "demo-topology",
+    }
+    save_inventory(inventory, inventory_path)
+
+    refreshed = build_inventory(
+        {
+            "edge-1": {
+                "id": "edge-1",
+                "type": "edge",
+                "display_name": "Edge 1",
+                "model": "edge6X0",
+                "model_suffix": "680",
+                "serial_number": "SERIAL1",
+                "ha_group_id": "edge-1",
+                "ha_role": "active",
+            },
+            "switch-1": {
+                "id": "switch-1",
+                "type": "switch",
+                "display_name": "Switch 1",
+                "model": "Dell-3048",
+                "ip_address": "10.0.0.1",
+            },
+        },
+        [
+            {
+                "id": "edge-1-ge1-switch-1",
+                "a": {"device_id": "edge-1", "interface": "GE1"},
+                "b": {"device_id": "switch-1", "interface": "Gi1/1"},
+                "role": "edge-access",
+            }
+        ],
+    )
+
+    saved = save_inventory(refreshed, inventory_path, preserve_local_state=True)
+
+    assert saved.hardware[0].available is False
+    assert saved.hardware[0].reservation is not None
+    assert saved.hardware[0].reservation.run_id == "run123"

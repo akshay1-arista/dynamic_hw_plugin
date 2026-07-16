@@ -45,6 +45,11 @@ REFERENCE_CONFIG_ROOT = _config_path(
     or LOCAL_REFERENCE_CONFIG_ROOT
 )
 INVENTORY_PATH = APP_ROOT / "backend" / "data" / "hardware_inventory.json"
+INVENTORY_STATE_PATH = _config_path(
+    os.environ.get("INVENTORY_STATE_PATH")
+    or DOTENV.get("INVENTORY_STATE_PATH", "")
+    or (APP_ROOT / "backend" / "data" / "hardware_inventory.local.json")
+)
 OUTPUTS_ROOT = APP_ROOT / "outputs"
 HAPY_REPO_ROOT = _optional_config_path(
     os.environ.get("HAPY_REPO_ROOT") or DOTENV.get("HAPY_REPO_ROOT", "")

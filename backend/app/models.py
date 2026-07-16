@@ -34,6 +34,17 @@ class HardwareReservation(BaseModel):
     topology_name: Optional[str] = None
 
 
+class HardwareLocalState(BaseModel):
+    available: bool = True
+    reservation: Optional[HardwareReservation] = None
+
+    @model_validator(mode="after")
+    def normalize_reservation(self) -> "HardwareLocalState":
+        if self.available:
+            self.reservation = None
+        return self
+
+
 class VlanRange(BaseModel):
     start: int
     end: int
@@ -228,6 +239,10 @@ class InventoryFile(BaseModel):
     connections: list[InventoryConnection] = Field(default_factory=list)
     allocations: list[HardwareAllocation] = Field(default_factory=list)
     hardware: list[HardwareEdge]
+
+
+class InventoryStateFile(BaseModel):
+    hardware: dict[str, HardwareLocalState] = Field(default_factory=dict)
 
 
 class EdgeSummary(BaseModel):

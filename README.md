@@ -67,6 +67,7 @@ Optional persistent overrides and secrets can be supplied with `/etc/default/dyn
 ## Data And Outputs
 
 - Hardware inventory: `backend/data/hardware_inventory.json`
+- Local hardware availability and reservation overlay: `backend/data/hardware_inventory.local.json`
 - Vendored reference topologies: `backend/reference_topologies/`
 - Generated topology folders and zip files: `outputs/<run_id>-<suffix>/`
 - Reference topologies are read from `backend/reference_topologies/` by default.
@@ -88,6 +89,8 @@ HAPY_REPO_ROOT=/Users/akshay1.jain/Documents/automation/hapy_repo_for_tools/velo
 # HAPY_TESTBED_CONFIG_ROOT=/absolute/path/to/velocloud.src/hapy/hapy/testbed/configs
 # Optional override for the persisted tool branch list:
 # HAPY_PRIVATE_BRANCH_REGISTRY_PATH=backend/data/hapy_private_branches.json
+# Optional override for local-only hardware availability and reservations:
+# INVENTORY_STATE_PATH=backend/data/hardware_inventory.local.json
 ```
 
 ## Verification

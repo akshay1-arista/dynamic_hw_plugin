@@ -366,6 +366,14 @@ class GenerateResult(BaseModel):
     messages: list[ValidationMessage] = Field(default_factory=list)
 
 
+class SavedGenerateRequest(BaseModel):
+    topology_name: str
+    reference_topology_id: str
+    hypervisor_ip: str = ""
+    hypervisor_interface: str = ""
+    mappings: list[MappingRequest] = Field(default_factory=list)
+
+
 class InventoryRefreshRequest(BaseModel):
     hardware_ids: list[str] = Field(default_factory=list)
 
@@ -557,8 +565,36 @@ class RunMetadata(BaseModel):
     topology_name: str
     reference_topology_id: str
     requested_by: Optional[ActorIdentity] = None
+    request: Optional[SavedGenerateRequest] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+    can_configure_switches: bool = False
+    mapping_statuses: list[GenerateMappingStatus] = Field(default_factory=list)
+    messages: list[ValidationMessage] = Field(default_factory=list)
     mappings: list[RunMappingMetadata] = Field(default_factory=list)
     hapy_publishes: list[HapyPublishMetadata] = Field(default_factory=list)
+
+
+class SavedRunSummary(BaseModel):
+    run_id: str
+    topology_name: str
+    requested_topology_name: str
+    reference_topology_id: str
+    requested_by: Optional[ActorIdentity] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+    private_branch_name: Optional[str] = None
+    private_branch_pushed: bool = False
+
+
+class SavedRunListResult(BaseModel):
+    runs: list[SavedRunSummary] = Field(default_factory=list)
+
+
+class SavedRunLoadResult(BaseModel):
+    request: SavedGenerateRequest
+    result: GenerateResult
+    publish_result: Optional[HapyCommitResult] = None
 
 
 class InventoryUpdateRequest(BaseModel):

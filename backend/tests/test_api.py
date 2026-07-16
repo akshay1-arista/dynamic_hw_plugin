@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 from app import main as app_main
 from app.config import INVENTORY_PATH
 from app.generator import generate_topology as real_generate_topology
-from app.inventory import load_inventory
+from app.inventory import load_inventory, save_inventory
 from app.main import app
 
 
@@ -145,6 +145,15 @@ def test_invalid_reference_generation_rejected():
 def test_generate_and_download_zip(tmp_path, monkeypatch):
     inventory_path = tmp_path / "inventory.json"
     inventory_path.write_text(Path(INVENTORY_PATH).read_text())
+    inventory = load_inventory(inventory_path)
+    target = next(
+        item
+        for item in inventory.hardware
+        if item.id == "ln-ha-a01-327-dgd10q2-a01-328-16c10q2"
+    )
+    target.available = True
+    target.reservation = None
+    save_inventory(inventory, inventory_path)
     outputs_root = tmp_path / "outputs"
     outputs_root.mkdir()
 
@@ -249,6 +258,84 @@ def test_list_private_branches_route(monkeypatch):
 
     assert response.status_code == 200
     assert response.json()["branches"][0]["private_branch_name"] == "hw_topo_gen_private_run123"
+
+
+def test_list_saved_runs_route(monkeypatch):
+    monkeypatch.setattr(
+        app_main,
+        "list_saved_runs",
+        lambda: {
+            "runs": [
+                {
+                    "run_id": "run123",
+                    "topology_name": "demo-topology-a1b2c3",
+                    "requested_topology_name": "demo-topology",
+                    "reference_topology_id": "3-site",
+                    "requested_by": {"name": "Test User", "email": "test@example.com"},
+                    "created_at": "2026-07-11T00:00:00+00:00",
+                    "updated_at": "2026-07-11T00:01:00+00:00",
+                    "private_branch_name": "hw_topo_gen_private_run123",
+                    "private_branch_pushed": True,
+                }
+            ]
+        },
+    )
+
+    response = client.get("/api/runs")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["runs"][0]["run_id"] == "run123"
+    assert body["runs"][0]["requested_topology_name"] == "demo-topology"
+
+
+def test_load_saved_run_route(monkeypatch):
+    monkeypatch.setattr(
+        app_main,
+        "load_saved_run",
+        lambda run_id: {
+            "request": {
+                "topology_name": "demo-topology",
+                "reference_topology_id": "3-site",
+                "hypervisor_ip": "10.68.136.50",
+                "hypervisor_interface": "vmnic0",
+                "mappings": [
+                    {
+                        "hardware_id": "demo-hw",
+                        "branch_name": "branch1",
+                        "edge_name": "edge1",
+                        "target_branch_name": None,
+                        "target_edge_name": "edge1-680",
+                        "interface_overrides": [
+                            {
+                                "reference_interface": "GE1",
+                                "hardware_interface": "GE1",
+                                "switch_vlans": [1510],
+                            }
+                        ],
+                    }
+                ],
+            },
+            "result": {
+                "run_id": run_id,
+                "topology_name": "demo-topology-a1b2c3",
+                "topology_path": "/tmp/demo-topology-a1b2c3",
+                "zip_path": "/tmp/demo-topology-a1b2c3.zip",
+                "download_url": f"/api/runs/{run_id}/download",
+                "can_configure_switches": True,
+                "mapping_statuses": [],
+                "messages": [{"level": "info", "message": "Loaded saved topology run."}],
+            },
+            "publish_result": None,
+        },
+    )
+
+    response = client.get("/api/runs/run123")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["request"]["hypervisor_interface"] == "vmnic0"
+    assert body["result"]["run_id"] == "run123"
 
 
 def test_hardware_availability_route(monkeypatch):

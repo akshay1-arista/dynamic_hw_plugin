@@ -31,6 +31,7 @@ from .models import (
     JsonObject,
     RunMappingMetadata,
     RunMetadata,
+    SavedGenerateRequest,
     ValidationMessage,
 )
 from .reference import resolve_reference_path
@@ -76,11 +77,21 @@ def generate_topology(
     if old_topology_name:
         global_replacements.append((old_topology_name, generated_topology_name))
 
+    now = _utc_now()
     run_metadata = RunMetadata(
         run_id=run_id,
         topology_name=generated_topology_name,
         reference_topology_id=request.reference_topology_id,
         requested_by=request.requested_by,
+        request=SavedGenerateRequest(
+            topology_name=request.topology_name,
+            reference_topology_id=request.reference_topology_id,
+            hypervisor_ip=request.hypervisor_ip,
+            hypervisor_interface=request.hypervisor_interface,
+            mappings=request.mappings,
+        ),
+        created_at=now,
+        updated_at=now,
     )
     mapping_statuses: list[GenerateMappingStatus] = []
 
@@ -209,6 +220,13 @@ def generate_topology(
     validation_messages = _validate_generated_json(topology_path)
     messages.extend(validation_messages)
     zip_path = _zip_topology(topology_path)
+    run_metadata.can_configure_switches = all(
+        mapping.path and mapping.path.complete and path_has_credentials(mapping.path, inventory)
+        for mapping in run_metadata.mappings
+    )
+    run_metadata.mapping_statuses = mapping_statuses
+    run_metadata.messages = messages
+    run_metadata.updated_at = _utc_now()
     _write_run_metadata(run_root, run_metadata)
     _saved_inventory, reservation_events = reserve_generated_hardware(
         [mapping.hardware_id for mapping in request.mappings],
@@ -225,10 +243,7 @@ def generate_topology(
         topology_path=str(topology_path),
         zip_path=str(zip_path),
         download_url=f"/api/runs/{run_id}/download",
-        can_configure_switches=all(
-            mapping.path and mapping.path.complete and path_has_credentials(mapping.path, inventory)
-            for mapping in run_metadata.mappings
-        ),
+        can_configure_switches=run_metadata.can_configure_switches,
         mapping_statuses=mapping_statuses,
         messages=messages,
     )
@@ -279,6 +294,12 @@ def _write_run_metadata(run_root: Path, metadata: RunMetadata) -> None:
     with (run_root / "run_metadata.json").open("w") as fh:
         json.dump(metadata.model_dump(mode="json"), fh, indent=2)
         fh.write("\n")
+
+
+def _utc_now() -> str:
+    from datetime import datetime, timezone
+
+    return datetime.now(timezone.utc).isoformat()
 
 
 def resolve_run_root(run_id: str, outputs_root: Path = OUTPUTS_ROOT) -> Path:

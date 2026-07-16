@@ -1221,6 +1221,12 @@ button:disabled {
   width: 34px;
 }
 
+.savedRunLoadButton {
+  align-self: start;
+  min-height: 34px;
+  padding: 7px 10px;
+}
+
 .dangerButton {
   border-color: #f0b8b2;
   color: var(--red);

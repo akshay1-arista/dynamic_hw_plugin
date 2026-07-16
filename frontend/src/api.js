@@ -60,6 +60,14 @@ export function fetchPrivateBranches() {
   return request('/api/hapy/private-branches');
 }
 
+export function fetchGeneratedRuns() {
+  return request('/api/runs');
+}
+
+export function fetchGeneratedRun(runId) {
+  return request(`/api/runs/${runId}`);
+}
+
 export function fetchAuditTrail() {
   return request('/api/audit-trail');
 }

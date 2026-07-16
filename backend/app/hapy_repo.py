@@ -130,6 +130,7 @@ def commit_run_to_hapy_repo(
         updated_at=now,
     )
     metadata.hapy_publishes.append(publish_metadata)
+    metadata.updated_at = now
     _write_run_metadata(metadata_path, metadata)
     _upsert_registry_record(registry_path, publish_metadata)
 
@@ -211,6 +212,7 @@ def publish_run_private_branch(
     )
     publish_metadata.updated_at = _utc_now()
     _replace_publish(metadata, publish_metadata)
+    metadata.updated_at = publish_metadata.updated_at
     _write_run_metadata(metadata_path, metadata)
     _upsert_registry_record(registry_path, publish_metadata)
     if request.requested_by is not None:
@@ -632,4 +634,5 @@ def _remove_publish_from_run_metadata(run_id: str, private_branch_name: str, out
         for publish in metadata.hapy_publishes
         if publish.private_branch_name != private_branch_name
     ]
+    metadata.updated_at = _utc_now()
     _write_run_metadata(metadata_path, metadata)

@@ -27,10 +27,13 @@ from .models import (
     InventoryRefreshRequest,
     InventoryRefreshResult,
     InventoryUpdateRequest,
+    SavedRunListResult,
+    SavedRunLoadResult,
     SwitchConfigureRequest,
     SwitchConfigureResult,
 )
 from .reference import list_references
+from .run_history import RunHistoryError, list_saved_runs, load_saved_run
 from .switch_config import SwitchConfigError, configure_switches_for_run
 
 
@@ -125,6 +128,22 @@ def post_generate(request: GenerateRequest):
     try:
         return generate_topology(request)
     except (GenerationError, ValueError, FileNotFoundError) as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@app.get("/api/runs", response_model=SavedRunListResult)
+def get_saved_runs():
+    try:
+        return list_saved_runs()
+    except (RunHistoryError, GenerationError, ValueError, FileNotFoundError) as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@app.get("/api/runs/{run_id}", response_model=SavedRunLoadResult)
+def get_saved_run(run_id: str):
+    try:
+        return load_saved_run(run_id)
+    except (RunHistoryError, GenerationError, ValueError, FileNotFoundError) as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
 
 

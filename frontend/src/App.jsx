@@ -22,6 +22,8 @@ import {
   configureSwitches,
   deletePrivateBranches,
   fetchAuditTrail,
+  fetchGeneratedRun,
+  fetchGeneratedRuns,
   fetchPrivateBranches,
   fetchInventory,
   fetchReferences,
@@ -52,6 +54,7 @@ export function App() {
   const [profileEmail, setProfileEmail] = useState(() => loadStoredUser()?.email || '');
   const [references, setReferences] = useState([]);
   const [inventory, setInventory] = useState({ hardware: [] });
+  const [generatedRuns, setGeneratedRuns] = useState([]);
   const [privateBranches, setPrivateBranches] = useState([]);
   const [auditTrail, setAuditTrail] = useState([]);
   const [selectedPrivateBranchNames, setSelectedPrivateBranchNames] = useState([]);
@@ -69,6 +72,7 @@ export function App() {
   const [copyState, setCopyState] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(Boolean(loadStoredUser()));
+  const [loadingSavedRunId, setLoadingSavedRunId] = useState('');
   const [generating, setGenerating] = useState(false);
   const [savingInventory, setSavingInventory] = useState(false);
   const [refreshingHardwareId, setRefreshingHardwareId] = useState('');
@@ -82,6 +86,7 @@ export function App() {
   const [expandedHardwareId, setExpandedHardwareId] = useState('');
   const [collapsedDataCards, setCollapsedDataCards] = useState({
     inventory: false,
+    generatedRuns: false,
     privateBranches: false,
     auditTrail: false
   });
@@ -224,14 +229,16 @@ export function App() {
     setLoading(true);
     setError('');
     try {
-      const [referenceData, inventoryData, privateBranchData, auditData] = await Promise.all([
+      const [referenceData, inventoryData, generatedRunData, privateBranchData, auditData] = await Promise.all([
         fetchReferences(),
         fetchInventory(),
+        fetchGeneratedRuns(),
         fetchPrivateBranches(),
         fetchAuditTrail()
       ]);
       setReferences(referenceData);
       setInventory(inventoryData);
+      setGeneratedRuns(generatedRunData.runs || []);
       setPrivateBranches(privateBranchData.branches || []);
       setAuditTrail(auditData.events || []);
       setSelectedPrivateBranchNames((current) =>
@@ -248,6 +255,32 @@ export function App() {
       setError(loadError.message);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function loadSavedRun(runId) {
+    setLoadingSavedRunId(runId);
+    setError('');
+    setSwitchPreview(null);
+    try {
+      const savedRun = await fetchGeneratedRun(runId);
+      setSelectedReferenceId(savedRun.request.reference_topology_id || '');
+      setTopologyName(savedRun.request.topology_name || '');
+      setHypervisorIp(savedRun.request.hypervisor_ip || '');
+      setHypervisorInterface(savedRun.request.hypervisor_interface || '');
+      setMappings(
+        savedRun.request.mappings?.length
+          ? savedRun.request.mappings.map((mapping) => savedMappingToEditorState(mapping))
+          : [{ ...emptyMapping }]
+      );
+      setResult(savedRun.result);
+      setPublishResult(savedRun.publish_result);
+      setPublishBaseBranch(savedRun.publish_result?.base_branch || 'master');
+      setCopyState('');
+    } catch (loadError) {
+      setError(loadError.message);
+    } finally {
+      setLoadingSavedRunId('');
     }
   }
 
@@ -329,6 +362,7 @@ export function App() {
     setCurrentUser(null);
     setReferences([]);
     setInventory({ hardware: [] });
+    setGeneratedRuns([]);
     setPrivateBranches([]);
     setAuditTrail([]);
     setSelectedPrivateBranchNames([]);
@@ -450,8 +484,13 @@ export function App() {
       };
       const generated = await generateTopology(payload);
       setResult(generated);
-      const [inventoryData, auditData] = await Promise.all([fetchInventory(), fetchAuditTrail()]);
+      const [inventoryData, generatedRunData, auditData] = await Promise.all([
+        fetchInventory(),
+        fetchGeneratedRuns(),
+        fetchAuditTrail()
+      ]);
       setInventory(inventoryData);
+      setGeneratedRuns(generatedRunData.runs || []);
       setAuditTrail(auditData.events || []);
     } catch (generateError) {
       setError(generateError.message);
@@ -472,7 +511,12 @@ export function App() {
         requested_by: currentUser
       });
       setPublishResult(response);
-      const [refreshed, auditData] = await Promise.all([fetchPrivateBranches(), fetchAuditTrail()]);
+      const [generatedRunData, refreshed, auditData] = await Promise.all([
+        fetchGeneratedRuns(),
+        fetchPrivateBranches(),
+        fetchAuditTrail()
+      ]);
+      setGeneratedRuns(generatedRunData.runs || []);
       setPrivateBranches(refreshed.branches || []);
       setAuditTrail(auditData.events || []);
       setCopyState('');
@@ -531,7 +575,12 @@ export function App() {
         private_branch_names: deleteAll ? [] : targets,
         requested_by: currentUser
       });
-      const [refreshed, auditData] = await Promise.all([fetchPrivateBranches(), fetchAuditTrail()]);
+      const [generatedRunData, refreshed, auditData] = await Promise.all([
+        fetchGeneratedRuns(),
+        fetchPrivateBranches(),
+        fetchAuditTrail()
+      ]);
+      setGeneratedRuns(generatedRunData.runs || []);
       setPrivateBranches(refreshed.branches || []);
       setAuditTrail(auditData.events || []);
       setSelectedPrivateBranchNames([]);
@@ -837,6 +886,60 @@ export function App() {
 
           <div className="operationsGrid">
             <CollapsiblePanel
+              className="savedRunsPanel"
+              collapsed={collapsedDataCards.generatedRuns}
+              description="Reload earlier generated runs to republish, reconfigure switches, or revise mappings."
+              icon={<Archive size={18} />}
+              onToggle={() => toggleDataCard('generatedRuns')}
+              title="Generated Runs"
+            >
+              {generatedRuns.length === 0 ? (
+                <div className="emptyState">
+                  <Archive size={18} aria-hidden="true" />
+                  <p>No generated runs recorded yet.</p>
+                </div>
+              ) : (
+                <div className="branchRegistryList">
+                  {generatedRuns.map((run) => (
+                    <div className="branchRegistryItem" key={run.run_id}>
+                      <div className="branchRegistrySelect">
+                        <span>
+                          <strong>{run.topology_name}</strong>
+                          <small>
+                            {run.reference_topology_id} / run {run.run_id}
+                          </small>
+                          <small>
+                            Requested as {run.requested_topology_name}
+                            {run.requested_by?.name ? ` by ${run.requested_by.name}` : ''}
+                          </small>
+                          {run.private_branch_name ? (
+                            <small>
+                              {run.private_branch_pushed ? 'Pushed' : 'Committed only'} / {run.private_branch_name}
+                            </small>
+                          ) : (
+                            <small>Not published to Gerrit yet</small>
+                          )}
+                        </span>
+                      </div>
+                      <button
+                        className="secondary savedRunLoadButton"
+                        onClick={() => loadSavedRun(run.run_id)}
+                        disabled={loadingSavedRunId !== '' || generating || publishingAction !== ''}
+                        aria-label={
+                          loadingSavedRunId === run.run_id ? `Loading run ${run.run_id}` : `Load run ${run.run_id}`
+                        }
+                        type="button"
+                      >
+                        {loadingSavedRunId === run.run_id ? <Loader2 className="spin" size={16} /> : <Archive size={16} />}
+                        {loadingSavedRunId === run.run_id ? 'Loading...' : 'Load'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CollapsiblePanel>
+
+            <CollapsiblePanel
               className="branchRegistryPanel"
               collapsed={collapsedDataCards.privateBranches}
               description="Recently created private branches for generated topology runs."
@@ -1128,6 +1231,7 @@ export function App() {
                 <CheckCircle2 size={18} aria-hidden="true" />
                 <span>
                   <strong>{result.topology_name}</strong>
+                  <small>Run {result.run_id}</small>
                   <small>{result.topology_path}</small>
                 </span>
               </div>
@@ -1326,6 +1430,22 @@ function getSafeStorage() {
     return null;
   }
   return candidate;
+}
+
+function savedMappingToEditorState(mapping) {
+  return {
+    ...emptyMapping,
+    hardware_id: mapping.hardware_id || '',
+    branch_name: mapping.branch_name || '',
+    edge_name: mapping.edge_name || '',
+    target_branch_name: mapping.target_branch_name || '',
+    target_edge_name: mapping.target_edge_name || '',
+    interface_overrides: (mapping.interface_overrides || []).map((override) => ({
+      reference_interface: override.reference_interface,
+      hardware_interface: override.hardware_interface || '',
+      switch_vlans_text: Array.isArray(override.switch_vlans) ? override.switch_vlans.join(', ') : ''
+    }))
+  };
 }
 
 function formatAuditAction(action) {

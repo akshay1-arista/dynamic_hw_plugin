@@ -265,6 +265,19 @@ beforeEach(() => {
     }
   });
   let inventoryState = JSON.parse(JSON.stringify(inventory));
+  let generatedRuns = [
+    {
+      run_id: 'saved123',
+      topology_name: 'saved-topology-a1b2c3',
+      requested_topology_name: 'saved-topology',
+      reference_topology_id: '3-site',
+      requested_by: defaultUser,
+      created_at: '2026-07-11T00:00:00+00:00',
+      updated_at: '2026-07-11T00:01:00+00:00',
+      private_branch_name: null,
+      private_branch_pushed: false
+    }
+  ];
   let privateBranches = [];
   let auditTrail = [];
   global.fetch = vi.fn(async (url, options = {}) => {
@@ -273,6 +286,60 @@ beforeEach(() => {
     }
     if (url === '/api/hardware' && !options.method) {
       return Response.json(inventoryState);
+    }
+    if (url === '/api/runs') {
+      return Response.json({ runs: generatedRuns });
+    }
+    if (url === '/api/runs/saved123') {
+      return Response.json({
+        request: {
+          topology_name: 'saved-topology',
+          reference_topology_id: '3-site',
+          hypervisor_ip: '10.68.136.50',
+          hypervisor_interface: 'vmnic0',
+          mappings: [
+            {
+              hardware_id: 'a01-680-standalone',
+              branch_name: 'branch1',
+              edge_name: 'b1-edge1',
+              target_branch_name: null,
+              target_edge_name: null,
+              interface_overrides: [
+                {
+                  reference_interface: 'GE1',
+                  hardware_interface: 'GE1',
+                  switch_vlans: [1510]
+                }
+              ]
+            }
+          ]
+        },
+        result: {
+          run_id: 'saved123',
+          topology_name: 'saved-topology-a1b2c3',
+          topology_path: '/tmp/saved-topology-a1b2c3',
+          zip_path: '/tmp/saved-topology-a1b2c3.zip',
+          download_url: '/api/runs/saved123/download',
+          can_configure_switches: true,
+          mapping_statuses: [
+            {
+              hardware_id: 'a01-680-standalone',
+              hardware_display_name: 'A01 680 Standalone',
+              branch_name: 'branch1',
+              edge_name: 'b1-edge1',
+              path_resolved: true,
+              auto_config_ready: true,
+              path: {
+                access_switch_name: 'a01-access-switch',
+                upstream_switch_name: 'a01-core-switch',
+                hypervisor_name: 'chn-rnd-srv-640-298VF33'
+              }
+            }
+          ],
+          messages: [{ level: 'info', message: 'Loaded saved topology run saved123.' }]
+        },
+        publish_result: null
+      });
     }
     if (url === '/api/hapy/private-branches') {
       return Response.json({ branches: privateBranches });
@@ -367,6 +434,20 @@ beforeEach(() => {
         },
         ...auditTrail
       ];
+      generatedRuns = [
+        {
+          run_id: 'abc123',
+          topology_name: '3-site-hw-a1b2c3',
+          requested_topology_name: payload.topology_name,
+          reference_topology_id: payload.reference_topology_id,
+          requested_by: payload.requested_by,
+          created_at: '2026-07-12T00:00:00+00:00',
+          updated_at: '2026-07-12T00:00:00+00:00',
+          private_branch_name: null,
+          private_branch_pushed: false
+        },
+        ...generatedRuns.filter((run) => run.run_id !== 'abc123')
+      ];
       if (payload.mappings?.[0]?.hardware_id === 'a01-680-standalone') {
         return Response.json({
           run_id: 'abc123',
@@ -414,24 +495,27 @@ beforeEach(() => {
         messages: [{ level: 'info', message: 'All generated JSON files parsed successfully' }]
       });
     }
-    if (url === '/api/runs/abc123/publish-private-branch' && options.method === 'POST') {
+    if (/^\/api\/runs\/[^/]+\/publish-private-branch$/.test(url) && options.method === 'POST') {
+      const runId = url.split('/')[3];
       const payload = JSON.parse(options.body);
+      const existingRun = generatedRuns.find((run) => run.run_id === runId);
+      const topologyName = existingRun?.topology_name || '3-site-hw-a1b2c3';
       const response = {
-        run_id: 'abc123',
-        topology_name: '3-site-hw-a1b2c3',
-        reference_topology_id: '3-site',
+        run_id: runId,
+        topology_name: topologyName,
+        reference_topology_id: existingRun?.reference_topology_id || '3-site',
         repo_path: '/repo/velocloud.src',
-        destination_path: `/repo/velocloud.src/hapy/hapy/testbed/configs/3-site-hw-a1b2c3`,
-        destination_relative_path: '3-site-hw-a1b2c3',
+        destination_path: `/repo/velocloud.src/hapy/hapy/testbed/configs/${topologyName}`,
+        destination_relative_path: topologyName,
         base_branch: payload.base_branch,
-        private_branch_name: 'hw_topo_gen_private_abc123',
+        private_branch_name: `hw_topo_gen_private_${runId}`,
         commit_sha: 'deadbeef1234',
-        commit_message: 'VLDT-None: add topology 3-site-hw-a1b2c3',
+        commit_message: `VLDT-None: add topology ${topologyName}`,
         private_branch_pushed: true,
         remote_name: 'origin',
-        remote_branch_ref: 'refs/heads/hw_topo_gen_private_abc123',
+        remote_branch_ref: `refs/heads/hw_topo_gen_private_${runId}`,
         fetch_command:
-          'git fetch origin refs/heads/hw_topo_gen_private_abc123 && git checkout -b hw_topo_gen_private_abc123 FETCH_HEAD',
+          `git fetch origin refs/heads/hw_topo_gen_private_${runId} && git checkout -b hw_topo_gen_private_${runId} FETCH_HEAD`,
         created_at: '2026-07-11T00:00:00+00:00',
         updated_at: '2026-07-11T00:01:00+00:00',
         messages: [{ level: 'info', message: 'Committed and pushed private branch to origin.' }]
@@ -456,6 +540,16 @@ beforeEach(() => {
           updated_at: response.updated_at
         }
       ];
+      generatedRuns = generatedRuns.map((run) =>
+        run.run_id === runId
+          ? {
+              ...run,
+              private_branch_name: response.private_branch_name,
+              private_branch_pushed: true,
+              updated_at: response.updated_at
+            }
+          : run
+      );
       auditTrail = [
         {
           id: 'audit-publish',
@@ -464,7 +558,7 @@ beforeEach(() => {
           target_type: 'private_branch',
           target_id: response.private_branch_name,
           summary: 'Pushed Gerrit private branch.',
-          details: { run_id: 'abc123' },
+          details: { run_id: runId },
           created_at: '2026-07-12T00:00:00+00:00'
         },
         ...auditTrail
@@ -479,8 +573,22 @@ beforeEach(() => {
       const deletedNames = payload.delete_all
         ? privateBranches.map((branch) => branch.private_branch_name)
         : payload.private_branch_names;
+      const deletedByRunId = new Set(
+        privateBranches
+          .filter((branch) => deletedNames.includes(branch.private_branch_name))
+          .map((branch) => branch.run_id)
+      );
       privateBranches = privateBranches.filter(
         (branch) => !deletedNames.includes(branch.private_branch_name)
+      );
+      generatedRuns = generatedRuns.map((run) =>
+        deletedByRunId.has(run.run_id)
+          ? {
+              ...run,
+              private_branch_name: null,
+              private_branch_pushed: false
+            }
+          : run
       );
       auditTrail = [
         ...deletedNames.map((branchName, index) => ({
@@ -660,6 +768,30 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: 'All' }));
     expect(within(inventoryPanel).getAllByText('CHN 3800 HA Pair 8').length).toBeGreaterThan(0);
     expect(within(inventoryPanel).getByText('A01 680 Standalone')).toBeInTheDocument();
+  });
+
+  test('loads a previously generated run into the editor and delivery panel', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await screen.findAllByText('CHN 3800 HA Pair 8');
+    await user.click(screen.getByRole('button', { name: /load run saved123/i }));
+
+    await waitFor(() => expect(screen.getByText('/tmp/saved-topology-a1b2c3')).toBeInTheDocument());
+    expect(screen.getByLabelText('Output topology name')).toHaveValue('saved-topology');
+    expect(screen.getByRole('combobox', { name: 'Hypervisor IP' })).toHaveValue('10.68.136.50');
+    expect(screen.getByRole('combobox', { name: 'Hypervisor interface' })).toHaveValue('vmnic0');
+    expect(screen.getByLabelText('Branch')).toHaveValue('branch1');
+    expect(screen.getByLabelText('Edge')).toHaveValue('b1-edge1');
+    expect(screen.getByText('Run saved123')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /commit and push gerrit private branch/i }));
+
+    const publishCall = global.fetch.mock.calls.find(([url]) => url === '/api/runs/saved123/publish-private-branch');
+    expect(JSON.parse(publishCall[1].body)).toEqual({
+      base_branch: 'master',
+      requested_by: defaultUser
+    });
   });
 
   test('adds mapping preview and generates download result', async () => {

@@ -108,7 +108,7 @@ def main() -> int:
     finally:
         client.close()
 
-    save_inventory(inventory, inventory_path)
+    save_inventory(inventory, inventory_path, preserve_local_state=True)
     print(
         f"Synced racks {', '.join(racks)} into {inventory_path}. "
         f"Imported/updated {len(rack_devices)} devices and processed {connection_count} wiremap links."

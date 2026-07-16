@@ -9,7 +9,6 @@
       "model_suffix": null,
       "serial_number": null,
       "ip_address": "10.68.136.67",
-      "available": true,
       "ha_group_id": null,
       "ha_role": null,
       "dpdk_enabled": null,
@@ -31,7 +30,6 @@
       },
       "lab_navigator_id": null,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": null
     },
     "b1e1_l2_switch": {
@@ -43,7 +41,6 @@
       "model_suffix": null,
       "serial_number": null,
       "ip_address": "10.68.136.94",
-      "available": true,
       "ha_group_id": null,
       "ha_role": null,
       "dpdk_enabled": null,
@@ -65,7 +62,6 @@
       },
       "lab_navigator_id": null,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": null
     },
     "chn_rnd_sw_3048_m0ap7qi": {
@@ -77,7 +73,6 @@
       "model_suffix": "3048",
       "serial_number": "C5MB9Z2",
       "ip_address": "10.68.136.96",
-      "available": true,
       "ha_group_id": null,
       "ha_role": null,
       "dpdk_enabled": null,
@@ -99,7 +94,6 @@
       },
       "lab_navigator_id": 252,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported from Lab Navigator rack A02, device id 252."
     },
     "chn_rnd_sw_4048_igcf7dd": {
@@ -111,7 +105,6 @@
       "model_suffix": "4048",
       "serial_number": "GBWSNK2",
       "ip_address": "10.68.137.214",
-      "available": true,
       "ha_group_id": null,
       "ha_role": null,
       "dpdk_enabled": null,
@@ -133,7 +126,6 @@
       },
       "lab_navigator_id": 253,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported from Lab Navigator rack A02, device id 253."
     },
     "ln-ha-a01-319-4rwfxc2-a01-320-g7xfxc2-active": {
@@ -145,7 +137,6 @@
       "model_suffix": "640",
       "serial_number": "4RWFXC2",
       "ip_address": null,
-      "available": false,
       "ha_group_id": "ln-ha-a01-319-4rwfxc2-a01-320-g7xfxc2",
       "ha_role": "active",
       "dpdk_enabled": null,
@@ -178,16 +169,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 319,
       "hypervisor_ip": null,
-      "reservation": {
-        "actor": {
-          "name": "Akshay Jain",
-          "email": "akshay1.jain@arista.com"
-        },
-        "reserved_at": "2026-07-14T08:02:23.269552+00:00",
-        "reason": "topology-generation",
-        "run_id": "850d61c4b291",
-        "topology_name": "5-site-cluster-spirent-hw-9d2bce"
-      },
       "notes": "Imported as HA pair from Lab Navigator active device ln-a01-319-4rwfxc2 and standby device ln-a01-320-g7xfxc2 based on matching VLAN profile. Imported from Lab Navigator rack A01, device id 319. Omitted 4 ports without VLAN-backed switch connections. Imported from Lab Navigator rack A01, device id 320. Omitted 4 ports without VLAN-backed switch connections. HA-paired in local inventory with chn-rnd-edge-640-G7XFXC2."
     },
     "ln-ha-a01-319-4rwfxc2-a01-320-g7xfxc2-standby": {
@@ -199,7 +180,6 @@
       "model_suffix": "640",
       "serial_number": "G7XFXC2",
       "ip_address": null,
-      "available": false,
       "ha_group_id": "ln-ha-a01-319-4rwfxc2-a01-320-g7xfxc2",
       "ha_role": "standby",
       "dpdk_enabled": null,
@@ -232,16 +212,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 320,
       "hypervisor_ip": null,
-      "reservation": {
-        "actor": {
-          "name": "Akshay Jain",
-          "email": "akshay1.jain@arista.com"
-        },
-        "reserved_at": "2026-07-14T08:02:23.269552+00:00",
-        "reason": "topology-generation",
-        "run_id": "850d61c4b291",
-        "topology_name": "5-site-cluster-spirent-hw-9d2bce"
-      },
       "notes": "Imported as HA pair from Lab Navigator active device ln-a01-319-4rwfxc2 and standby device ln-a01-320-g7xfxc2 based on matching VLAN profile. Imported from Lab Navigator rack A01, device id 319. Omitted 4 ports without VLAN-backed switch connections. Imported from Lab Navigator rack A01, device id 320. Omitted 4 ports without VLAN-backed switch connections. HA-paired in local inventory with chn-rnd-edge-640-4RWFXC2."
     },
     "chn_rnd_sw_3048_j8vsg02": {
@@ -253,7 +223,6 @@
       "model_suffix": "3048",
       "serial_number": "J8VSG02",
       "ip_address": "10.68.136.204",
-      "available": true,
       "ha_group_id": null,
       "ha_role": null,
       "dpdk_enabled": null,
@@ -275,7 +244,6 @@
       },
       "lab_navigator_id": 310,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported from Lab Navigator rack A01, device id 310."
     },
     "ln-ha-a01-325-vc05100065814-a01-326-vc05100065869-active": {
@@ -287,7 +255,6 @@
       "model_suffix": "510",
       "serial_number": "VC05100065814",
       "ip_address": null,
-      "available": true,
       "ha_group_id": "ln-ha-a01-325-vc05100065814-a01-326-vc05100065869",
       "ha_role": "active",
       "dpdk_enabled": null,
@@ -310,7 +277,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 325,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported as HA pair from Lab Navigator active device ln-a01-325-vc05100065814 and standby device ln-a01-326-vc05100065869 based on matching VLAN profile. Imported from Lab Navigator rack A01, device id 325. Omitted 3 ports without VLAN-backed switch connections. Imported from Lab Navigator rack A01, device id 326. Omitted 3 ports without VLAN-backed switch connections. HA-paired in local inventory with chn-rnd-edge-510-0065869."
     },
     "ln-ha-a01-325-vc05100065814-a01-326-vc05100065869-standby": {
@@ -322,7 +288,6 @@
       "model_suffix": "510",
       "serial_number": "VC05100065869",
       "ip_address": null,
-      "available": true,
       "ha_group_id": "ln-ha-a01-325-vc05100065814-a01-326-vc05100065869",
       "ha_role": "standby",
       "dpdk_enabled": null,
@@ -345,7 +310,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 326,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported as HA pair from Lab Navigator active device ln-a01-325-vc05100065814 and standby device ln-a01-326-vc05100065869 based on matching VLAN profile. Imported from Lab Navigator rack A01, device id 325. Omitted 3 ports without VLAN-backed switch connections. Imported from Lab Navigator rack A01, device id 326. Omitted 3 ports without VLAN-backed switch connections. HA-paired in local inventory with chn-rnd-edge-510-0065814."
     },
     "ln-ha-a01-327-dgd10q2-a01-328-16c10q2-active": {
@@ -357,7 +321,6 @@
       "model_suffix": "3800",
       "serial_number": "DGD10Q2",
       "ip_address": null,
-      "available": false,
       "ha_group_id": "ln-ha-a01-327-dgd10q2-a01-328-16c10q2",
       "ha_role": "active",
       "dpdk_enabled": null,
@@ -390,16 +353,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 327,
       "hypervisor_ip": null,
-      "reservation": {
-        "actor": {
-          "name": "Akshay Jain",
-          "email": "akshay1.jain@arista.com"
-        },
-        "reserved_at": "2026-07-14T08:02:23.269608+00:00",
-        "reason": "topology-generation",
-        "run_id": "850d61c4b291",
-        "topology_name": "5-site-cluster-spirent-hw-9d2bce"
-      },
       "notes": "Imported from Lab Navigator rack A01, device id 327. HA-paired in local inventory with chn-rnd-edge-3800-16C10Q2."
     },
     "ln-ha-a01-327-dgd10q2-a01-328-16c10q2-standby": {
@@ -411,7 +364,6 @@
       "model_suffix": "3800",
       "serial_number": "16C10Q2",
       "ip_address": null,
-      "available": false,
       "ha_group_id": "ln-ha-a01-327-dgd10q2-a01-328-16c10q2",
       "ha_role": "standby",
       "dpdk_enabled": null,
@@ -444,16 +396,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 328,
       "hypervisor_ip": null,
-      "reservation": {
-        "actor": {
-          "name": "Akshay Jain",
-          "email": "akshay1.jain@arista.com"
-        },
-        "reserved_at": "2026-07-14T08:02:23.269608+00:00",
-        "reason": "topology-generation",
-        "run_id": "850d61c4b291",
-        "topology_name": "5-site-cluster-spirent-hw-9d2bce"
-      },
       "notes": "Imported from Lab Navigator rack A01, device id 328. HA-paired in local inventory with chn-rnd-edge-3800-14DQ363."
     },
     "chn_rnd_sw_3048_j8f10q2": {
@@ -465,7 +407,6 @@
       "model_suffix": "3048",
       "serial_number": "J8F10Q2",
       "ip_address": "10.68.137.69",
-      "available": true,
       "ha_group_id": null,
       "ha_role": null,
       "dpdk_enabled": null,
@@ -487,7 +428,6 @@
       },
       "lab_navigator_id": 311,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported from Lab Navigator rack A01, device id 311."
     },
     "ln-ha-a01-329-10xb9z2-a01-330-10sc9z2-active": {
@@ -499,7 +439,6 @@
       "model_suffix": "3400",
       "serial_number": "10XB9Z2",
       "ip_address": null,
-      "available": true,
       "ha_group_id": "ln-ha-a01-329-10xb9z2-a01-330-10sc9z2",
       "ha_role": "active",
       "dpdk_enabled": null,
@@ -532,7 +471,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 329,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported as HA pair from Lab Navigator active device ln-a01-329-10xb9z2 and standby device ln-a01-330-10sc9z2 based on matching VLAN profile. Imported from Lab Navigator rack A01, device id 329. Omitted 5 ports without VLAN-backed switch connections. Imported from Lab Navigator rack A01, device id 330. Omitted 5 ports without VLAN-backed switch connections. HA-paired in local inventory with chn-rnd-edge-3400-10SC9Z2."
     },
     "ln-ha-a01-329-10xb9z2-a01-330-10sc9z2-standby": {
@@ -544,7 +482,6 @@
       "model_suffix": "3400",
       "serial_number": "10SC9Z2",
       "ip_address": null,
-      "available": true,
       "ha_group_id": "ln-ha-a01-329-10xb9z2-a01-330-10sc9z2",
       "ha_role": "standby",
       "dpdk_enabled": null,
@@ -577,7 +514,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 330,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported as HA pair from Lab Navigator active device ln-a01-329-10xb9z2 and standby device ln-a01-330-10sc9z2 based on matching VLAN profile. Imported from Lab Navigator rack A01, device id 329. Omitted 5 ports without VLAN-backed switch connections. Imported from Lab Navigator rack A01, device id 330. Omitted 5 ports without VLAN-backed switch connections. HA-paired in local inventory with chn-rnd-edge-3400-10XB9Z2."
     },
     "chn_rnd_sw_3048_73v00q2": {
@@ -589,7 +525,6 @@
       "model_suffix": "3048",
       "serial_number": "73V00Q2",
       "ip_address": "10.68.137.20",
-      "available": true,
       "ha_group_id": null,
       "ha_role": null,
       "dpdk_enabled": null,
@@ -611,7 +546,6 @@
       },
       "lab_navigator_id": 308,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported from Lab Navigator rack A01, device id 308."
     },
     "ln-ha-a01-331-vc05400003126-a01-332-vc05400007099-active": {
@@ -623,7 +557,6 @@
       "model_suffix": "540",
       "serial_number": "VC05400003126",
       "ip_address": null,
-      "available": false,
       "ha_group_id": "ln-ha-a01-331-vc05400003126-a01-332-vc05400007099",
       "ha_role": "active",
       "dpdk_enabled": null,
@@ -656,16 +589,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 331,
       "hypervisor_ip": null,
-      "reservation": {
-        "actor": {
-          "name": "Akshay Jain",
-          "email": "akshay1.jain@arista.com"
-        },
-        "reserved_at": "2026-07-14T08:02:23.269620+00:00",
-        "reason": "topology-generation",
-        "run_id": "850d61c4b291",
-        "topology_name": "5-site-cluster-spirent-hw-9d2bce"
-      },
       "notes": "Imported as HA pair from Lab Navigator active device ln-a01-331-vc05400003126 and standby device ln-a01-332-vc05400007099 based on matching VLAN profile. Imported from Lab Navigator rack A01, device id 331. Omitted 9 ports without VLAN-backed switch connections. Imported from Lab Navigator rack A01, device id 332. Omitted 9 ports without VLAN-backed switch connections. HA-paired in local inventory with chn-rnd-edge-540-0007099."
     },
     "ln-ha-a01-331-vc05400003126-a01-332-vc05400007099-standby": {
@@ -677,7 +600,6 @@
       "model_suffix": "540",
       "serial_number": "VC05400007099",
       "ip_address": null,
-      "available": false,
       "ha_group_id": "ln-ha-a01-331-vc05400003126-a01-332-vc05400007099",
       "ha_role": "standby",
       "dpdk_enabled": null,
@@ -710,16 +632,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 332,
       "hypervisor_ip": null,
-      "reservation": {
-        "actor": {
-          "name": "Akshay Jain",
-          "email": "akshay1.jain@arista.com"
-        },
-        "reserved_at": "2026-07-14T08:02:23.269620+00:00",
-        "reason": "topology-generation",
-        "run_id": "850d61c4b291",
-        "topology_name": "5-site-cluster-spirent-hw-9d2bce"
-      },
       "notes": "Imported as HA pair from Lab Navigator active device ln-a01-331-vc05400003126 and standby device ln-a01-332-vc05400007099 based on matching VLAN profile. Imported from Lab Navigator rack A01, device id 331. Omitted 9 ports without VLAN-backed switch connections. Imported from Lab Navigator rack A01, device id 332. Omitted 9 ports without VLAN-backed switch connections. HA-paired in local inventory with chn-rnd-edge-540-0040546."
     },
     "ln-ha-a01-333-vc05200000142-a01-334-vc05200003323-active": {
@@ -731,7 +643,6 @@
       "model_suffix": "520",
       "serial_number": "VC05200000142",
       "ip_address": null,
-      "available": true,
       "ha_group_id": "ln-ha-a01-333-vc05200000142-a01-334-vc05200003323",
       "ha_role": "active",
       "dpdk_enabled": null,
@@ -764,7 +675,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 333,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported as HA pair from Lab Navigator active device ln-a01-333-vc05200000142 and standby device ln-a01-334-vc05200003323 based on matching VLAN profile. Imported from Lab Navigator rack A01, device id 333. Omitted 10 ports without VLAN-backed switch connections. Imported from Lab Navigator rack A01, device id 334. Omitted 10 ports without VLAN-backed switch connections. HA-paired in local inventory with chn-rnd-edge-520-0003323."
     },
     "ln-ha-a01-333-vc05200000142-a01-334-vc05200003323-standby": {
@@ -776,7 +686,6 @@
       "model_suffix": "520",
       "serial_number": "VC05200003323",
       "ip_address": null,
-      "available": true,
       "ha_group_id": "ln-ha-a01-333-vc05200000142-a01-334-vc05200003323",
       "ha_role": "standby",
       "dpdk_enabled": null,
@@ -809,7 +718,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 334,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported as HA pair from Lab Navigator active device ln-a01-333-vc05200000142 and standby device ln-a01-334-vc05200003323 based on matching VLAN profile. Imported from Lab Navigator rack A01, device id 333. Omitted 10 ports without VLAN-backed switch connections. Imported from Lab Navigator rack A01, device id 334. Omitted 10 ports without VLAN-backed switch connections. HA-paired in local inventory with chn-rnd-edge-520-0000142."
     },
     "ln-ha-a01-335-vc05100000127-a01-336-vco5100000124-active": {
@@ -821,7 +729,6 @@
       "model_suffix": "520",
       "serial_number": "VC05100000127",
       "ip_address": null,
-      "available": true,
       "ha_group_id": "ln-ha-a01-335-vc05100000127-a01-336-vco5100000124",
       "ha_role": "active",
       "dpdk_enabled": null,
@@ -854,7 +761,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 335,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported as HA pair from Lab Navigator active device ln-a01-335-vc05100000127 and standby device ln-a01-336-vco5100000124 based on matching VLAN profile. Imported from Lab Navigator rack A01, device id 335. Omitted 12 ports without VLAN-backed switch connections. Imported from Lab Navigator rack A01, device id 336. Omitted 12 ports without VLAN-backed switch connections. HA-paired in local inventory with chn-rnd-edge-520-0000124."
     },
     "ln-ha-a01-335-vc05100000127-a01-336-vco5100000124-standby": {
@@ -866,7 +772,6 @@
       "model_suffix": "520",
       "serial_number": "VCO5100000124",
       "ip_address": null,
-      "available": true,
       "ha_group_id": "ln-ha-a01-335-vc05100000127-a01-336-vco5100000124",
       "ha_role": "standby",
       "dpdk_enabled": null,
@@ -899,7 +804,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 336,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported as HA pair from Lab Navigator active device ln-a01-335-vc05100000127 and standby device ln-a01-336-vco5100000124 based on matching VLAN profile. Imported from Lab Navigator rack A01, device id 335. Omitted 12 ports without VLAN-backed switch connections. Imported from Lab Navigator rack A01, device id 336. Omitted 12 ports without VLAN-backed switch connections. HA-paired in local inventory with chn-rnd-edge-520-0000127."
     },
     "ln-ha-a01-337-vce08400000028-a01-338-vce08400000448-active": {
@@ -911,7 +815,6 @@
       "model_suffix": "840",
       "serial_number": "VCE08400000028",
       "ip_address": null,
-      "available": true,
       "ha_group_id": "ln-ha-a01-337-vce08400000028-a01-338-vce08400000448",
       "ha_role": "active",
       "dpdk_enabled": null,
@@ -920,7 +823,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 337,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported as HA pair from Lab Navigator active device ln-a01-337-vce08400000028 and standby device ln-a01-338-vce08400000448 based on matching VLAN profile. Imported from Lab Navigator rack A01, device id 337. Omitted 3 ports without VLAN-backed switch connections. Imported from Lab Navigator rack A01, device id 338. Omitted 3 ports without VLAN-backed switch connections."
     },
     "ln-ha-a01-337-vce08400000028-a01-338-vce08400000448-standby": {
@@ -932,7 +834,6 @@
       "model_suffix": "840",
       "serial_number": "VCE08400000448",
       "ip_address": null,
-      "available": true,
       "ha_group_id": "ln-ha-a01-337-vce08400000028-a01-338-vce08400000448",
       "ha_role": "standby",
       "dpdk_enabled": null,
@@ -941,7 +842,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 338,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported as HA pair from Lab Navigator active device ln-a01-337-vce08400000028 and standby device ln-a01-338-vce08400000448 based on matching VLAN profile. Imported from Lab Navigator rack A01, device id 337. Omitted 3 ports without VLAN-backed switch connections. Imported from Lab Navigator rack A01, device id 338. Omitted 3 ports without VLAN-backed switch connections."
     },
     "ln-ha-a01-341-gq25v43-a01-342-cs5npk2-active": {
@@ -953,7 +853,6 @@
       "model_suffix": "610",
       "serial_number": "GQ25V43",
       "ip_address": null,
-      "available": false,
       "ha_group_id": "ln-ha-a01-341-gq25v43-a01-342-cs5npk2",
       "ha_role": "active",
       "dpdk_enabled": null,
@@ -986,16 +885,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 341,
       "hypervisor_ip": null,
-      "reservation": {
-        "actor": {
-          "name": "Akshay Jain",
-          "email": "akshay1.jain@arista.com"
-        },
-        "reserved_at": "2026-07-14T08:02:23.269630+00:00",
-        "reason": "topology-generation",
-        "run_id": "850d61c4b291",
-        "topology_name": "5-site-cluster-spirent-hw-9d2bce"
-      },
       "notes": "Imported as HA pair from Lab Navigator active device ln-a01-341-gq25v43 and standby device ln-a01-342-cs5npk2 based on matching VLAN profile. Imported from Lab Navigator rack A01, device id 341. Omitted 5 ports without VLAN-backed switch connections. Imported from Lab Navigator rack A01, device id 342. Omitted 5 ports without VLAN-backed switch connections. HA-paired in local inventory with chn-rnd-edge-610-CS5NPK2."
     },
     "ln-ha-a01-341-gq25v43-a01-342-cs5npk2-standby": {
@@ -1007,7 +896,6 @@
       "model_suffix": "610",
       "serial_number": "CS5NPK2",
       "ip_address": null,
-      "available": false,
       "ha_group_id": "ln-ha-a01-341-gq25v43-a01-342-cs5npk2",
       "ha_role": "standby",
       "dpdk_enabled": null,
@@ -1040,16 +928,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 342,
       "hypervisor_ip": null,
-      "reservation": {
-        "actor": {
-          "name": "Akshay Jain",
-          "email": "akshay1.jain@arista.com"
-        },
-        "reserved_at": "2026-07-14T08:02:23.269630+00:00",
-        "reason": "topology-generation",
-        "run_id": "850d61c4b291",
-        "topology_name": "5-site-cluster-spirent-hw-9d2bce"
-      },
       "notes": "Imported as HA pair from Lab Navigator active device ln-a01-341-gq25v43 and standby device ln-a01-342-cs5npk2 based on matching VLAN profile. Imported from Lab Navigator rack A01, device id 341. Omitted 5 ports without VLAN-backed switch connections. Imported from Lab Navigator rack A01, device id 342. Omitted 5 ports without VLAN-backed switch connections. HA-paired in local inventory with chn-rnd-edge-610-GQ25V43."
     },
     "chn_rnd_sw_3048_6g900q2": {
@@ -1061,7 +939,6 @@
       "model_suffix": "3048",
       "serial_number": "6G900Q2",
       "ip_address": "10.68.136.149",
-      "available": true,
       "ha_group_id": null,
       "ha_role": null,
       "dpdk_enabled": null,
@@ -1083,7 +960,6 @@
       },
       "lab_navigator_id": 234,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported from Lab Navigator rack A02, device id 234."
     },
     "ln-ha-a02-314-236254370-a02-315-236254372-active": {
@@ -1095,7 +971,6 @@
       "model_suffix": "710",
       "serial_number": "236254370",
       "ip_address": null,
-      "available": true,
       "ha_group_id": "ln-ha-a02-314-236254370-a02-315-236254372",
       "ha_role": "active",
       "dpdk_enabled": null,
@@ -1128,7 +1003,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 314,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported as HA pair from Lab Navigator active device ln-a02-314-236254370 and standby device ln-a02-315-236254372 based on matching VLAN profile. Fresh Lab Navigator import added SFP1 switch connections without VLAN metadata. Imported from Lab Navigator rack A02, device id 314. Omitted 2 ports without VLAN-backed switch connections. Imported from Lab Navigator rack A02, device id 315. Omitted 2 ports without VLAN-backed switch connections. HA-paired in local inventory with chn-rnd-edge-710-6254372."
     },
     "ln-ha-a02-314-236254370-a02-315-236254372-standby": {
@@ -1140,7 +1014,6 @@
       "model_suffix": "710",
       "serial_number": "236254372",
       "ip_address": null,
-      "available": true,
       "ha_group_id": "ln-ha-a02-314-236254370-a02-315-236254372",
       "ha_role": "standby",
       "dpdk_enabled": null,
@@ -1173,7 +1046,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 315,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported as HA pair from Lab Navigator active device ln-a02-314-236254370 and standby device ln-a02-315-236254372 based on matching VLAN profile. Fresh Lab Navigator import added SFP1 switch connections without VLAN metadata. Imported from Lab Navigator rack A02, device id 314. Omitted 2 ports without VLAN-backed switch connections. Imported from Lab Navigator rack A02, device id 315. Omitted 2 ports without VLAN-backed switch connections. HA-paired in local inventory with chn-rnd-edge-710-6254370."
     },
     "chn_rnd_sw_3048_fctd9z2": {
@@ -1185,7 +1057,6 @@
       "model_suffix": "3048",
       "serial_number": "FCTD9Z2",
       "ip_address": "10.68.136.111",
-      "available": true,
       "ha_group_id": null,
       "ha_role": null,
       "dpdk_enabled": null,
@@ -1207,7 +1078,6 @@
       },
       "lab_navigator_id": 309,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported from Lab Navigator rack A01, device id 309."
     },
     "ln-a01-318-1kxfxc2": {
@@ -1219,7 +1089,6 @@
       "model_suffix": "680",
       "serial_number": "1KXFXC2",
       "ip_address": null,
-      "available": true,
       "ha_group_id": "ln-a01-318-1kxfxc2",
       "ha_role": "active",
       "dpdk_enabled": null,
@@ -1252,7 +1121,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 318,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported from Lab Navigator rack A01, device id 318. Omitted 5 ports without VLAN-backed switch connections."
     },
     "ln-a01-321-90wfxc2": {
@@ -1264,7 +1132,6 @@
       "model_suffix": "620",
       "serial_number": "90WFXC2",
       "ip_address": null,
-      "available": true,
       "ha_group_id": "user-ha-chn_rnd_edge_620_90wfxc2-chn_rnd_edge_620_49x6v43",
       "ha_role": "active",
       "dpdk_enabled": null,
@@ -1297,7 +1164,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 321,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported from Lab Navigator rack A01, device id 321. Omitted 5 ports without VLAN-backed switch connections. HA-paired in local inventory with chn-rnd-edge-620-49X6V43."
     },
     "ln-a01-322-49x6v43": {
@@ -1309,7 +1175,6 @@
       "model_suffix": "620",
       "serial_number": "49X6V43",
       "ip_address": null,
-      "available": true,
       "ha_group_id": "user-ha-chn_rnd_edge_620_90wfxc2-chn_rnd_edge_620_49x6v43",
       "ha_role": "standby",
       "dpdk_enabled": null,
@@ -1342,7 +1207,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 322,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported from Lab Navigator rack A01, device id 322. Omitted 5 ports without VLAN-backed switch connections. HA-paired in local inventory with chn-rnd-edge-620-90WFXC2."
     },
     "ln-a01-323-vc05100000125": {
@@ -1354,7 +1218,6 @@
       "model_suffix": "510",
       "serial_number": "VC05100000125",
       "ip_address": null,
-      "available": true,
       "ha_group_id": "user-ha-chn_rnd_edge_510_0000125-chn_rnd_edge_510_0109677",
       "ha_role": "active",
       "dpdk_enabled": null,
@@ -1387,7 +1250,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 323,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported from Lab Navigator rack A01, device id 323. Omitted 2 ports without VLAN-backed switch connections. HA-paired in local inventory with chn-rnd-edge-510-0109677."
     },
     "ln-a01-324-vc05100109677": {
@@ -1399,7 +1261,6 @@
       "model_suffix": "510",
       "serial_number": "VC05100109677",
       "ip_address": null,
-      "available": true,
       "ha_group_id": "user-ha-chn_rnd_edge_510_0000125-chn_rnd_edge_510_0109677",
       "ha_role": "standby",
       "dpdk_enabled": null,
@@ -1432,7 +1293,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 324,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported from Lab Navigator rack A01, device id 324. Omitted 3 ports without VLAN-backed switch connections. HA-paired in local inventory with chn-rnd-edge-510-0000125."
     },
     "chn_rnd_sw_3248_qg9immu": {
@@ -1444,7 +1304,6 @@
       "model_suffix": "3248",
       "serial_number": null,
       "ip_address": "10.68.136.160",
-      "available": true,
       "ha_group_id": null,
       "ha_role": null,
       "dpdk_enabled": null,
@@ -1466,7 +1325,6 @@
       },
       "lab_navigator_id": 233,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported from Lab Navigator rack A02, device id 233."
     },
     "chn_rnd_sw_4148_ujx270b": {
@@ -1478,7 +1336,6 @@
       "model_suffix": "4148",
       "serial_number": "DQ8CV43",
       "ip_address": "10.68.137.112",
-      "available": true,
       "ha_group_id": null,
       "ha_role": null,
       "dpdk_enabled": null,
@@ -1500,7 +1357,6 @@
       },
       "lab_navigator_id": 235,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported from Lab Navigator rack A02, device id 235."
     },
     "chn_rnd_sw_3048_grcz81j": {
@@ -1512,7 +1368,6 @@
       "model_suffix": null,
       "serial_number": null,
       "ip_address": "10.68.137.73",
-      "available": true,
       "ha_group_id": null,
       "ha_role": null,
       "dpdk_enabled": null,
@@ -1534,7 +1389,6 @@
       },
       "lab_navigator_id": null,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": null
     },
     "chn_rnd_sw_4048_p6wzt1e": {
@@ -1546,7 +1400,6 @@
       "model_suffix": null,
       "serial_number": null,
       "ip_address": "10.68.136.152",
-      "available": true,
       "ha_group_id": null,
       "ha_role": null,
       "dpdk_enabled": null,
@@ -1568,7 +1421,6 @@
       },
       "lab_navigator_id": null,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": null
     },
     "ln-a02-312-246218457": {
@@ -1580,7 +1432,6 @@
       "model_suffix": "720",
       "serial_number": "246218457",
       "ip_address": null,
-      "available": false,
       "ha_group_id": "ln-ha-a02-312-246218457-a02-313-246218453",
       "ha_role": "active",
       "dpdk_enabled": null,
@@ -1613,16 +1464,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 312,
       "hypervisor_ip": null,
-      "reservation": {
-        "actor": {
-          "name": "Akshay Jain",
-          "email": "akshay1.jain@arista.com"
-        },
-        "reserved_at": "2026-07-14T08:02:23.269639+00:00",
-        "reason": "topology-generation",
-        "run_id": "850d61c4b291",
-        "topology_name": "5-site-cluster-spirent-hw-9d2bce"
-      },
       "notes": "Manually updated as HA pair from supplied connection table. Active device ln-a02-312-246218457 and standby device ln-a02-313-246218453 use matching VLAN profiles. GE6 and SFP2 are not connected. Imported from Lab Navigator rack A02, device id 312. HA-paired in local inventory with chn-rnd-edge-720-6218453."
     },
     "ln-a02-313-246218453": {
@@ -1634,7 +1475,6 @@
       "model_suffix": "720",
       "serial_number": "246218453",
       "ip_address": null,
-      "available": false,
       "ha_group_id": "ln-ha-a02-312-246218457-a02-313-246218453",
       "ha_role": "standby",
       "dpdk_enabled": null,
@@ -1667,16 +1507,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 313,
       "hypervisor_ip": null,
-      "reservation": {
-        "actor": {
-          "name": "Akshay Jain",
-          "email": "akshay1.jain@arista.com"
-        },
-        "reserved_at": "2026-07-14T08:02:23.269639+00:00",
-        "reason": "topology-generation",
-        "run_id": "850d61c4b291",
-        "topology_name": "5-site-cluster-spirent-hw-9d2bce"
-      },
       "notes": "Manually updated as HA pair from supplied connection table. Active device ln-a02-312-246218457 and standby device ln-a02-313-246218453 use matching VLAN profiles. GE6 and SFP2 are not connected. Imported from Lab Navigator rack A02, device id 313. HA-paired in local inventory with chn-rnd-edge-720-6218457."
     },
     "ln-a02-343-gsea187565": {
@@ -1688,7 +1518,6 @@
       "model_suffix": "4100",
       "serial_number": "GSEA187565",
       "ip_address": null,
-      "available": true,
       "ha_group_id": "user-ha-chn_rnd_edge_4100_a187565-chn_rnd_edge_4100_a187635",
       "ha_role": "active",
       "dpdk_enabled": null,
@@ -1721,7 +1550,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 343,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported from Lab Navigator rack A02, device id 343. Omitted 14 ports without VLAN-backed switch connections. HA-paired in local inventory with chn-rnd-edge-4100-A187635."
     },
     "chn_rnd_sw_3048_fd1f9z2": {
@@ -1733,7 +1561,6 @@
       "model_suffix": "3048",
       "serial_number": "FD1F9Z2",
       "ip_address": "10.68.137.207",
-      "available": true,
       "ha_group_id": null,
       "ha_role": null,
       "dpdk_enabled": null,
@@ -1755,7 +1582,6 @@
       },
       "lab_navigator_id": 339,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported from Lab Navigator rack A01, device id 339."
     },
     "ln-a02-344-gsea187635": {
@@ -1767,7 +1593,6 @@
       "model_suffix": "4100",
       "serial_number": "GSEA187635",
       "ip_address": null,
-      "available": true,
       "ha_group_id": "user-ha-chn_rnd_edge_4100_a187565-chn_rnd_edge_4100_a187635",
       "ha_role": "standby",
       "dpdk_enabled": null,
@@ -1800,7 +1625,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 344,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported from Lab Navigator rack A02, device id 344. Omitted 14 ports without VLAN-backed switch connections. HA-paired in local inventory with chn-rnd-edge-4100-A187565."
     },
     "ln-a02-345-2437000011": {
@@ -1812,7 +1636,6 @@
       "model_suffix": "5100",
       "serial_number": "2437000011",
       "ip_address": null,
-      "available": true,
       "ha_group_id": "user-ha-chn_rnd_edge_5100_7000011-chn_rnd_edge_5100_7000010",
       "ha_role": "active",
       "dpdk_enabled": null,
@@ -1845,7 +1668,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 345,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported from Lab Navigator rack A02, device id 345. Omitted 12 ports without VLAN-backed switch connections. HA-paired in local inventory with chn-rnd-edge-5100-7000010."
     },
     "ln-a02-346-2437000010": {
@@ -1857,7 +1679,6 @@
       "model_suffix": "5100",
       "serial_number": "2437000010",
       "ip_address": null,
-      "available": true,
       "ha_group_id": "user-ha-chn_rnd_edge_5100_7000011-chn_rnd_edge_5100_7000010",
       "ha_role": "standby",
       "dpdk_enabled": null,
@@ -1890,7 +1711,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 346,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported from Lab Navigator rack A02, device id 346. Omitted 14 ports without VLAN-backed switch connections. HA-paired in local inventory with chn-rnd-edge-5100-7000011."
     },
     "ln_a02_316_edge_246208325": {
@@ -1902,7 +1722,6 @@
       "model_suffix": "7105g",
       "serial_number": "246208325",
       "ip_address": null,
-      "available": true,
       "ha_group_id": "user-ha-chn_rnd_edge_7105_6208325-chn_rnd_edge_7105_6208327",
       "ha_role": "active",
       "dpdk_enabled": null,
@@ -1935,7 +1754,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 316,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported from Lab Navigator rack A02, device id 316. HA-paired in local inventory with chn-rnd-edge-7105-6208327."
     },
     "ln_a02_317_edge_246208327": {
@@ -1947,7 +1765,6 @@
       "model_suffix": "7105g",
       "serial_number": "246208327",
       "ip_address": null,
-      "available": true,
       "ha_group_id": "user-ha-chn_rnd_edge_7105_6208325-chn_rnd_edge_7105_6208327",
       "ha_role": "standby",
       "dpdk_enabled": null,
@@ -1980,7 +1797,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 317,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported from Lab Navigator rack A02, device id 317. HA-paired in local inventory with chn-rnd-edge-7105-6208325."
     },
     "ln_a03_573_edge_246218451": {
@@ -1992,7 +1808,6 @@
       "model_suffix": "720",
       "serial_number": "246218451",
       "ip_address": null,
-      "available": true,
       "ha_group_id": "ln-ha-a03-476-248202223-a03-573-246218451",
       "ha_role": "standby",
       "dpdk_enabled": null,
@@ -2025,7 +1840,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 573,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported from Lab Navigator rack A03, device id 573."
     },
     "ln_a03_476_edge_248202223": {
@@ -2037,7 +1851,6 @@
       "model_suffix": "720",
       "serial_number": "248202223",
       "ip_address": null,
-      "available": true,
       "ha_group_id": "ln-ha-a03-476-248202223-a03-573-246218451",
       "ha_role": "active",
       "dpdk_enabled": null,
@@ -2070,7 +1883,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 476,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported from Lab Navigator rack A03, device id 476."
     },
     "ln_a03_516_edge_248202193": {
@@ -2082,7 +1894,6 @@
       "model_suffix": "740",
       "serial_number": "248202193",
       "ip_address": null,
-      "available": true,
       "ha_group_id": "ln-ha-a03-515-248202197-a03-516-248202193",
       "ha_role": "standby",
       "dpdk_enabled": null,
@@ -2115,7 +1926,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 516,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported from Lab Navigator rack A03, device id 516."
     },
     "ln_a03_515_edge_248202197": {
@@ -2127,7 +1937,6 @@
       "model_suffix": "740",
       "serial_number": "248202197",
       "ip_address": null,
-      "available": true,
       "ha_group_id": "ln-ha-a03-515-248202197-a03-516-248202193",
       "ha_role": "active",
       "dpdk_enabled": null,
@@ -2160,7 +1969,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 515,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported from Lab Navigator rack A03, device id 515."
     },
     "ln_a01_355_hypervisor_298vf33": {
@@ -2172,7 +1980,6 @@
       "model_suffix": "640",
       "serial_number": "298VF33",
       "ip_address": "10.68.137.7",
-      "available": true,
       "ha_group_id": null,
       "ha_role": null,
       "dpdk_enabled": null,
@@ -2181,7 +1988,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 355,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported from Lab Navigator rack A01, device id 355."
     },
     "ln_a02_348_hypervisor_2p83s63": {
@@ -2193,7 +1999,6 @@
       "model_suffix": "640",
       "serial_number": "2P83S63",
       "ip_address": "10.68.137.102",
-      "available": true,
       "ha_group_id": null,
       "ha_role": null,
       "dpdk_enabled": null,
@@ -2202,7 +2007,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 348,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported from Lab Navigator rack A02, device id 348."
     },
     "ln_a02_347_hypervisor_3p83s63": {
@@ -2214,7 +2018,6 @@
       "model_suffix": "640",
       "serial_number": "3P83S63",
       "ip_address": "10.68.136.221",
-      "available": true,
       "ha_group_id": null,
       "ha_role": null,
       "dpdk_enabled": null,
@@ -2223,7 +2026,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 347,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported from Lab Navigator rack A02, device id 347."
     },
     "ln_a02_249_hypervisor_4w8vf33": {
@@ -2235,7 +2037,6 @@
       "model_suffix": "640",
       "serial_number": "4W8VF33",
       "ip_address": "10.68.136.247",
-      "available": true,
       "ha_group_id": null,
       "ha_role": null,
       "dpdk_enabled": null,
@@ -2244,7 +2045,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 249,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported from Lab Navigator rack A02, device id 249."
     },
     "ln_a01_353_hypervisor_588vf33": {
@@ -2256,7 +2056,6 @@
       "model_suffix": "640",
       "serial_number": "588VF33",
       "ip_address": "10.68.137.151",
-      "available": true,
       "ha_group_id": null,
       "ha_role": null,
       "dpdk_enabled": null,
@@ -2265,7 +2064,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 353,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported from Lab Navigator rack A01, device id 353."
     },
     "ln_a01_354_hypervisor_5s8vf33": {
@@ -2277,7 +2075,6 @@
       "model_suffix": "640",
       "serial_number": "5S8VF33",
       "ip_address": "10.68.137.180",
-      "available": true,
       "ha_group_id": null,
       "ha_role": null,
       "dpdk_enabled": null,
@@ -2286,7 +2083,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 354,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported from Lab Navigator rack A01, device id 354."
     },
     "ln_a02_251_hypervisor_8fys6t2": {
@@ -2298,7 +2094,6 @@
       "model_suffix": "640",
       "serial_number": "8FYS6T2",
       "ip_address": "10.68.137.162",
-      "available": true,
       "ha_group_id": null,
       "ha_role": null,
       "dpdk_enabled": null,
@@ -2307,7 +2102,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 251,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported from Lab Navigator rack A02, device id 251."
     },
     "ln_a01_351_hypervisor_8kcgjj3": {
@@ -2319,7 +2113,6 @@
       "model_suffix": "640",
       "serial_number": "8KCGJJ3",
       "ip_address": "10.68.137.28",
-      "available": true,
       "ha_group_id": null,
       "ha_role": null,
       "dpdk_enabled": null,
@@ -2328,7 +2121,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 351,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported from Lab Navigator rack A01, device id 351."
     },
     "ln_a02_250_hypervisor_f88vf33": {
@@ -2340,7 +2132,6 @@
       "model_suffix": "640",
       "serial_number": "F88VF33",
       "ip_address": "10.68.136.208",
-      "available": true,
       "ha_group_id": null,
       "ha_role": null,
       "dpdk_enabled": null,
@@ -2349,7 +2140,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 250,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported from Lab Navigator rack A02, device id 250."
     },
     "ln_a02_349_hypervisor_hlz02s2": {
@@ -2361,7 +2151,6 @@
       "model_suffix": "640",
       "serial_number": "HLZ02S2",
       "ip_address": "10.68.141.176",
-      "available": true,
       "ha_group_id": null,
       "ha_role": null,
       "dpdk_enabled": null,
@@ -2370,7 +2159,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 349,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported from Lab Navigator rack A02, device id 349."
     },
     "ln_a01_352_hypervisor_js8vf33": {
@@ -2382,7 +2170,6 @@
       "model_suffix": "640",
       "serial_number": "JS8VF33",
       "ip_address": "10.68.137.190",
-      "available": true,
       "ha_group_id": null,
       "ha_role": null,
       "dpdk_enabled": null,
@@ -2391,7 +2178,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 352,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported from Lab Navigator rack A01, device id 352."
     },
     "ln_a02_248_hypervisor_jv8vf33": {
@@ -2403,7 +2189,6 @@
       "model_suffix": "640",
       "serial_number": "JV8VF33",
       "ip_address": "10.68.137.65",
-      "available": true,
       "ha_group_id": null,
       "ha_role": null,
       "dpdk_enabled": null,
@@ -2412,7 +2197,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 248,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported from Lab Navigator rack A02, device id 248."
     },
     "ln_a01_350_hypervisor_9kcgjj3": {
@@ -2424,7 +2208,6 @@
       "model_suffix": "650",
       "serial_number": "9KCGJJ3",
       "ip_address": null,
-      "available": true,
       "ha_group_id": null,
       "ha_role": null,
       "dpdk_enabled": null,
@@ -2433,7 +2216,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 350,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported from Lab Navigator rack A01, device id 350."
     },
     "ln_a03_276_hypervisor_g1hvkj3": {
@@ -2445,7 +2227,6 @@
       "model_suffix": "650",
       "serial_number": "G1HVKJ3",
       "ip_address": "10.68.137.104",
-      "available": false,
       "ha_group_id": null,
       "ha_role": null,
       "dpdk_enabled": null,
@@ -2454,7 +2235,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 276,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported from Lab Navigator rack A03, device id 276."
     },
     "ln_a01_847_switch_73kzzp2": {
@@ -2466,7 +2246,6 @@
       "model_suffix": "3048",
       "serial_number": "73KZZP2",
       "ip_address": "10.68.136.129",
-      "available": true,
       "ha_group_id": null,
       "ha_role": null,
       "dpdk_enabled": null,
@@ -2488,7 +2267,6 @@
       },
       "lab_navigator_id": 847,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported from Lab Navigator rack A01, device id 847."
     },
     "ln_a02_232_switch_cnzc9z2": {
@@ -2500,7 +2278,6 @@
       "model_suffix": "3048",
       "serial_number": "CNZC9Z2",
       "ip_address": "10.68.136.27",
-      "available": true,
       "ha_group_id": null,
       "ha_role": null,
       "dpdk_enabled": null,
@@ -2522,7 +2299,6 @@
       },
       "lab_navigator_id": 232,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported from Lab Navigator rack A02, device id 232."
     },
     "ln_a02_231_switch_crrd9z2": {
@@ -2534,7 +2310,6 @@
       "model_suffix": "3048",
       "serial_number": "CRRD9Z2",
       "ip_address": "10.68.137.213",
-      "available": true,
       "ha_group_id": null,
       "ha_role": null,
       "dpdk_enabled": null,
@@ -2556,7 +2331,6 @@
       },
       "lab_navigator_id": 231,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported from Lab Navigator rack A02, device id 231."
     },
     "ln_a01_848_switch_dtrb9z2": {
@@ -2568,7 +2342,6 @@
       "model_suffix": "3048",
       "serial_number": "DTRB9Z2",
       "ip_address": "10.68.136.38",
-      "available": true,
       "ha_group_id": null,
       "ha_role": null,
       "dpdk_enabled": null,
@@ -2590,7 +2363,6 @@
       },
       "lab_navigator_id": 848,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported from Lab Navigator rack A01, device id 848."
     },
     "ln_a03_777_switch_j8y00q2": {
@@ -2602,7 +2374,6 @@
       "model_suffix": "3048",
       "serial_number": "J8Y00Q2",
       "ip_address": "10.68.136.28",
-      "available": false,
       "ha_group_id": null,
       "ha_role": null,
       "dpdk_enabled": null,
@@ -2624,7 +2395,6 @@
       },
       "lab_navigator_id": 777,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported from Lab Navigator rack A03, device id 777."
     },
     "ln_a01_340_switch_hfcqxc2": {
@@ -2636,7 +2406,6 @@
       "model_suffix": "4048",
       "serial_number": "HFCQXC2",
       "ip_address": "10.68.137.146",
-      "available": true,
       "ha_group_id": null,
       "ha_role": null,
       "dpdk_enabled": null,
@@ -2658,7 +2427,6 @@
       },
       "lab_navigator_id": 340,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported from Lab Navigator rack A01, device id 340."
     },
     "ln_a03_798_switch_f19cv43": {
@@ -2670,7 +2438,6 @@
       "model_suffix": "4148",
       "serial_number": "F19CV43",
       "ip_address": "10.68.137.247",
-      "available": false,
       "ha_group_id": null,
       "ha_role": null,
       "dpdk_enabled": null,
@@ -2692,7 +2459,6 @@
       },
       "lab_navigator_id": 798,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported from Lab Navigator rack A03, device id 798."
     },
     "ln_a02_852_edge_4d25pk2": {
@@ -2704,7 +2470,6 @@
       "model_suffix": "610",
       "serial_number": "4D25PK2",
       "ip_address": null,
-      "available": false,
       "ha_group_id": "user-ha-chn_rnd_edge_610_4d25pk2-chn_rnd_edge_610_1j25pk2",
       "ha_role": "active",
       "dpdk_enabled": null,
@@ -2737,7 +2502,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 852,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported from Lab Navigator rack A02, device id 852. HA-paired in local inventory with chn-rnd-edge-610-1J25PK2."
     },
     "ln_a02_853_edge_1j25pk2": {
@@ -2749,7 +2513,6 @@
       "model_suffix": "610",
       "serial_number": "1J25PK2",
       "ip_address": null,
-      "available": false,
       "ha_group_id": "user-ha-chn_rnd_edge_610_4d25pk2-chn_rnd_edge_610_1j25pk2",
       "ha_role": "standby",
       "dpdk_enabled": null,
@@ -2782,7 +2545,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 853,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported from Lab Navigator rack A02, device id 853. HA-paired in local inventory with chn-rnd-edge-610-4D25PK2."
     },
     "ln_a01_851_edge_150q363": {
@@ -2794,7 +2556,6 @@
       "model_suffix": "3800",
       "serial_number": "150Q363",
       "ip_address": null,
-      "available": false,
       "ha_group_id": "user-ha-chn_rnd_edge_3800_150q363-chn_rnd_edge_3800_f4z00q2",
       "ha_role": "active",
       "dpdk_enabled": null,
@@ -2827,7 +2588,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 851,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported from Lab Navigator rack A01, device id 851. HA-paired in local inventory with chn-rnd-edge-3800-F4Z00Q2."
     },
     "ln_a01_782_edge_f4z00q2": {
@@ -2839,7 +2599,6 @@
       "model_suffix": "3800",
       "serial_number": "F4Z00Q2",
       "ip_address": null,
-      "available": false,
       "ha_group_id": "user-ha-chn_rnd_edge_3800_150q363-chn_rnd_edge_3800_f4z00q2",
       "ha_role": "standby",
       "dpdk_enabled": null,
@@ -2872,7 +2631,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 782,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported from Lab Navigator rack A01, device id 782. HA-paired in local inventory with chn-rnd-edge-3800-150Q363."
     },
     "ln_rack_849_edge_246218429": {
@@ -2884,7 +2642,6 @@
       "model_suffix": "740",
       "serial_number": "246218429",
       "ip_address": null,
-      "available": true,
       "ha_group_id": "user-ha-chn_rnd_edge_740_6218429-chn_rnd_edge_740_6218430",
       "ha_role": "active",
       "dpdk_enabled": null,
@@ -2917,7 +2674,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 849,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported from Lab Navigator rack , device id 849. HA-paired in local inventory with chn-rnd-edge-740-6218430."
     },
     "ln_rack_850_edge_246218430": {
@@ -2929,7 +2685,6 @@
       "model_suffix": "740",
       "serial_number": "246218430",
       "ip_address": null,
-      "available": true,
       "ha_group_id": "user-ha-chn_rnd_edge_740_6218429-chn_rnd_edge_740_6218430",
       "ha_role": "standby",
       "dpdk_enabled": null,
@@ -2962,7 +2717,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 850,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported from Lab Navigator rack , device id 850. HA-paired in local inventory with chn-rnd-edge-740-6218429."
     },
     "ln_a01_854_edge_6c6npk2": {
@@ -2974,7 +2728,6 @@
       "model_suffix": "610",
       "serial_number": "6C6NPK2",
       "ip_address": null,
-      "available": false,
       "ha_group_id": "user-ha-chn_rnd_edge_610_6c6npk2-chn_rnd_edge_610_1b6npk2",
       "ha_role": "active",
       "dpdk_enabled": null,
@@ -3007,7 +2760,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 854,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported from Lab Navigator rack A01, device id 854. HA-paired in local inventory with chn-rnd-edge-610-1B6NPK2."
     },
     "ln_a01_855_edge_1b6npk2": {
@@ -3019,7 +2771,6 @@
       "model_suffix": "610",
       "serial_number": "1B6NPK2",
       "ip_address": null,
-      "available": false,
       "ha_group_id": "user-ha-chn_rnd_edge_610_6c6npk2-chn_rnd_edge_610_1b6npk2",
       "ha_role": "standby",
       "dpdk_enabled": null,
@@ -3052,7 +2803,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 855,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported from Lab Navigator rack A01, device id 855. HA-paired in local inventory with chn-rnd-edge-610-6C6NPK2."
     },
     "ln_a01_856_edge_gtt6v43": {
@@ -3064,7 +2814,6 @@
       "model_suffix": "640",
       "serial_number": "GTT6V43",
       "ip_address": null,
-      "available": false,
       "ha_group_id": "user-ha-chn_rnd_edge_640_gtt6v43-chn_rnd_edge_640_f4v6v43",
       "ha_role": "active",
       "dpdk_enabled": null,
@@ -3097,7 +2846,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 856,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported from Lab Navigator rack A01, device id 856. HA-paired in local inventory with chn-rnd-edge-640-F4V6V43."
     },
     "ln_a01_857_edge_f4v6v43": {
@@ -3109,7 +2857,6 @@
       "model_suffix": "640",
       "serial_number": "F4V6V43",
       "ip_address": null,
-      "available": false,
       "ha_group_id": "user-ha-chn_rnd_edge_640_gtt6v43-chn_rnd_edge_640_f4v6v43",
       "ha_role": "standby",
       "dpdk_enabled": null,
@@ -3142,7 +2889,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 857,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported from Lab Navigator rack A01, device id 857. HA-paired in local inventory with chn-rnd-edge-640-GTT6V43."
     },
     "ln_rack_484_edge_246208335": {
@@ -3154,7 +2900,6 @@
       "model_suffix": "7105g",
       "serial_number": "246208335",
       "ip_address": null,
-      "available": true,
       "ha_group_id": "user-ha-chn_rnd_edge_7105_6208335-chn_rnd_edge_7105_6208321",
       "ha_role": "active",
       "dpdk_enabled": null,
@@ -3187,7 +2932,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 484,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported from Lab Navigator rack , device id 484. HA-paired in local inventory with chn-rnd-edge-7105-6208321."
     },
     "ln_rack_485_edge_246208321": {
@@ -3199,7 +2943,6 @@
       "model_suffix": "7105g",
       "serial_number": "246208321",
       "ip_address": null,
-      "available": true,
       "ha_group_id": "user-ha-chn_rnd_edge_7105_6208335-chn_rnd_edge_7105_6208321",
       "ha_role": "standby",
       "dpdk_enabled": null,
@@ -3232,7 +2975,6 @@
       "switch_metadata": null,
       "lab_navigator_id": 485,
       "hypervisor_ip": null,
-      "reservation": null,
       "notes": "Imported from Lab Navigator rack , device id 485. HA-paired in local inventory with chn-rnd-edge-7105-6208335."
     }
   },

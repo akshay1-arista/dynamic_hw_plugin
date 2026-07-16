@@ -9,3 +9,4 @@ __pycache__/
 *.pyc
 backend/data/audit_log.json
 backend/data/hapy_private_branches.json
+backend/data/*.local.json

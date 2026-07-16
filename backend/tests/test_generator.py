@@ -19,7 +19,8 @@ from app.inventory import build_inventory, resolve_mapping_path
 from app.models import GenerateRequest, HardwareEdge, InterfaceOverride, InventoryFile
 
 DEFAULT_3800_HARDWARE_ID = "ln-ha-a01-327-dgd10q2-a01-328-16c10q2"
-SECONDARY_HARDWARE_ID = "ln-a01-318-1kxfxc2"
+SECONDARY_HARDWARE_ID = "ln-ha-a02-312-246218457-a02-313-246218453"
+STANDALONE_SOURCE_HARDWARE_ID = "ln-ha-a02-314-236254370-a02-315-236254372"
 
 
 def make_request(**overrides):
@@ -58,6 +59,48 @@ def copy_inventory(tmp_path):
     inventory_path = tmp_path / "inventory.json"
     inventory_path.write_text(INVENTORY_PATH.read_text())
     return inventory_path
+
+
+def build_standalone_inventory(tmp_path):
+    with INVENTORY_PATH.open() as fh:
+        inventory = json.load(fh)
+
+    source_active_id = f"{STANDALONE_SOURCE_HARDWARE_ID}-active"
+    source_standby_id = f"{STANDALONE_SOURCE_HARDWARE_ID}-standby"
+    standalone_id = "test-standalone-710"
+
+    source_active = inventory["devices"][source_active_id]
+    inventory["devices"].pop(source_active_id)
+    inventory["devices"].pop(source_standby_id)
+    inventory["devices"][standalone_id] = {
+        **source_active,
+        "id": standalone_id,
+        "display_name": "Test Standalone 710",
+        "short_name": "test-standalone-710",
+        "ha_group_id": standalone_id,
+        "ha_role": "active",
+    }
+
+    filtered_connections = []
+    for connection in inventory["connections"]:
+        endpoint_ids = {connection["a"]["device_id"], connection["b"]["device_id"]}
+        if endpoint_ids & {source_active_id, source_standby_id}:
+            if source_active_id not in endpoint_ids:
+                continue
+            clone = json.loads(json.dumps(connection))
+            if clone["a"]["device_id"] == source_active_id:
+                clone["a"]["device_id"] = standalone_id
+            if clone["b"]["device_id"] == source_active_id:
+                clone["b"]["device_id"] = standalone_id
+            clone["id"] = clone["id"].replace(source_active_id, standalone_id)
+            filtered_connections.append(clone)
+            continue
+        filtered_connections.append(connection)
+
+    inventory["connections"] = filtered_connections
+    inventory_path = tmp_path / "inventory.json"
+    inventory_path.write_text(json.dumps(inventory))
+    return inventory_path, standalone_id
 
 
 def test_generate_3_site_hardware_branch(tmp_path):
@@ -1340,18 +1383,19 @@ def test_apply_hardware_to_edge_forces_dpdk_enabled_true():
 
 
 def test_standalone_hardware_on_ha_reference_warns_and_drops_extra_interfaces(tmp_path):
+    inventory_path, standalone_id = build_standalone_inventory(tmp_path)
     request = make_request(
         topology_name="standalone-caveat",
         mappings=[
             {
-                "hardware_id": "ln-a01-318-1kxfxc2",
+                "hardware_id": standalone_id,
                 "branch_name": "branch2",
                 "edge_name": "b2-edge1",
             }
         ],
         hypervisor_interface="vmnic0",
     )
-    result = generate_topology(request, inventory_path=copy_inventory(tmp_path), outputs_root=tmp_path)
+    result = generate_topology(request, inventory_path=inventory_path, outputs_root=tmp_path)
     config = load_config(result)
     branch = next(item for item in config["topology"]["branches"] if item["name"] == "branch2")
     edge = branch["edges"][0]

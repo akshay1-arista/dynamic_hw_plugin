@@ -6,34 +6,41 @@ from pathlib import Path
 from typing import Any
 
 from .audit import build_audit_event
-from .config import INVENTORY_PATH
+from .config import INVENTORY_PATH, INVENTORY_STATE_PATH
 from .models import (
     ActorIdentity,
     AuditEvent,
     HardwareEdge,
+    HardwareLocalState,
     HardwareReservation,
     HardwarePathSummary,
     InventoryConnection,
     InventoryDevice,
     InventoryFile,
+    InventoryStateFile,
     SwitchMetadata,
     VlanRange,
 )
 
 
-def load_inventory(path: Path = INVENTORY_PATH) -> InventoryFile:
+def load_inventory(path: Path = INVENTORY_PATH, *, state_path: Path | None = None) -> InventoryFile:
     with path.open() as fh:
         raw = json.load(fh)
     if "devices" in raw and "connections" in raw:
-        return build_inventory(raw["devices"], raw["connections"], raw.get("allocations"))
-    return InventoryFile.model_validate(
-        {
-            "devices": {},
-            "connections": [],
-            "allocations": raw.get("allocations", []),
-            "hardware": raw.get("hardware", []),
-        }
-    )
+        inventory = build_inventory(raw["devices"], raw["connections"], raw.get("allocations"))
+    else:
+        inventory = InventoryFile.model_validate(
+            {
+                "devices": {},
+                "connections": [],
+                "allocations": raw.get("allocations", []),
+                "hardware": raw.get("hardware", []),
+            }
+        )
+    resolved_state_path = _resolve_inventory_state_path(path, state_path)
+    local_state = _load_inventory_state(resolved_state_path)
+    _apply_local_inventory_state(inventory, local_state, clear_missing=resolved_state_path.exists())
+    return inventory
 
 
 def build_inventory(
@@ -57,19 +64,35 @@ def build_inventory(
     )
 
 
-def save_inventory(inventory: InventoryFile, path: Path = INVENTORY_PATH) -> InventoryFile:
+def save_inventory(
+    inventory: InventoryFile,
+    path: Path = INVENTORY_PATH,
+    *,
+    preserve_local_state: bool = False,
+    state_path: Path | None = None,
+) -> InventoryFile:
     path.parent.mkdir(parents=True, exist_ok=True)
+    resolved_state_path = _resolve_inventory_state_path(path, state_path)
+    existing_local_state = _load_inventory_state(resolved_state_path)
     inventory.connections = _sanitize_connections(inventory.connections)
     inventory.allocations = []
     _normalize_hardware_state(inventory)
-    _apply_hardware_state(inventory)
+    _apply_shared_hardware_state(inventory)
+    local_state = _build_local_inventory_state(
+        inventory,
+        existing_local_state,
+        preserve_existing=preserve_local_state,
+    )
+    _apply_local_inventory_state(inventory, local_state, clear_missing=True)
     persisted = inventory.model_dump(mode="json", exclude={"hardware"})
     if not persisted["devices"] and inventory.hardware:
         persisted = _legacy_hardware_to_graph(inventory.hardware)
+    _strip_local_state_from_persisted_inventory(persisted)
     with path.open("w") as fh:
         json.dump(persisted, fh, indent=2)
         fh.write("\n")
-    return load_inventory(path)
+    _save_inventory_state(local_state, resolved_state_path)
+    return load_inventory(path, state_path=resolved_state_path)
 
 
 def get_hardware_by_id(hardware_id: str, path: Path = INVENTORY_PATH) -> HardwareEdge | None:
@@ -297,7 +320,7 @@ def path_has_credentials(path: HardwarePathSummary | None, inventory: InventoryF
     return _path_has_credentials(path, inventory.devices)
 
 
-def _apply_hardware_state(inventory: InventoryFile) -> None:
+def _apply_shared_hardware_state(inventory: InventoryFile) -> None:
     if not inventory.devices or not inventory.hardware:
         return
     hardware_by_id = {item.id: item for item in inventory.hardware}
@@ -308,9 +331,7 @@ def _apply_hardware_state(inventory: InventoryFile) -> None:
         hardware = hardware_by_id.get(group_id)
         if not hardware:
             continue
-        device.available = hardware.available
         device.hypervisor_ip = hardware.hypervisor_ip
-        device.reservation = hardware.reservation
         device.vlan_range = hardware.vlan_range
 
 
@@ -792,6 +813,94 @@ def _normalize_hardware_state(inventory: InventoryFile) -> None:
     for hardware in inventory.hardware:
         if hardware.available:
             hardware.reservation = None
+
+
+def _resolve_inventory_state_path(path: Path, state_path: Path | None) -> Path:
+    if state_path is not None:
+        return state_path
+    if path == INVENTORY_PATH:
+        return INVENTORY_STATE_PATH
+    suffix = "".join(path.suffixes)
+    if not suffix:
+        return path.with_name(f"{path.name}.local")
+    stem = path.name[: -len(suffix)]
+    return path.with_name(f"{stem}.local{suffix}")
+
+
+def _load_inventory_state(path: Path) -> InventoryStateFile:
+    if not path.exists():
+        return InventoryStateFile()
+    with path.open() as fh:
+        return InventoryStateFile.model_validate(json.load(fh))
+
+
+def _save_inventory_state(state: InventoryStateFile, path: Path) -> None:
+    if not state.hardware:
+        if path.exists():
+            path.unlink()
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w") as fh:
+        json.dump(state.model_dump(mode="json"), fh, indent=2)
+        fh.write("\n")
+
+
+def _build_local_inventory_state(
+    inventory: InventoryFile,
+    existing: InventoryStateFile,
+    *,
+    preserve_existing: bool,
+) -> InventoryStateFile:
+    hardware_state: dict[str, HardwareLocalState] = {}
+    for hardware in inventory.hardware:
+        state = HardwareLocalState(available=hardware.available, reservation=hardware.reservation)
+        if preserve_existing and hardware.id in existing.hardware:
+            state = existing.hardware[hardware.id]
+        if state.available and state.reservation is None:
+            continue
+        hardware_state[hardware.id] = state
+    return InventoryStateFile(hardware=hardware_state)
+
+
+def _apply_local_inventory_state(
+    inventory: InventoryFile,
+    state: InventoryStateFile,
+    *,
+    clear_missing: bool,
+) -> None:
+    if clear_missing:
+        for hardware in inventory.hardware:
+            hardware.available = True
+            hardware.reservation = None
+        for device in inventory.devices.values():
+            if device.type == "edge":
+                device.available = True
+                device.reservation = None
+
+    for hardware in inventory.hardware:
+        local_state = state.hardware.get(hardware.id)
+        if not local_state:
+            continue
+        hardware.available = local_state.available
+        hardware.reservation = local_state.reservation
+
+    if not inventory.devices:
+        return
+    for device in inventory.devices.values():
+        if device.type != "edge":
+            continue
+        group_id = device.ha_group_id or device.id
+        local_state = state.hardware.get(group_id)
+        if not local_state:
+            continue
+        device.available = local_state.available
+        device.reservation = local_state.reservation
+
+
+def _strip_local_state_from_persisted_inventory(persisted: dict[str, Any]) -> None:
+    for device in persisted.get("devices", {}).values():
+        device.pop("available", None)
+        device.pop("reservation", None)
 
 
 def _legacy_hardware_to_graph(hardware: list[HardwareEdge]) -> dict[str, Any]:

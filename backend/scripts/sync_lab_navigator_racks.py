@@ -11,6 +11,7 @@ if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
 from app.discovery import LabNavigatorClient
+from app.edge_models import extract_edge_model_suffix, normalize_edge_model
 from app.inventory import load_inventory, save_inventory
 from app.models import (
     InventoryConnection,
@@ -19,27 +20,6 @@ from app.models import (
     SwitchCredentials,
     SwitchMetadata,
 )
-
-
-EDGE_MODEL_MAP = {
-    "VeloCloud-3400": ("edge3X00", "3400"),
-    "VeloCloud-3800": ("edge3X00", "3800"),
-    "VeloCloud-3810": ("edge3X10", "3810"),
-    "VeloCloud-510": ("edge510", "510"),
-    "VeloCloud-510lte": ("edge510lte", "510"),
-    "VeloCloud-520": ("edge5X0", "520"),
-    "VeloCloud-540": ("edge5X0", "540"),
-    "VeloCloud-610": ("edge6X0", "610"),
-    "VeloCloud-620": ("edge6X0", "620"),
-    "VeloCloud-640": ("edge6X0", "640"),
-    "VeloCloud-680": ("edge6X0", "680"),
-    "VeloCloud-710": ("edge710", "710"),
-    "VeloCloud-720": ("edge7X0", "720"),
-    "VeloCloud-740": ("edge7X0", "740"),
-    "VeloCloud-840": ("edge840", "840"),
-    "VeloCloud-4100": ("edge4100", "4100"),
-    "VeloCloud-5100": ("edge5100", "5100"),
-}
 
 
 def main() -> int:
@@ -280,9 +260,9 @@ def map_device_type(device_type: str) -> str | None:
 def normalize_model(device: dict, inventory_type: str) -> tuple[str | None, str | None]:
     model = device.get("display_model") or device.get("device_model") or None
     if inventory_type != "edge" or not model:
-        suffix = extract_model_suffix(model) if model else None
+        suffix = extract_edge_model_suffix(model) if model else None
         return model, suffix
-    return EDGE_MODEL_MAP.get(model, (model, extract_model_suffix(model)))
+    return normalize_edge_model(model)
 
 
 def resolve_availability(value: str | None) -> bool:
@@ -346,13 +326,6 @@ def merge_notes(existing: str | None, note: str) -> str:
     if note in existing:
         return existing
     return f"{existing} {note}"
-
-
-def extract_model_suffix(model: str | None) -> str | None:
-    if not model:
-        return None
-    match = re.search(r"(\d+[a-z]*)", model.lower())
-    return match.group(1) if match else None
 
 
 def build_inventory_id(device: dict, inventory_type: str) -> str:

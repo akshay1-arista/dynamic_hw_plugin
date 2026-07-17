@@ -8,6 +8,7 @@ from typing import Any
 
 from .audit import build_audit_event
 from .config import INVENTORY_PATH, INVENTORY_STATE_PATH
+from .edge_models import normalize_edge_model
 from .models import (
     ActorIdentity,
     AuditEvent,
@@ -51,6 +52,7 @@ def build_inventory(
     raw_connections: list[dict[str, Any]],
     raw_allocations: list[dict[str, Any]] | None = None,
 ) -> InventoryFile:
+    raw_devices = _normalize_inventory_devices(raw_devices)
     connections = _sanitize_connections(
         [InventoryConnection.model_validate(connection) for connection in raw_connections]
     )
@@ -83,6 +85,7 @@ def save_inventory(
     requested_connections = len(inventory.connections)
     requested_hardware = len(inventory.hardware)
     inventory.connections = _sanitize_connections(inventory.connections)
+    _normalize_inventory_file_devices(inventory)
     inventory.allocations = []
     _normalize_hardware_state(inventory)
     _apply_shared_hardware_state(inventory)
@@ -277,6 +280,26 @@ def _sanitize_connections(connections: list[InventoryConnection]) -> list[Invent
         used_endpoints.update(endpoints)
 
     return [connections[index] for index in sorted(selected_indexes)]
+
+
+def _normalize_inventory_devices(raw_devices: dict[str, Any]) -> dict[str, Any]:
+    normalized_devices: dict[str, Any] = {}
+    for device_id, raw_device in raw_devices.items():
+        device = dict(raw_device)
+        if device.get("type") == "edge":
+            device["model"], device["model_suffix"] = normalize_edge_model(
+                device.get("model"),
+                device.get("model_suffix"),
+            )
+        normalized_devices[device_id] = device
+    return normalized_devices
+
+
+def _normalize_inventory_file_devices(inventory: InventoryFile) -> None:
+    for device in inventory.devices.values():
+        if device.type != "edge":
+            continue
+        device.model, device.model_suffix = normalize_edge_model(device.model, device.model_suffix)
 
 
 def _connection_preference(connection: InventoryConnection) -> tuple[int, int, int, int, int, int]:

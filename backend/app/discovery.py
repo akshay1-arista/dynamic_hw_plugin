@@ -457,29 +457,14 @@ def _build_wiremap_connection(
     if endpoints is None:
         return None
 
-    role, left_type, right_type, left_id, left_if, right_id, right_if = endpoints
-    if left_type == "switch":
-        vlan_source = (
-            wiremap_entry.get("local_vlans") or ""
-            if left_id == local_device.id
-            else wiremap_entry.get("remote_vlans") or ""
-        )
-    elif right_type == "switch":
-        vlan_source = (
-            wiremap_entry.get("remote_vlans") or ""
-            if right_id == remote_device.id
-            else wiremap_entry.get("local_vlans") or ""
-        )
-    else:
-        vlan_source = wiremap_entry.get("vlans") or ""
-    parsed_vlans = _parse_wiremap_vlans("", "", vlan_source)
+    role, _left_type, _right_type, left_id, left_if, right_id, right_if = endpoints
     return {
         "id": _build_connection_id(left_id, left_if, right_id, right_if),
         "a": {"device_id": left_id, "interface": left_if},
         "b": {"device_id": right_id, "interface": right_if},
-        "vlans": parsed_vlans["vlans"],
-        "tagged_vlans": parsed_vlans["tagged_vlans"],
-        "untagged_vlan": parsed_vlans["untagged_vlan"],
+        "vlans": [],
+        "tagged_vlans": [],
+        "untagged_vlan": None,
         "role": role,
         "notes": "Imported from Lab Navigator wiremap.",
     }
@@ -770,31 +755,6 @@ def _normalize_interface_name(value: str, device_type: str) -> str:
         if match:
             return f"{prefix}{match.group(1)}"
     return text.lower()
-
-
-def _parse_wiremap_vlans(local_vlans: str, remote_vlans: str, raw_vlans: str) -> dict[str, Any]:
-    vlan_source = raw_vlans or remote_vlans or local_vlans
-    tagged: list[int] = []
-    untagged: int | None = None
-    for part in str(vlan_source or "").split("|"):
-        chunk = part.strip()
-        if chunk.startswith("Tagged:"):
-            tagged.extend(_parse_vlan_numbers(chunk.removeprefix("Tagged:")))
-        elif chunk.startswith("Untagged:"):
-            numbers = _parse_vlan_numbers(chunk.removeprefix("Untagged:"))
-            if numbers:
-                untagged = numbers[0]
-    ordered_vlans = [untagged] if untagged is not None else []
-    ordered_vlans.extend(vlan for vlan in tagged if vlan != untagged)
-    return {
-        "vlans": ordered_vlans,
-        "tagged_vlans": [vlan for vlan in tagged if vlan != untagged],
-        "untagged_vlan": untagged,
-    }
-
-
-def _parse_vlan_numbers(value: str) -> list[int]:
-    return [int(match) for match in re.findall(r"\d+", value)]
 
 
 def _build_connection_id(left_id: str, left_if: str, right_id: str, right_if: str) -> str:

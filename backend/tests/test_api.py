@@ -48,7 +48,7 @@ def test_a02_720_pair_is_derived_as_ha():
     assert ports["GE5"].tagged_vlans == []
 
 
-def test_a02_710_pair_keeps_no_vlan_sfp1_connection():
+def test_a02_710_pair_derives_both_member_ports():
     inventory = load_inventory()
     hardware = next(
         item
@@ -58,27 +58,25 @@ def test_a02_710_pair_keeps_no_vlan_sfp1_connection():
 
     ports = {port.logical_interface: port for port in hardware.ports}
     assert ports["SFP1"].switch_active_port == "gigabitethernet1/20"
-    assert ports["SFP1"].switch_vlans == []
-    assert ports["SFP1"].tagged_vlans == []
-    assert ports["SFP1"].untagged_vlan is None
+    assert ports["SFP1"].switch_standby_port == "gigabitethernet1/25"
+    assert ports["SFP1"].manual_mapping_required is True
+    assert "active and standby switch connections differ" in str(ports["SFP1"].port_warning)
 
 
-def test_a01_3800_pair_falls_back_to_vlan_matching_for_shifted_standby_ports():
+def test_a01_3800_pair_keeps_standby_only_connection():
     inventory = load_inventory()
     hardware = next(
         item
         for item in inventory.hardware
-        if item.id == "user-ha-chn_rnd_edge_3800_150q363-chn_rnd_edge_3800_f4z00q2"
+        if item.id == "ln-ha-a01-327-dgd10q2-a01-328-16c10q2"
     )
 
     ports = {port.logical_interface: port for port in hardware.ports}
-    assert hardware.active_serial == "150Q363"
-    assert hardware.standby_serial == "F4Z00Q2"
-    assert ports["GE1"].switch_standby_port is None
-    assert ports["GE2"].switch_standby_port == "gigabitethernet1/12"
-    assert ports["GE3"].switch_standby_port == "gigabitethernet1/13"
-    assert ports["GE4"].switch_standby_port == "gigabitethernet1/14"
-    assert ports["GE5"].switch_standby_port == "gigabitethernet1/15"
+    assert hardware.active_serial == "DGD10Q2"
+    assert hardware.standby_serial == "16C10Q2"
+    assert ports["GE5"].switch_active_port is None
+    assert ports["GE5"].switch_standby_port == "gigabitethernet1/25"
+    assert "standby-member switch connection" in str(ports["GE5"].port_warning)
 
 
 def test_connected_ports_without_vlans_are_kept_in_inventory(tmp_path):

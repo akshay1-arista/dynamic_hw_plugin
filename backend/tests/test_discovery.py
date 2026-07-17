@@ -241,9 +241,9 @@ def test_inventory_refresh_apply_updates_edge_access_connections_from_wiremap(tm
 
     refreshed_ports = {port.logical_interface: port for port in result.inventory.hardware[0].ports}
     assert refreshed_ports["GE1"].switch_active_port == "gigabitethernet1/10"
-    assert refreshed_ports["GE1"].switch_vlans == [300, 301]
-    assert refreshed_ports["GE1"].tagged_vlans == [301]
-    assert refreshed_ports["GE1"].untagged_vlan == 300
+    assert refreshed_ports["GE1"].switch_vlans == []
+    assert refreshed_ports["GE1"].tagged_vlans == []
+    assert refreshed_ports["GE1"].untagged_vlan is None
     connection_ids = {connection.id for connection in result.inventory.connections}
     assert "ln-edge-1-old-wiremap" not in connection_ids
 

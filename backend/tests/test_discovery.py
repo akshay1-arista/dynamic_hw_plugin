@@ -307,6 +307,94 @@ def test_inventory_refresh_apply_does_not_require_hypervisor_ip(tmp_path):
     assert ("hypervisor-access", "agg_sw", "esxi_01") in roles
 
 
+def test_inventory_refresh_apply_recovers_hidden_ha_group_from_devices(tmp_path):
+    class HiddenHaStubClient:
+        def close(self):
+            return None
+
+        def get_wiremap(self, device_id):
+            if device_id == 101:
+                return {
+                    "connections": [
+                        {
+                            "interface_name": "GE1",
+                            "remote_device": {
+                                "id": 11,
+                                "name": "access-sw",
+                                "ip_address": "10.0.0.10",
+                                "device_type": "switch",
+                                "device_model": "Dell-3048",
+                            },
+                            "remote_interface_name": "Gi1/10",
+                        }
+                    ]
+                }
+            if device_id == 102:
+                return {
+                    "connections": [
+                        {
+                            "interface_name": "GE1",
+                            "remote_device": {
+                                "id": 11,
+                                "name": "access-sw",
+                                "ip_address": "10.0.0.10",
+                                "device_type": "switch",
+                                "device_model": "Dell-3048",
+                            },
+                            "remote_interface_name": "Gi1/20",
+                        }
+                    ]
+                }
+            return {"connections": []}
+
+    inventory_path = tmp_path / "inventory.json"
+    inventory_path.write_text(
+        json.dumps(
+            {
+                "devices": {
+                    "edge-ha-active": {
+                        "id": "edge-ha-active",
+                        "type": "edge",
+                        "display_name": "Hidden HA Active",
+                        "model": "edge7X0",
+                        "model_suffix": "740",
+                        "serial_number": "SERIAL1",
+                        "lab_navigator_id": 101,
+                        "ha_group_id": "edge-ha-hidden",
+                        "ha_role": "active",
+                    },
+                    "edge-ha-standby": {
+                        "id": "edge-ha-standby",
+                        "type": "edge",
+                        "display_name": "Hidden HA Standby",
+                        "model": "edge7X0",
+                        "model_suffix": "740",
+                        "serial_number": "SERIAL2",
+                        "lab_navigator_id": 102,
+                        "ha_group_id": "edge-ha-hidden",
+                        "ha_role": "standby",
+                    }
+                },
+                "connections": [],
+            }
+        )
+    )
+
+    result = apply_inventory_refresh(
+        InventoryRefreshRequest(hardware_ids=["edge-ha-hidden"]),
+        inventory_path=inventory_path,
+        client=HiddenHaStubClient(),
+    )
+
+    hardware = next(item for item in result.inventory.hardware if item.id == "edge-ha-hidden")
+    assert hardware.ha is True
+    assert hardware.active_serial == "SERIAL1"
+    assert hardware.standby_serial == "SERIAL2"
+    ports = {port.logical_interface: port for port in hardware.ports}
+    assert ports["GE1"].switch_active_port == "gigabitethernet1/10"
+    assert ports["GE1"].switch_standby_port == "gigabitethernet1/20"
+
+
 def test_lab_navigator_client_allows_anonymous_reads():
     client = LabNavigatorClient(api_key="")
     try:

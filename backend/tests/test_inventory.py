@@ -1,6 +1,14 @@
 import json
 
-from app.inventory import build_inventory, load_inventory, reserve_generated_hardware, save_inventory, update_hardware_availability
+from app.inventory import (
+    build_inventory,
+    load_inventory,
+    reserve_generated_hardware,
+    save_inventory,
+    save_inventory_hardware_edits,
+    update_hardware_availability,
+)
+from app.models import VlanRange
 
 
 def test_build_inventory_sanitizes_conflicting_remote_interface_connections():
@@ -449,3 +457,75 @@ def test_save_inventory_can_preserve_existing_local_state(tmp_path):
     assert saved.hardware[0].available is False
     assert saved.hardware[0].reservation is not None
     assert saved.hardware[0].reservation.run_id == "run123"
+
+
+def test_save_inventory_hardware_edits_preserves_existing_graph(tmp_path):
+    inventory_path = tmp_path / "inventory.json"
+    inventory_path.write_text(
+        """
+{
+  "devices": {
+    "edge-1": {
+      "id": "edge-1",
+      "type": "edge",
+      "display_name": "Edge 1",
+      "model": "edge6X0",
+      "model_suffix": "680",
+      "serial_number": "SERIAL1",
+      "ha_group_id": "edge-1",
+      "ha_role": "active",
+      "free_vlans": [101, 102, 103],
+      "vlan_range": {"start": 101, "end": 103}
+    },
+    "edge-2": {
+      "id": "edge-2",
+      "type": "edge",
+      "display_name": "Edge 2",
+      "model": "edge5X0",
+      "model_suffix": "520",
+      "serial_number": "SERIAL2",
+      "ha_group_id": "edge-2",
+      "ha_role": "active",
+      "free_vlans": [201, 202, 203],
+      "vlan_range": {"start": 201, "end": 203}
+    },
+    "switch-1": {
+      "id": "switch-1",
+      "type": "switch",
+      "display_name": "Switch 1",
+      "model": "Dell-3048",
+      "ip_address": "10.0.0.1"
+    }
+  },
+  "connections": [
+    {
+      "id": "edge-1-ge1-switch-1",
+      "a": {"device_id": "edge-1", "interface": "GE1"},
+      "b": {"device_id": "switch-1", "interface": "Gi1/1"},
+      "role": "edge-access"
+    },
+    {
+      "id": "edge-2-ge1-switch-1",
+      "a": {"device_id": "edge-2", "interface": "GE1"},
+      "b": {"device_id": "switch-1", "interface": "Gi1/2"},
+      "role": "edge-access"
+    }
+  ],
+  "allocations": []
+}
+""".strip()
+    )
+
+    current = load_inventory(inventory_path)
+    stale_browser_snapshot = build_inventory({}, [])
+    stale_browser_snapshot.hardware = [current.hardware[0].model_copy(deep=True)]
+    stale_browser_snapshot.hardware[0].vlan_range = VlanRange(start=111, end=113)
+
+    saved = save_inventory_hardware_edits(stale_browser_snapshot, inventory_path)
+    persisted = json.loads(inventory_path.read_text())
+
+    assert len(saved.hardware) == 2
+    assert len(persisted["devices"]) == 3
+    assert len(persisted["connections"]) == 2
+    assert persisted["devices"]["edge-1"]["vlan_range"] == {"start": 111, "end": 113}
+    assert persisted["devices"]["edge-2"]["vlan_range"] == {"start": 201, "end": 203}

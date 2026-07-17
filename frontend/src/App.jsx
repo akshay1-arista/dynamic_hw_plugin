@@ -206,6 +206,14 @@ export function App() {
     }
     return auditTrail.filter((event) => auditSearchText(event).includes(query));
   }, [auditTrail, auditSearch]);
+  const refreshAllHardwareIds = useMemo(() => allRefreshableHardwareIds(inventory), [inventory]);
+  const refreshTargets = useMemo(
+    () =>
+      filteredHardware.length === inventory.hardware.length
+        ? refreshAllHardwareIds
+        : filteredHardware.map((hardware) => hardware.id),
+    [filteredHardware, inventory.hardware.length, refreshAllHardwareIds]
+  );
   const refreshingInventory = refreshingHardwareIds.length > 0;
 
   const configureSwitchState = useMemo(() => {
@@ -891,8 +899,8 @@ export function App() {
             </div>
             <button
               className="secondary"
-              onClick={() => refreshHardwareFromLabNavigator(filteredHardware.map((hardware) => hardware.id))}
-              disabled={refreshingInventory || filteredHardware.length === 0}
+              onClick={() => refreshHardwareFromLabNavigator(refreshTargets)}
+              disabled={refreshingInventory || refreshTargets.length === 0}
               type="button"
             >
               {refreshingInventory ? <Loader2 className="spin" size={16} /> : <RefreshCw size={16} />}
@@ -1610,6 +1618,17 @@ function hardwareSearchText(hardware) {
     .filter(Boolean)
     .join(' ')
     .toLowerCase();
+}
+
+function allRefreshableHardwareIds(inventory) {
+  const ids = new Set((inventory.hardware || []).map((hardware) => hardware.id).filter(Boolean));
+  Object.values(inventory.devices || {}).forEach((device) => {
+    if (device.type !== 'edge') {
+      return;
+    }
+    ids.add(device.ha_group_id || device.id);
+  });
+  return [...ids];
 }
 
 function buildHypervisorOptions(inventory) {

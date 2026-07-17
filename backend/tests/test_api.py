@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 from app import main as app_main
 from app.config import INVENTORY_PATH
 from app.generator import generate_topology as real_generate_topology
-from app.inventory import load_inventory, save_inventory
+from app.inventory import load_inventory, save_inventory, save_inventory_hardware_edits as real_save_inventory_hardware_edits
 from app.main import app
 
 
@@ -132,6 +132,98 @@ def test_connected_ports_without_vlans_are_kept_in_inventory(tmp_path):
     assert ports["GE1"].switch_vlans == [101]
     assert ports["GE2"].switch_active_port == "Gi1/2"
     assert ports["GE2"].switch_vlans == []
+
+
+def test_save_inventory_route_preserves_existing_graph(tmp_path, monkeypatch):
+    inventory_path = tmp_path / "inventory.json"
+    inventory_path.write_text(
+        """
+{
+  "devices": {
+    "edge-1": {
+      "id": "edge-1",
+      "type": "edge",
+      "display_name": "Edge 1",
+      "model": "edge6X0",
+      "model_suffix": "680",
+      "serial_number": "SERIAL1",
+      "ha_group_id": "edge-1",
+      "ha_role": "active",
+      "free_vlans": [101, 102, 103],
+      "vlan_range": {"start": 101, "end": 103}
+    },
+    "edge-2": {
+      "id": "edge-2",
+      "type": "edge",
+      "display_name": "Edge 2",
+      "model": "edge5X0",
+      "model_suffix": "520",
+      "serial_number": "SERIAL2",
+      "ha_group_id": "edge-2",
+      "ha_role": "active",
+      "free_vlans": [201, 202, 203],
+      "vlan_range": {"start": 201, "end": 203}
+    },
+    "switch-1": {
+      "id": "switch-1",
+      "type": "switch",
+      "display_name": "Switch 1",
+      "model": "Dell-3048",
+      "ip_address": "10.0.0.1"
+    }
+  },
+  "connections": [
+    {
+      "id": "edge-1-ge1-switch-1",
+      "a": {"device_id": "edge-1", "interface": "GE1"},
+      "b": {"device_id": "switch-1", "interface": "Gi1/1"},
+      "role": "edge-access"
+    },
+    {
+      "id": "edge-2-ge1-switch-1",
+      "a": {"device_id": "edge-2", "interface": "GE1"},
+      "b": {"device_id": "switch-1", "interface": "Gi1/2"},
+      "role": "edge-access"
+    }
+  ],
+  "allocations": []
+}
+""".strip()
+    )
+
+    inventory = load_inventory(inventory_path)
+    edited_hardware = inventory.hardware[0].model_dump(mode="json")
+    edited_hardware["vlan_range"] = {"start": 111, "end": 113}
+
+    def save_with_temp_inventory(request_inventory):
+        return real_save_inventory_hardware_edits(request_inventory, inventory_path)
+
+    monkeypatch.setattr(app_main, "save_inventory_hardware_edits", save_with_temp_inventory)
+
+    response = client.put(
+        "/api/hardware",
+        json={
+            "inventory": {
+                "devices": {},
+                "connections": [],
+                "allocations": [],
+                "hardware": [edited_hardware],
+            },
+            "requested_by": {"name": "Test User", "email": "test@example.com"},
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body["hardware"]) == 2
+
+    persisted = load_inventory(inventory_path)
+    assert len(persisted.hardware) == 2
+    assert len(persisted.connections) == 2
+    edge_1 = persisted.devices["edge-1"]
+    edge_2 = persisted.devices["edge-2"]
+    assert edge_1.vlan_range.model_dump(mode="json") == {"start": 111, "end": 113}
+    assert edge_2.vlan_range.model_dump(mode="json") == {"start": 201, "end": 203}
 
 
 def test_invalid_reference_generation_rejected():

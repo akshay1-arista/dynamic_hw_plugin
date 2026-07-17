@@ -214,11 +214,15 @@ def _build_refreshed_inventory(
     hardware_by_id = {item.id: item for item in inventory.hardware}
 
     for hardware_id in hardware_ids:
-        if hardware_id not in hardware_by_id:
-            raise DiscoveryError(f"Unknown hardware id: {hardware_id}")
         members = _hardware_members(devices, hardware_id)
         if not members:
             raise DiscoveryError(f"{hardware_id} is missing edge devices in inventory")
+        if hardware_id not in hardware_by_id:
+            _log(
+                logging.INFO,
+                "Refreshing hidden inventory group hardware_id=%s from edge members because it is not currently derived in hardware",
+                hardware_id,
+            )
         _log(
             logging.INFO,
             "Refreshing inventory graph for hardware_id=%s member_edges=%s",

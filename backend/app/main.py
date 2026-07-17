@@ -12,7 +12,7 @@ from .discovery import DiscoveryError, apply_inventory_refresh, preview_inventor
 from .config import OUTPUTS_ROOT
 from .generator import GenerationError, generate_topology, resolve_run_root
 from .hapy_repo import HapyRepoError, delete_private_branches, list_private_branches, publish_run_private_branch
-from .inventory import load_inventory, save_inventory, update_hardware_availability
+from .inventory import load_inventory, save_inventory_hardware_edits, update_hardware_availability
 from .models import (
     AuditTrailResult,
     GenerateRequest,
@@ -72,7 +72,7 @@ def get_hardware():
 
 @app.put("/api/hardware", response_model=InventoryFile)
 def put_hardware(request: InventoryUpdateRequest):
-    saved = save_inventory(request.inventory)
+    saved = save_inventory_hardware_edits(request.inventory)
     if request.requested_by is not None:
         append_audit_event(
             action="inventory_saved",

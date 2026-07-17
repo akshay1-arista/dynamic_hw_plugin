@@ -86,6 +86,26 @@ const inventory = {
       serial_number: '8FYS6T2',
       ip_address: '10.68.137.162',
       available: true
+    },
+    'hidden-ha-active': {
+      id: 'hidden-ha-active',
+      type: 'edge',
+      display_name: 'Hidden HA Active',
+      model: 'edge7X0',
+      model_suffix: '740',
+      serial_number: 'HIDDEN1',
+      ha_group_id: 'hidden-ha-pair',
+      ha_role: 'active'
+    },
+    'hidden-ha-standby': {
+      id: 'hidden-ha-standby',
+      type: 'edge',
+      display_name: 'Hidden HA Standby',
+      model: 'edge7X0',
+      model_suffix: '740',
+      serial_number: 'HIDDEN2',
+      ha_group_id: 'hidden-ha-pair',
+      ha_role: 'standby'
     }
   },
   connections: [
@@ -856,13 +876,19 @@ describe('App', () => {
         expect.objectContaining({
           method: 'POST',
           body: JSON.stringify({
-            hardware_ids: ['chn-3800-8-ha', 'a01-680-standalone', 'a01-3800-asymmetric-ha', 'internet-dynamic-680']
+            hardware_ids: [
+              'chn-3800-8-ha',
+              'a01-680-standalone',
+              'a01-3800-asymmetric-ha',
+              'internet-dynamic-680',
+              'hidden-ha-pair'
+            ]
           })
         })
       );
     });
     expect(window.confirm).toHaveBeenCalledWith(
-      expect.stringContaining('Apply Lab Navigator refresh for 4 inventory devices?')
+      expect.stringContaining('Apply Lab Navigator refresh for 5 inventory devices?')
     );
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
@@ -870,7 +896,13 @@ describe('App', () => {
         expect.objectContaining({
           method: 'POST',
           body: JSON.stringify({
-            hardware_ids: ['chn-3800-8-ha', 'a01-680-standalone', 'a01-3800-asymmetric-ha', 'internet-dynamic-680']
+            hardware_ids: [
+              'chn-3800-8-ha',
+              'a01-680-standalone',
+              'a01-3800-asymmetric-ha',
+              'internet-dynamic-680',
+              'hidden-ha-pair'
+            ]
           })
         })
       );

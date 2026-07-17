@@ -95,6 +95,24 @@ def save_inventory(
     return load_inventory(path, state_path=resolved_state_path)
 
 
+def save_inventory_hardware_edits(
+    inventory: InventoryFile,
+    path: Path = INVENTORY_PATH,
+    *,
+    state_path: Path | None = None,
+) -> InventoryFile:
+    current = load_inventory(path, state_path=state_path)
+    requested_hardware = {item.id: item for item in inventory.hardware}
+
+    for hardware in current.hardware:
+        updated = requested_hardware.get(hardware.id)
+        if updated is None:
+            continue
+        hardware.vlan_range = updated.vlan_range
+
+    return save_inventory(current, path, state_path=state_path)
+
+
 def get_hardware_by_id(hardware_id: str, path: Path = INVENTORY_PATH) -> HardwareEdge | None:
     inventory = load_inventory(path)
     return next((item for item in inventory.hardware if item.id == hardware_id), None)

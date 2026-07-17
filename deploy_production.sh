@@ -237,6 +237,12 @@ bootstrap_system_dependencies() {
     fi
   fi
 
+  if ! command_exists sshpass; then
+    if ! append_unique sshpass "${packages[@]}"; then
+      packages+=("sshpass")
+    fi
+  fi
+
   if ! command_exists lsof; then
     if ! append_unique lsof "${packages[@]}"; then
       packages+=("lsof")
@@ -288,6 +294,7 @@ bootstrap_system_dependencies() {
   require_command curl
   require_command lsof
   require_command install
+  require_command sshpass
   require_command systemctl
 
   if ! python_venv_ready; then

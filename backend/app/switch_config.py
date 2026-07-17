@@ -904,7 +904,9 @@ def _execute_switch_plan(plan: SwitchCommandPlan, device: InventoryDevice) -> No
 
 def _build_ssh_command(device: InventoryDevice, *, force_tty: bool) -> list[str]:
     if not shutil.which("sshpass"):
-        raise SwitchConfigError("sshpass is required for switch auto-config")
+        raise SwitchConfigError(
+            "sshpass is required for switch auto-config. Install the host package `sshpass` and retry."
+        )
     metadata = device.switch_metadata
     if not metadata:
         raise SwitchConfigError(f"Missing switch metadata for {device.display_name}")

@@ -32,6 +32,7 @@ sudo ./deploy_production.sh
 It will:
 
 - auto-install missing host packages on supported distros (`apt-get` and `dnf`) unless `AUTO_INSTALL_SYSTEM_DEPS=0`
+- install `sshpass` for switch auto-config support
 - create or refresh `.venv-production`
 - install backend dependencies from `backend/requirements.txt`
 - run `npm ci` and `npm run build` when `npm` is available
@@ -63,6 +64,8 @@ journalctl -u dynamic-hw-topology-backend.service -u dynamic-hw-topology-fronten
 ```
 
 Optional persistent overrides and secrets can be supplied with `/etc/default/dynamic-hw-topology`. A sample file is available at `deploy/systemd/dynamic-hw-topology.env.example`.
+
+Switch auto-config uses `sshpass` to open non-interactive SSH sessions to access and upstream switches. If you deploy with `AUTO_INSTALL_SYSTEM_DEPS=0`, install the OS package manually before using the "Configure switches" flow.
 
 ## Data And Outputs
 

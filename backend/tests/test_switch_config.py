@@ -2,6 +2,7 @@ import json
 import subprocess
 
 from app.models import InventoryDevice, InventoryFile, SwitchConfigureRequest
+from app.switch_config import _build_ssh_command
 from app.switch_config import _merge_shared_os10_tagged_vlans
 from app.switch_config import _run_ssh_script, configure_switches_for_run
 from app.switch_config import SSH_COMMAND_TIMEOUT_SECONDS, SSH_CONNECT_TIMEOUT_SECONDS, SwitchConfigError
@@ -1342,6 +1343,33 @@ def test_run_ssh_script_uses_clean_compatibility_options(monkeypatch):
     assert captured["kwargs"]["check"] is True
     assert captured["kwargs"]["capture_output"] is True
     assert captured["kwargs"]["timeout"] == SSH_COMMAND_TIMEOUT_SECONDS
+
+
+def test_build_ssh_command_requires_sshpass(monkeypatch):
+    device = InventoryDevice.model_validate(
+        {
+            "id": "access_sw",
+            "type": "switch",
+            "display_name": "legacy-switch",
+            "model": "Dell-3048",
+            "ip_address": "10.0.0.10",
+            "switch_metadata": {
+                "name": "legacy-switch",
+                "model": "Dell-3048",
+                "connections": {"ip": "10.0.0.10", "port": 2222},
+                "credentials": {"username": "velo", "password": "secret"},
+            },
+        }
+    )
+
+    monkeypatch.setattr("app.switch_config.shutil.which", lambda _tool: None)
+
+    try:
+        _build_ssh_command(device, force_tty=False)
+    except SwitchConfigError as error:
+        assert str(error) == "sshpass is required for switch auto-config. Install the host package `sshpass` and retry."
+    else:
+        raise AssertionError("Expected SwitchConfigError when sshpass is unavailable")
 
 
 def test_run_ssh_script_surfaces_timeout_errors(monkeypatch):

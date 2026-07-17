@@ -1,4 +1,5 @@
 import json
+import ssl
 
 import httpx
 import pytest
@@ -310,6 +311,54 @@ def test_lab_navigator_client_allows_anonymous_reads():
     client = LabNavigatorClient(api_key="")
     try:
         assert "Authorization" not in client.client.headers
+    finally:
+        client.close()
+
+
+def test_lab_navigator_client_uses_configured_ca_bundle(tmp_path, monkeypatch):
+    captured: dict[str, object] = {}
+    ca_bundle = tmp_path / "lab-navigator-ca.pem"
+    ca_bundle.write_text("not-a-real-ca")
+    expected_context = ssl.create_default_context()
+
+    class FakeClient:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+        def close(self):
+            return None
+
+    def fake_create_default_context(*, cafile=None):
+        captured["cafile"] = cafile
+        return expected_context
+
+    monkeypatch.setattr("app.discovery.ssl.create_default_context", fake_create_default_context)
+    monkeypatch.setattr(httpx, "Client", FakeClient)
+
+    client = LabNavigatorClient(ca_bundle=ca_bundle)
+    try:
+        verify = captured["verify"]
+        assert verify is expected_context
+        assert captured["cafile"] == str(ca_bundle)
+    finally:
+        client.close()
+
+
+def test_lab_navigator_client_allows_tls_verification_override(monkeypatch):
+    captured: dict[str, object] = {}
+
+    class FakeClient:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+        def close(self):
+            return None
+
+    monkeypatch.setattr(httpx, "Client", FakeClient)
+
+    client = LabNavigatorClient(tls_verify=False)
+    try:
+        assert captured["verify"] is False
     finally:
         client.close()
 

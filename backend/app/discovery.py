@@ -7,12 +7,19 @@ from collections import deque
 from contextvars import ContextVar
 from dataclasses import dataclass
 from pathlib import Path
+import ssl
 from typing import Any
 from uuid import uuid4
 
 import httpx
 
-from .config import INVENTORY_PATH, LAB_NAVIGATOR_API_KEY, LAB_NAVIGATOR_BASE_URL
+from .config import (
+    INVENTORY_PATH,
+    LAB_NAVIGATOR_API_KEY,
+    LAB_NAVIGATOR_BASE_URL,
+    LAB_NAVIGATOR_CA_BUNDLE,
+    LAB_NAVIGATOR_TLS_VERIFY,
+)
 from .inventory import build_inventory, load_inventory, save_inventory
 from .models import (
     HardwareEdge,
@@ -73,14 +80,24 @@ class LabNavigatorClient:
         base_url: str = LAB_NAVIGATOR_BASE_URL,
         api_key: str = LAB_NAVIGATOR_API_KEY,
         timeout: float = 30.0,
+        ca_bundle: Path | None = LAB_NAVIGATOR_CA_BUNDLE,
+        tls_verify: bool = LAB_NAVIGATOR_TLS_VERIFY,
     ) -> None:
         normalized_api_key = api_key.strip()
         headers = {"Authorization": f"Bearer {normalized_api_key}"} if normalized_api_key else {}
         self.base_url = base_url.rstrip("/")
+        verify: bool | ssl.SSLContext
+        if not tls_verify:
+            verify = False
+        elif ca_bundle is not None:
+            verify = ssl.create_default_context(cafile=str(ca_bundle))
+        else:
+            verify = True
         self.client = httpx.Client(
             base_url=self.base_url,
             timeout=timeout,
             headers=headers,
+            verify=verify,
         )
 
     def close(self) -> None:

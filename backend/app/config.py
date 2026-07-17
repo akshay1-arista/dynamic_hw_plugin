@@ -37,6 +37,21 @@ def _optional_config_path(value: str | Path | None) -> Path | None:
     return _config_path(text)
 
 
+def _config_bool(value: str | bool | None, default: bool) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    text = str(value).strip().lower()
+    if not text:
+        return default
+    if text in {"1", "true", "yes", "on"}:
+        return True
+    if text in {"0", "false", "no", "off"}:
+        return False
+    return default
+
+
 DOTENV = _load_dotenv(APP_ROOT / ".env")
 LOCAL_REFERENCE_CONFIG_ROOT = APP_ROOT / "backend" / "reference_topologies"
 REFERENCE_CONFIG_ROOT = _config_path(
@@ -96,6 +111,13 @@ LAB_NAVIGATOR_BASE_URL = (
     or "https://lab-navigator.velo.maa.aristanetworks.com"
 )
 LAB_NAVIGATOR_API_KEY = os.environ.get("LN_PROD_API_KEY") or DOTENV.get("LN_PROD_API_KEY", "")
+LAB_NAVIGATOR_CA_BUNDLE = _optional_config_path(
+    os.environ.get("LAB_NAVIGATOR_CA_BUNDLE") or DOTENV.get("LAB_NAVIGATOR_CA_BUNDLE", "")
+)
+LAB_NAVIGATOR_TLS_VERIFY = _config_bool(
+    os.environ.get("LAB_NAVIGATOR_TLS_VERIFY") or DOTENV.get("LAB_NAVIGATOR_TLS_VERIFY"),
+    True,
+)
 
 REFERENCE_TOPOLOGIES = [
     "1-site",

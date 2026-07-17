@@ -72,7 +72,11 @@ def get_hardware():
 
 @app.put("/api/hardware", response_model=InventoryFile)
 def put_hardware(request: InventoryUpdateRequest):
-    saved = save_inventory_hardware_edits(request.inventory)
+    saved = save_inventory_hardware_edits(
+        request.inventory,
+        write_source="ui-save",
+        write_context={"actor_email": request.requested_by.email if request.requested_by is not None else None},
+    )
     if request.requested_by is not None:
         append_audit_event(
             action="inventory_saved",

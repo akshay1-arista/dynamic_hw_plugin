@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 from pathlib import Path
 from typing import Any
@@ -21,6 +22,8 @@ from .models import (
     SwitchMetadata,
     VlanRange,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def load_inventory(path: Path = INVENTORY_PATH, *, state_path: Path | None = None) -> InventoryFile:
@@ -70,10 +73,15 @@ def save_inventory(
     *,
     preserve_local_state: bool = False,
     state_path: Path | None = None,
+    write_source: str = "unknown",
+    write_context: dict[str, Any] | None = None,
 ) -> InventoryFile:
     path.parent.mkdir(parents=True, exist_ok=True)
     resolved_state_path = _resolve_inventory_state_path(path, state_path)
     existing_local_state = _load_inventory_state(resolved_state_path)
+    requested_devices = len(inventory.devices)
+    requested_connections = len(inventory.connections)
+    requested_hardware = len(inventory.hardware)
     inventory.connections = _sanitize_connections(inventory.connections)
     inventory.allocations = []
     _normalize_hardware_state(inventory)
@@ -92,7 +100,24 @@ def save_inventory(
         json.dump(persisted, fh, indent=2)
         fh.write("\n")
     _save_inventory_state(local_state, resolved_state_path)
-    return load_inventory(path, state_path=resolved_state_path)
+    saved = load_inventory(path, state_path=resolved_state_path)
+    hidden_group_ids = _hidden_edge_group_ids(saved)
+    logger.info(
+        "Inventory write source=%s path=%s context=%s requested_devices=%d requested_connections=%d requested_hardware=%d "
+        "saved_devices=%d saved_connections=%d saved_hardware=%d hidden_groups=%d hidden_group_ids=%s",
+        write_source,
+        path,
+        json.dumps(write_context or {}, sort_keys=True),
+        requested_devices,
+        requested_connections,
+        requested_hardware,
+        len(saved.devices),
+        len(saved.connections),
+        len(saved.hardware),
+        len(hidden_group_ids),
+        hidden_group_ids[:20],
+    )
+    return saved
 
 
 def save_inventory_hardware_edits(
@@ -100,6 +125,8 @@ def save_inventory_hardware_edits(
     path: Path = INVENTORY_PATH,
     *,
     state_path: Path | None = None,
+    write_source: str = "unknown",
+    write_context: dict[str, Any] | None = None,
 ) -> InventoryFile:
     current = load_inventory(path, state_path=state_path)
     requested_hardware = {item.id: item for item in inventory.hardware}
@@ -110,7 +137,13 @@ def save_inventory_hardware_edits(
             continue
         hardware.vlan_range = updated.vlan_range
 
-    return save_inventory(current, path, state_path=state_path)
+    return save_inventory(
+        current,
+        path,
+        state_path=state_path,
+        write_source=write_source,
+        write_context=write_context,
+    )
 
 
 def get_hardware_by_id(hardware_id: str, path: Path = INVENTORY_PATH) -> HardwareEdge | None:
@@ -154,7 +187,17 @@ def reserve_generated_hardware(
                 },
             )
         )
-    saved = save_inventory(inventory, path)
+    saved = save_inventory(
+        inventory,
+        path,
+        write_source="topology-reservation",
+        write_context={
+            "hardware_ids": sorted(hardware_set),
+            "run_id": run_id,
+            "topology_name": topology_name,
+            "actor_email": _actor_email(actor),
+        },
+    )
     return saved, events
 
 
@@ -193,7 +236,16 @@ def update_hardware_availability(
             "hardware_display_name": hardware.display_name,
         }
 
-    saved = save_inventory(inventory, path)
+    saved = save_inventory(
+        inventory,
+        path,
+        write_source="availability-update",
+        write_context={
+            "hardware_id": hardware.id,
+            "available": available,
+            "actor_email": _actor_email(actor),
+        },
+    )
     event = build_audit_event(
         action=action,
         actor=actor,
@@ -831,6 +883,26 @@ def _normalize_hardware_state(inventory: InventoryFile) -> None:
     for hardware in inventory.hardware:
         if hardware.available:
             hardware.reservation = None
+
+
+def _hidden_edge_group_ids(inventory: InventoryFile) -> list[str]:
+    hardware_ids = {item.id for item in inventory.hardware}
+    hidden: set[str] = set()
+    for device in inventory.devices.values():
+        if device.type != "edge":
+            continue
+        group_id = device.ha_group_id or device.id
+        if group_id not in hardware_ids:
+            hidden.add(group_id)
+    return sorted(hidden)
+
+
+def _actor_email(actor: ActorIdentity | dict[str, Any]) -> str | None:
+    if isinstance(actor, dict):
+        value = actor.get("email")
+        return str(value) if value else None
+    value = getattr(actor, "email", None)
+    return str(value) if value else None
 
 
 def _resolve_inventory_state_path(path: Path, state_path: Path | None) -> Path:

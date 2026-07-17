@@ -195,8 +195,8 @@ def test_save_inventory_route_preserves_existing_graph(tmp_path, monkeypatch):
     edited_hardware = inventory.hardware[0].model_dump(mode="json")
     edited_hardware["vlan_range"] = {"start": 111, "end": 113}
 
-    def save_with_temp_inventory(request_inventory):
-        return real_save_inventory_hardware_edits(request_inventory, inventory_path)
+    def save_with_temp_inventory(request_inventory, **kwargs):
+        return real_save_inventory_hardware_edits(request_inventory, inventory_path, **kwargs)
 
     monkeypatch.setattr(app_main, "save_inventory_hardware_edits", save_with_temp_inventory)
 

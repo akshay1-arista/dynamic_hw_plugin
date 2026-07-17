@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
+from collections import deque
+from contextvars import ContextVar
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 import httpx
 
@@ -18,6 +22,7 @@ from .models import (
     InventoryRefreshChange,
     InventoryRefreshRequest,
     InventoryRefreshResult,
+    SwitchCredentials,
     SwitchMetadata,
     ValidationMessage,
 )
@@ -25,6 +30,22 @@ from .models import (
 
 class DiscoveryError(ValueError):
     pass
+
+
+logger = logging.getLogger(__name__)
+_refresh_log_id: ContextVar[str | None] = ContextVar("refresh_log_id", default=None)
+
+
+def _new_refresh_log_id() -> str:
+    return uuid4().hex[:8]
+
+
+def _current_refresh_log_id() -> str:
+    return _refresh_log_id.get() or "-"
+
+
+def _log(level: int, message: str, *args: Any) -> None:
+    logger.log(level, "[refresh_id=%s] " + message, _current_refresh_log_id(), *args)
 
 
 @dataclass
@@ -105,12 +126,22 @@ def preview_inventory_refresh(
     inventory_path: Path = INVENTORY_PATH,
     client: LabNavigatorClient | None = None,
 ) -> InventoryRefreshResult:
+    token = _refresh_log_id.set(_refresh_log_id.get() or _new_refresh_log_id())
+    _log(logging.INFO, "Inventory refresh preview requested for hardware_ids=%s", request.hardware_ids)
     inventory = load_inventory(inventory_path)
     owns_client = client is None
     client = client or LabNavigatorClient()
     try:
         proposed = _build_refreshed_inventory(inventory, request.hardware_ids, client)
         changes = _diff_inventory(inventory, proposed)
+        _log(
+            logging.INFO,
+            "Inventory refresh preview completed for hardware_ids=%s changes=%d devices=%d connections=%d",
+            request.hardware_ids,
+            len(changes),
+            len(proposed.devices),
+            len(proposed.connections),
+        )
         messages = [ValidationMessage(level="info", message=f"Previewed {len(changes)} inventory change(s).")]
         return InventoryRefreshResult(
             hardware_ids=request.hardware_ids,
@@ -121,6 +152,7 @@ def preview_inventory_refresh(
     finally:
         if owns_client:
             client.close()
+        _refresh_log_id.reset(token)
 
 
 def apply_inventory_refresh(
@@ -129,17 +161,30 @@ def apply_inventory_refresh(
     inventory_path: Path = INVENTORY_PATH,
     client: LabNavigatorClient | None = None,
 ) -> InventoryRefreshResult:
-    preview = preview_inventory_refresh(request, inventory_path=inventory_path, client=client)
-    saved = save_inventory(preview.inventory, inventory_path)
-    return InventoryRefreshResult(
-        hardware_ids=request.hardware_ids,
-        changes=preview.changes,
-        inventory=saved,
-        messages=[
-            *preview.messages,
-            ValidationMessage(level="info", message="Applied Lab Navigator inventory refresh."),
-        ],
-    )
+    token = _refresh_log_id.set(_refresh_log_id.get() or _new_refresh_log_id())
+    try:
+        _log(logging.INFO, "Inventory refresh apply requested for hardware_ids=%s", request.hardware_ids)
+        preview = preview_inventory_refresh(request, inventory_path=inventory_path, client=client)
+        saved = save_inventory(preview.inventory, inventory_path)
+        _log(
+            logging.INFO,
+            "Inventory refresh apply completed for hardware_ids=%s changes=%d saved_devices=%d saved_connections=%d",
+            request.hardware_ids,
+            len(preview.changes),
+            len(saved.devices),
+            len(saved.connections),
+        )
+        return InventoryRefreshResult(
+            hardware_ids=request.hardware_ids,
+            changes=preview.changes,
+            inventory=saved,
+            messages=[
+                *preview.messages,
+                ValidationMessage(level="info", message="Applied Lab Navigator inventory refresh."),
+            ],
+        )
+    finally:
+        _refresh_log_id.reset(token)
 
 
 def _build_refreshed_inventory(
@@ -152,42 +197,35 @@ def _build_refreshed_inventory(
     hardware_by_id = {item.id: item for item in inventory.hardware}
 
     for hardware_id in hardware_ids:
-        hardware = hardware_by_id.get(hardware_id)
-        if not hardware:
+        if hardware_id not in hardware_by_id:
             raise DiscoveryError(f"Unknown hardware id: {hardware_id}")
-        if not hardware.switch:
-            raise DiscoveryError(f"{hardware_id} is missing an access switch in inventory")
-        if not hardware.hypervisor_ip:
-            raise DiscoveryError(f"{hardware_id} is missing hypervisor_ip in inventory")
-
-        candidate = _discover_candidate_path(hardware, client)
-        _merge_device(devices, _inventory_switch_device(hardware.switch.name, hardware.switch.model, hardware.switch.connections.ip, candidate.access_switch["id"]))
-        _merge_device(devices, _inventory_switch_device(candidate.upstream_switch["name"], _device_model(candidate.upstream_switch), candidate.upstream_switch.get("ip_address") or "", candidate.upstream_switch["id"]))
-        _merge_device(devices, _inventory_hypervisor_device(candidate.hypervisor))
-        _merge_connection(
-            connections,
-            {
-                "id": f"{_safe_id(hardware.switch.name)}-{candidate.access_uplink_port}-{_safe_id(candidate.upstream_switch['name'])}",
-                "a": {"device_id": _safe_id(hardware.switch.name), "interface": candidate.access_uplink_port},
-                "b": {"device_id": _safe_id(candidate.upstream_switch["name"]), "interface": candidate.upstream_access_port},
-                "vlans": [],
-                "tagged_vlans": [],
-                "untagged_vlan": None,
-                "role": "switch-uplink",
-            },
+        members = _hardware_members(devices, hardware_id)
+        if not members:
+            raise DiscoveryError(f"{hardware_id} is missing edge devices in inventory")
+        _log(
+            logging.INFO,
+            "Refreshing inventory graph for hardware_id=%s member_edges=%s",
+            hardware_id,
+            [member.id for member in members],
         )
-        _merge_connection(
-            connections,
-            {
-                "id": f"{_safe_id(candidate.upstream_switch['name'])}-{candidate.upstream_hypervisor_port}-{_safe_id(candidate.hypervisor['name'])}",
-                "a": {"device_id": _safe_id(candidate.upstream_switch["name"]), "interface": candidate.upstream_hypervisor_port},
-                "b": {"device_id": _safe_id(candidate.hypervisor["name"]), "interface": candidate.hypervisor_interface},
-                "vlans": [],
-                "tagged_vlans": [],
-                "untagged_vlan": None,
-                "role": "hypervisor-access",
-            },
+        refreshed_ids, refreshed_devices, refreshed_connections = _discover_lab_navigator_subgraph(
+            members,
+            devices,
+            client,
         )
+        _log(
+            logging.INFO,
+            "Discovered Lab Navigator subgraph for hardware_id=%s inventory_devices=%d connections=%d refreshed_ids=%s",
+            hardware_id,
+            len(refreshed_devices),
+            len(refreshed_connections),
+            sorted(refreshed_ids),
+        )
+        _drop_lab_navigator_wiremap_connections(connections, refreshed_ids)
+        for device in refreshed_devices.values():
+            _merge_device(devices, device)
+        for connection in refreshed_connections:
+            _merge_connection(connections, connection)
 
     return build_inventory(devices, connections)
 
@@ -236,6 +274,278 @@ def _discover_candidate_path(hardware: HardwareEdge, client: LabNavigatorClient)
     return best
 
 
+def _hardware_members(
+    devices: dict[str, dict[str, Any]],
+    hardware_id: str,
+) -> list[InventoryDevice]:
+    members: list[InventoryDevice] = []
+    for raw_device in devices.values():
+        device = InventoryDevice.model_validate(raw_device)
+        if device.type != "edge":
+            continue
+        group_id = device.ha_group_id or device.id
+        if group_id == hardware_id:
+            members.append(device)
+    return members
+
+
+def _discover_lab_navigator_subgraph(
+    root_edges: list[InventoryDevice],
+    devices: dict[str, dict[str, Any]],
+    client: LabNavigatorClient,
+) -> tuple[set[str], dict[str, dict[str, Any]], list[dict[str, Any]]]:
+    refreshed_ids = {edge.id for edge in root_edges}
+    discovered_devices: dict[str, dict[str, Any]] = {}
+    discovered_connections: list[dict[str, Any]] = []
+    queue: deque[tuple[InventoryDevice, dict[str, Any]]] = deque()
+    visited_lab_navigator_ids: set[int] = set()
+
+    for edge in root_edges:
+        lab_navigator_device = _resolve_inventory_device(client, edge)
+        _log(
+            logging.INFO,
+            "Resolved root edge inventory_device=%s to_lab_navigator_id=%s name=%s",
+            edge.id,
+            lab_navigator_device["id"],
+            lab_navigator_device.get("name"),
+        )
+        queue.append((edge, lab_navigator_device))
+        visited_lab_navigator_ids.add(lab_navigator_device["id"])
+
+    while queue:
+        current_device, lab_navigator_device = queue.popleft()
+        _log(
+            logging.INFO,
+            "Walking wiremap for inventory_device=%s type=%s lab_navigator_id=%s",
+            current_device.id,
+            current_device.type,
+            lab_navigator_device["id"],
+        )
+        for item in client.get_wiremap(lab_navigator_device["id"]).get("connections", []):
+            remote_device = _resolve_wiremap_remote_device(client, item)
+            if not remote_device:
+                _log(
+                    logging.WARNING,
+                    "Skipping wiremap entry for inventory_device=%s because remote device could not be resolved: %s",
+                    current_device.id,
+                    item,
+                )
+                continue
+
+            remote_inventory_device = _wiremap_remote_inventory_device(
+                current_device,
+                remote_device,
+                devices,
+                discovered_devices,
+            )
+            if remote_inventory_device is None:
+                _log(
+                    logging.INFO,
+                    "Skipping unsupported wiremap peer for inventory_device=%s remote_name=%s remote_device_type=%s remote_model=%s",
+                    current_device.id,
+                    remote_device.get("name"),
+                    remote_device.get("device_type"),
+                    _device_model(remote_device),
+                )
+                continue
+
+            refreshed_ids.add(remote_inventory_device.id)
+            discovered_devices[remote_inventory_device.id] = remote_inventory_device.model_dump(mode="json")
+            connection = _build_wiremap_connection(current_device, remote_inventory_device, item)
+            if connection:
+                _merge_connection(discovered_connections, connection)
+                _log(
+                    logging.INFO,
+                    "Imported wiremap connection role=%s local=%s:%s remote=%s:%s",
+                    connection["role"],
+                    connection["a"]["device_id"],
+                    connection["a"]["interface"],
+                    connection["b"]["device_id"],
+                    connection["b"]["interface"],
+                )
+            else:
+                _log(
+                    logging.WARNING,
+                    "Skipped wiremap connection for local_device=%s remote_device=%s due to missing or unsupported interface data",
+                    current_device.id,
+                    remote_inventory_device.id,
+                )
+
+            if (
+                remote_inventory_device.type == "switch"
+                and remote_device["id"] not in visited_lab_navigator_ids
+            ):
+                queue.append((remote_inventory_device, remote_device))
+                visited_lab_navigator_ids.add(remote_device["id"])
+
+    return refreshed_ids, discovered_devices, discovered_connections
+
+
+def _drop_lab_navigator_wiremap_connections(
+    connections: list[dict[str, Any]],
+    inventory_device_ids: set[str],
+) -> None:
+    retained: list[dict[str, Any]] = []
+    removed = 0
+    for connection in connections:
+        notes = str(connection.get("notes") or "")
+        endpoints = {
+            connection.get("a", {}).get("device_id"),
+            connection.get("b", {}).get("device_id"),
+        }
+        if "Lab Navigator wiremap" in notes and endpoints & inventory_device_ids:
+            removed += 1
+            continue
+        retained.append(connection)
+    connections[:] = retained
+    _log(
+        logging.INFO,
+        "Dropped %d existing Lab Navigator wiremap connection(s) for inventory_device_ids=%s",
+        removed,
+        sorted(inventory_device_ids),
+    )
+
+
+def _wiremap_remote_inventory_device(
+    current_device: InventoryDevice,
+    remote_device: dict[str, Any],
+    devices: dict[str, dict[str, Any]],
+    discovered_devices: dict[str, dict[str, Any]],
+) -> InventoryDevice | None:
+    remote_type = _infer_inventory_type(current_device.type, remote_device)
+    if remote_type == "switch":
+        switch_id = _safe_id(remote_device["name"])
+        existing_devices = {**devices, **discovered_devices}
+        return InventoryDevice.model_validate(
+            _inventory_switch_device(
+                remote_device["name"],
+                _device_model(remote_device),
+                remote_device.get("ip_address") or "",
+                remote_device["id"],
+                existing=_existing_inventory_device(existing_devices, switch_id),
+            )
+        )
+    if remote_type == "hypervisor":
+        return InventoryDevice.model_validate(_inventory_hypervisor_device(remote_device))
+    return None
+
+
+def _build_wiremap_connection(
+    local_device: InventoryDevice,
+    remote_device: InventoryDevice,
+    wiremap_entry: dict[str, Any],
+) -> dict[str, Any] | None:
+    local_interface = _normalize_interface_name(
+        wiremap_entry.get("interface_name") or "",
+        local_device.type,
+    )
+    remote_interface = _normalize_interface_name(
+        wiremap_entry.get("remote_interface_name") or wiremap_entry.get("remote_interface") or "",
+        remote_device.type,
+    )
+    if not local_interface or not remote_interface:
+        return None
+
+    endpoints = _orient_wiremap_connection(
+        local_device.type,
+        local_device.id,
+        local_interface,
+        remote_device.type,
+        remote_device.id,
+        remote_interface,
+    )
+    if endpoints is None:
+        return None
+
+    role, left_type, right_type, left_id, left_if, right_id, right_if = endpoints
+    if left_type == "switch":
+        vlan_source = (
+            wiremap_entry.get("local_vlans") or ""
+            if left_id == local_device.id
+            else wiremap_entry.get("remote_vlans") or ""
+        )
+    elif right_type == "switch":
+        vlan_source = (
+            wiremap_entry.get("remote_vlans") or ""
+            if right_id == remote_device.id
+            else wiremap_entry.get("local_vlans") or ""
+        )
+    else:
+        vlan_source = wiremap_entry.get("vlans") or ""
+    parsed_vlans = _parse_wiremap_vlans("", "", vlan_source)
+    return {
+        "id": _build_connection_id(left_id, left_if, right_id, right_if),
+        "a": {"device_id": left_id, "interface": left_if},
+        "b": {"device_id": right_id, "interface": right_if},
+        "vlans": parsed_vlans["vlans"],
+        "tagged_vlans": parsed_vlans["tagged_vlans"],
+        "untagged_vlan": parsed_vlans["untagged_vlan"],
+        "role": role,
+        "notes": "Imported from Lab Navigator wiremap.",
+    }
+
+
+def _resolve_inventory_device(client: LabNavigatorClient, device: InventoryDevice) -> dict[str, Any]:
+    if device.lab_navigator_id is not None:
+        _log(
+            logging.INFO,
+            "Using stored Lab Navigator id for inventory_device=%s lab_navigator_id=%s",
+            device.id,
+            device.lab_navigator_id,
+        )
+        return {"id": device.lab_navigator_id, "name": device.display_name}
+
+    if device.serial_number:
+        serial_matches = [
+            item
+            for item in client.search(device.serial_number)
+            if item.get("serial_number") == device.serial_number
+        ]
+        if len(serial_matches) == 1:
+            _log(
+                logging.INFO,
+                "Resolved inventory_device=%s via serial_number=%s to_lab_navigator_id=%s",
+                device.id,
+                device.serial_number,
+                serial_matches[0]["id"],
+            )
+            return serial_matches[0]
+
+    name_matches = [
+        item
+        for item in client.search(device.display_name)
+        if item.get("name") == device.display_name
+    ]
+    if len(name_matches) == 1:
+        _log(
+            logging.INFO,
+            "Resolved inventory_device=%s via display_name=%s to_lab_navigator_id=%s",
+            device.id,
+            device.display_name,
+            name_matches[0]["id"],
+        )
+        return name_matches[0]
+
+    raise DiscoveryError(f"Could not resolve Lab Navigator device for inventory device {device.id}")
+
+
+def _resolve_wiremap_remote_device(
+    client: LabNavigatorClient,
+    wiremap_entry: dict[str, Any],
+) -> dict[str, Any] | None:
+    remote_device = wiremap_entry.get("remote_device")
+    if isinstance(remote_device, dict):
+        return remote_device
+
+    remote_name = str(remote_device or "").strip()
+    if not remote_name:
+        return None
+    matches = [item for item in client.search(remote_name) if item.get("name") == remote_name]
+    if len(matches) != 1:
+        raise DiscoveryError(f"Expected exactly one Lab Navigator device named {remote_name}")
+    return matches[0]
+
+
 def _resolve_by_ip(client: LabNavigatorClient, ip_address: str) -> dict[str, Any]:
     if not ip_address:
         raise DiscoveryError("Discovery requires an exact IP address")
@@ -273,18 +583,33 @@ def _has_reciprocal_link(
     return False
 
 
-def _inventory_switch_device(name: str, model: str, ip_address: str, lab_navigator_id: int) -> dict[str, Any]:
+def _inventory_switch_device(
+    name: str,
+    model: str,
+    ip_address: str,
+    lab_navigator_id: int,
+    *,
+    existing: InventoryDevice | None = None,
+) -> dict[str, Any]:
+    existing_metadata = existing.switch_metadata if existing else None
+    switch_ip = ip_address or (existing_metadata.connections.ip if existing_metadata else "")
     return InventoryDevice(
         id=_safe_id(name),
         type="switch",
         display_name=name,
         model=model,
-        ip_address=ip_address,
+        ip_address=switch_ip,
         lab_navigator_id=lab_navigator_id,
         switch_metadata=SwitchMetadata(
             name=name,
-            model=model or "Dell",
-            connections={"ip": ip_address, "port": None},
+            device_type=existing_metadata.device_type if existing_metadata else "DELL",
+            model=model or (existing_metadata.model if existing_metadata else "Dell"),
+            os_family=existing_metadata.os_family if existing_metadata else None,
+            connections={
+                "ip": switch_ip,
+                "port": existing_metadata.connections.port if existing_metadata else None,
+            },
+            credentials=existing_metadata.credentials if existing_metadata else SwitchCredentials(),
         ),
     ).model_dump(mode="json")
 
@@ -319,6 +644,16 @@ def _merge_connection(connections: list[dict[str, Any]], connection: dict[str, A
             connections[index] = {**existing, **connection}
             return
     connections.append(connection)
+
+
+def _existing_inventory_device(
+    devices: dict[str, dict[str, Any]],
+    device_id: str,
+) -> InventoryDevice | None:
+    existing = devices.get(device_id)
+    if not existing:
+        return None
+    return InventoryDevice.model_validate(existing)
 
 
 def _diff_inventory(current: InventoryFile, proposed: InventoryFile) -> list[InventoryRefreshChange]:
@@ -367,3 +702,100 @@ def _diff_inventory(current: InventoryFile, proposed: InventoryFile) -> list[Inv
 
 def _safe_id(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "_", value.lower()).strip("_")
+
+
+def _map_device_type(device_type: Any) -> str | None:
+    normalized = str(device_type or "").lower()
+    if normalized == "edge":
+        return "edge"
+    if normalized == "switch":
+        return "switch"
+    if normalized in {"server", "hypervisor"}:
+        return "hypervisor"
+    return None
+
+
+def _infer_inventory_type(current_type: str, remote_device: dict[str, Any]) -> str | None:
+    explicit = _map_device_type(remote_device.get("device_type"))
+    if explicit:
+        return explicit
+
+    model = _device_model(remote_device).lower()
+    if current_type == "edge":
+        return "switch"
+    if any(token in model for token in ("dell-3048", "dell-4048", "dell-4148", "switch")):
+        return "switch"
+    if any(token in model for token in ("esxi", "server", "r640", "r650", "hypervisor")):
+        return "hypervisor"
+    return None
+
+
+def _orient_wiremap_connection(
+    local_type: str,
+    local_id: str,
+    local_interface: str,
+    remote_type: str,
+    remote_id: str,
+    remote_interface: str,
+) -> tuple[str, str, str, str, str, str, str] | None:
+    if {local_type, remote_type} == {"edge", "switch"}:
+        if local_type == "edge":
+            return ("edge-access", local_type, remote_type, local_id, local_interface, remote_id, remote_interface)
+        return ("edge-access", remote_type, local_type, remote_id, remote_interface, local_id, local_interface)
+    if local_type == "switch" and remote_type == "hypervisor":
+        return ("hypervisor-access", local_type, remote_type, local_id, local_interface, remote_id, remote_interface)
+    if local_type == "hypervisor" and remote_type == "switch":
+        return ("hypervisor-access", remote_type, local_type, remote_id, remote_interface, local_id, local_interface)
+    if local_type == "switch" and remote_type == "switch":
+        left = (local_id, local_interface)
+        right = (remote_id, remote_interface)
+        if right < left:
+            return ("switch-uplink", remote_type, local_type, remote_id, remote_interface, local_id, local_interface)
+        return ("switch-uplink", local_type, remote_type, local_id, local_interface, remote_id, remote_interface)
+    return None
+
+
+def _normalize_interface_name(value: str, device_type: str) -> str:
+    if device_type != "switch":
+        return value
+    text = (value or "").strip()
+    mappings = (
+        (r"^gi(\d+/\d+)$", "gigabitethernet"),
+        (r"^te(\d+/\d+)$", "tengigabitethernet"),
+        (r"^fo(\d+/\d+)$", "fortygigabitethernet"),
+        (r"^ma(\d+/\d+)$", "managementethernet"),
+    )
+    for pattern, prefix in mappings:
+        match = re.match(pattern, text, flags=re.IGNORECASE)
+        if match:
+            return f"{prefix}{match.group(1)}"
+    return text.lower()
+
+
+def _parse_wiremap_vlans(local_vlans: str, remote_vlans: str, raw_vlans: str) -> dict[str, Any]:
+    vlan_source = raw_vlans or remote_vlans or local_vlans
+    tagged: list[int] = []
+    untagged: int | None = None
+    for part in str(vlan_source or "").split("|"):
+        chunk = part.strip()
+        if chunk.startswith("Tagged:"):
+            tagged.extend(_parse_vlan_numbers(chunk.removeprefix("Tagged:")))
+        elif chunk.startswith("Untagged:"):
+            numbers = _parse_vlan_numbers(chunk.removeprefix("Untagged:"))
+            if numbers:
+                untagged = numbers[0]
+    ordered_vlans = [untagged] if untagged is not None else []
+    ordered_vlans.extend(vlan for vlan in tagged if vlan != untagged)
+    return {
+        "vlans": ordered_vlans,
+        "tagged_vlans": [vlan for vlan in tagged if vlan != untagged],
+        "untagged_vlan": untagged,
+    }
+
+
+def _parse_vlan_numbers(value: str) -> list[int]:
+    return [int(match) for match in re.findall(r"\d+", value)]
+
+
+def _build_connection_id(left_id: str, left_if: str, right_id: str, right_if: str) -> str:
+    return _safe_id(f"ln-{left_id}-{left_if}-{right_id}-{right_if}")

@@ -63,6 +63,16 @@ HAPY_GERRIT_REMOTE_NAME = (
     or DOTENV.get("HAPY_GERRIT_REMOTE_NAME", "")
     or "origin"
 )
+HAPY_GIT_USER_NAME = (
+    os.environ.get("HAPY_GIT_USER_NAME")
+    or DOTENV.get("HAPY_GIT_USER_NAME", "")
+    or ""
+).strip()
+HAPY_GIT_USER_EMAIL = (
+    os.environ.get("HAPY_GIT_USER_EMAIL")
+    or DOTENV.get("HAPY_GIT_USER_EMAIL", "")
+    or ""
+).strip()
 HAPY_PRIVATE_BRANCH_REGISTRY_PATH = _config_path(
     os.environ.get("HAPY_PRIVATE_BRANCH_REGISTRY_PATH")
     or DOTENV.get("HAPY_PRIVATE_BRANCH_REGISTRY_PATH", "")

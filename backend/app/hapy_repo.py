@@ -14,6 +14,8 @@ from .audit import append_audit_event
 from .config import (
     HAPY_BASE_BRANCHES,
     HAPY_GERRIT_REMOTE_NAME,
+    HAPY_GIT_USER_EMAIL,
+    HAPY_GIT_USER_NAME,
     HAPY_PRIVATE_BRANCH_REGISTRY_PATH,
     HAPY_REPO_ROOT,
     HAPY_TESTBED_CONFIG_ROOT,
@@ -21,6 +23,7 @@ from .config import (
 )
 from .generator import GenerationError, resolve_run_root
 from .models import (
+    ActorIdentity,
     HapyCommitRequest,
     HapyCommitResult,
     HapyPrivateBranchDeleteRequest,
@@ -94,6 +97,7 @@ def commit_run_to_hapy_repo(
         remote_name=remote_name,
         base_branch=base_branch,
         private_branch_name=private_branch_name,
+        commit_actor=request.requested_by,
     )
 
     destination_path = workspace_path / repo_destination_relative_path
@@ -342,6 +346,7 @@ def _prepare_workspace(
     remote_name: str,
     base_branch: str,
     private_branch_name: str,
+    commit_actor: ActorIdentity | None = None,
 ) -> Path:
     workspace_root = run_root / "hapy_publish"
     workspace_path = workspace_root / f"{_slugify(base_branch)}-{_slugify(private_branch_name)}"
@@ -355,24 +360,65 @@ def _prepare_workspace(
     else:
         _git(workspace_path, "remote", "rename", "origin", "source")
         _git(workspace_path, "remote", "add", remote_name, remote_url)
-    _copy_git_identity(repo_root, workspace_path)
+    _configure_git_identity(repo_root, workspace_path, commit_actor)
     _git(workspace_path, "fetch", remote_name, base_branch)
     _git(workspace_path, "checkout", "-B", private_branch_name, f"{remote_name}/{base_branch}")
     return workspace_path
 
 
-def _copy_git_identity(source_repo: Path, target_repo: Path) -> None:
-    for key in ("user.name", "user.email"):
-        completed = subprocess.run(
-            ["git", "config", "--get", key],
-            cwd=source_repo,
-            check=False,
-            capture_output=True,
-            text=True,
+def _configure_git_identity(
+    source_repo: Path,
+    target_repo: Path,
+    commit_actor: ActorIdentity | None,
+) -> None:
+    name, email = _resolve_git_identity(source_repo, commit_actor)
+    _git(target_repo, "config", "user.name", name)
+    _git(target_repo, "config", "user.email", email)
+
+
+def _resolve_git_identity(
+    source_repo: Path,
+    commit_actor: ActorIdentity | None,
+) -> tuple[str, str]:
+    if commit_actor is not None:
+        return commit_actor.name.strip(), commit_actor.email.strip()
+
+    env_name = HAPY_GIT_USER_NAME.strip()
+    env_email = HAPY_GIT_USER_EMAIL.strip()
+    if env_name or env_email:
+        if not env_name or not env_email:
+            raise HapyRepoError(
+                "Git commit identity is incomplete. Set both HAPY_GIT_USER_NAME and "
+                "HAPY_GIT_USER_EMAIL, or provide requested_by in the request."
+            )
+        return env_name, env_email
+
+    repo_name = _git_config_get(source_repo, "user.name")
+    repo_email = _git_config_get(source_repo, "user.email")
+    if repo_name and repo_email:
+        return repo_name, repo_email
+    if repo_name or repo_email:
+        raise HapyRepoError(
+            "Git commit identity is incomplete in the configured Hapy repo. Set both "
+            "user.name and user.email there, configure HAPY_GIT_USER_NAME and "
+            "HAPY_GIT_USER_EMAIL, or provide requested_by in the request."
         )
-        value = completed.stdout.strip() if completed.returncode == 0 else ""
-        if value:
-            _git(target_repo, "config", key, value)
+    raise HapyRepoError(
+        "Git commit identity is not configured. Provide requested_by in the request, "
+        "set HAPY_GIT_USER_NAME and HAPY_GIT_USER_EMAIL, or configure user.name and "
+        "user.email in the Hapy repo."
+    )
+
+
+def _git_config_get(repo_root: Path, key: str) -> str:
+    completed = subprocess.run(
+        ["git", "config", "--get", key],
+        cwd=repo_root,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    return completed.stdout.strip() if completed.returncode == 0 else ""
 
 
 def _find_publish(

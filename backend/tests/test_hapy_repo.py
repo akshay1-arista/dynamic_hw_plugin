@@ -3,6 +3,7 @@ import subprocess
 from pathlib import Path
 
 from app.hapy_repo import (
+    HapyRepoError,
     commit_run_to_hapy_repo,
     delete_private_branches,
     list_private_branches,
@@ -32,7 +33,7 @@ def _git_dir(git_dir: Path, *args: str) -> str:
     return completed.stdout.strip()
 
 
-def _init_repo(tmp_path: Path) -> tuple[Path, Path, Path]:
+def _init_repo(tmp_path: Path, *, configure_identity: bool = True) -> tuple[Path, Path, Path]:
     remote_root = tmp_path / "remote.git"
     subprocess.run(["git", "init", "--bare", str(remote_root)], check=True, capture_output=True, text=True)
 
@@ -40,12 +41,31 @@ def _init_repo(tmp_path: Path) -> tuple[Path, Path, Path]:
     repo_root.mkdir()
     _git(repo_root, "init")
     _git(repo_root, "checkout", "-B", "master")
-    _git(repo_root, "config", "user.name", "Test User")
-    _git(repo_root, "config", "user.email", "test@example.com")
+    if configure_identity:
+        _git(repo_root, "config", "user.name", "Test User")
+        _git(repo_root, "config", "user.email", "test@example.com")
     (repo_root / "README.md").write_text("seed\n")
     (repo_root / "hapy" / "hapy" / "testbed" / "configs").mkdir(parents=True)
     _git(repo_root, "add", "README.md", "hapy")
-    _git(repo_root, "commit", "-m", "seed")
+    if configure_identity:
+        _git(repo_root, "commit", "-m", "seed")
+    else:
+        subprocess.run(
+            [
+                "git",
+                "-c",
+                "user.name=Seed User",
+                "-c",
+                "user.email=seed@example.com",
+                "commit",
+                "-m",
+                "seed",
+            ],
+            cwd=repo_root,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
     _git(repo_root, "remote", "add", "origin", str(remote_root))
     _git(repo_root, "push", "-u", "origin", "master")
     _git(repo_root, "branch", "release_6.4", "master")
@@ -95,6 +115,55 @@ def test_commit_run_to_hapy_repo_places_nested_reference_under_parent_folder(tmp
     assert result.base_branch == "release_6.4"
     assert result.private_branch_name == "hw_topo_gen_private_run123"
     assert list_private_branches(registry_path).branches[0].private_branch_name == result.private_branch_name
+
+
+def test_commit_run_to_hapy_repo_uses_request_actor_git_identity(tmp_path):
+    repo_root, _remote_root, configs_root = _init_repo(tmp_path, configure_identity=False)
+    outputs_root, run_id = _build_run_outputs(tmp_path, reference_topology_id="3-site")
+    registry_path = tmp_path / "hapy_private_branches.json"
+
+    result = commit_run_to_hapy_repo(
+        run_id,
+        HapyCommitRequest(
+            base_branch="release_6.4",
+            requested_by=ActorIdentity(name="Prod User", email="prod.user@example.com"),
+        ),
+        outputs_root=outputs_root,
+        repo_root=repo_root,
+        configs_root=configs_root,
+        remote_name="origin",
+        registry_path=registry_path,
+    )
+
+    branch_record = list_private_branches(registry_path).branches[0]
+    workspace_path = Path(branch_record.workspace_path)
+    assert _git(workspace_path, "show", "-s", "--format=%an <%ae>", result.commit_sha) == "Prod User <prod.user@example.com>"
+
+
+def test_commit_run_to_hapy_repo_requires_git_identity_when_none_available(tmp_path, monkeypatch):
+    repo_root, _remote_root, configs_root = _init_repo(tmp_path, configure_identity=False)
+    outputs_root, run_id = _build_run_outputs(tmp_path, reference_topology_id="3-site")
+    registry_path = tmp_path / "hapy_private_branches.json"
+    empty_home = tmp_path / "empty-home"
+    empty_home.mkdir()
+    monkeypatch.setenv("HOME", str(empty_home))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(empty_home / ".config"))
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+
+    try:
+        commit_run_to_hapy_repo(
+            run_id,
+            HapyCommitRequest(base_branch="release_6.4"),
+            outputs_root=outputs_root,
+            repo_root=repo_root,
+            configs_root=configs_root,
+            remote_name="origin",
+            registry_path=registry_path,
+        )
+    except HapyRepoError as error:
+        assert "Git commit identity is not configured" in str(error)
+    else:
+        raise AssertionError("Expected missing git identity error")
 
 
 def test_publish_run_private_branch_pushes_only_private_branch_ref(tmp_path):

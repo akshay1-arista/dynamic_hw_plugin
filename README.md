@@ -79,6 +79,9 @@ Optional persistent overrides and secrets can be supplied with `/etc/default/dyn
 - Tool-created Gerrit private branches are tracked in `backend/data/hapy_private_branches.json` by default.
 - Hapy commits and pushes run inside isolated per-run clone workspaces under `outputs/`, so different
   users and different base branches do not share a mutable checkout.
+- Gerrit private branch commits use `requested_by` from the API request as the git author identity when
+  available. For non-UI callers or service-only deployments, configure `HAPY_GIT_USER_NAME` and
+  `HAPY_GIT_USER_EMAIL` as a fallback, or set `user.name` and `user.email` in the source Hapy repo.
 
 Example `.env`:
 
@@ -89,6 +92,9 @@ HAPY_REPO_ROOT=/Users/akshay1.jain/Documents/automation/hapy_repo_for_tools/velo
 # HAPY_TESTBED_CONFIG_ROOT=/absolute/path/to/velocloud.src/hapy/hapy/testbed/configs
 # Optional override for the persisted tool branch list:
 # HAPY_PRIVATE_BRANCH_REGISTRY_PATH=backend/data/hapy_private_branches.json
+# Optional fallback commit identity if requested_by is not provided:
+# HAPY_GIT_USER_NAME=Dynamic HW Topology
+# HAPY_GIT_USER_EMAIL=dynamic-hw-topology@example.com
 # Optional override for local-only hardware availability and reservations:
 # INVENTORY_STATE_PATH=backend/data/hardware_inventory.local.json
 ```

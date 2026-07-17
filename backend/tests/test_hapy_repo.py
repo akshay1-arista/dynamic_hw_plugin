@@ -2,6 +2,7 @@ import json
 import subprocess
 from pathlib import Path
 
+import app.hapy_repo as hapy_repo
 from app.hapy_repo import (
     HapyRepoError,
     commit_run_to_hapy_repo,
@@ -117,10 +118,12 @@ def test_commit_run_to_hapy_repo_places_nested_reference_under_parent_folder(tmp
     assert list_private_branches(registry_path).branches[0].private_branch_name == result.private_branch_name
 
 
-def test_commit_run_to_hapy_repo_uses_request_actor_git_identity(tmp_path):
+def test_commit_run_to_hapy_repo_uses_fixed_service_git_identity(tmp_path, monkeypatch):
     repo_root, _remote_root, configs_root = _init_repo(tmp_path, configure_identity=False)
     outputs_root, run_id = _build_run_outputs(tmp_path, reference_topology_id="3-site")
     registry_path = tmp_path / "hapy_private_branches.json"
+    monkeypatch.setattr(hapy_repo, "HAPY_GIT_USER_NAME", "Dynamic HW Topology")
+    monkeypatch.setattr(hapy_repo, "HAPY_GIT_USER_EMAIL", "dynamic-hw-topology@example.com")
 
     result = commit_run_to_hapy_repo(
         run_id,
@@ -137,7 +140,11 @@ def test_commit_run_to_hapy_repo_uses_request_actor_git_identity(tmp_path):
 
     branch_record = list_private_branches(registry_path).branches[0]
     workspace_path = Path(branch_record.workspace_path)
-    assert _git(workspace_path, "show", "-s", "--format=%an <%ae>", result.commit_sha) == "Prod User <prod.user@example.com>"
+    assert (
+        _git(workspace_path, "show", "-s", "--format=%cn <%ce> | %an <%ae>", result.commit_sha)
+        == "Dynamic HW Topology <dynamic-hw-topology@example.com> | "
+        "Dynamic HW Topology <dynamic-hw-topology@example.com>"
+    )
 
 
 def test_commit_run_to_hapy_repo_requires_git_identity_when_none_available(tmp_path, monkeypatch):
@@ -161,7 +168,7 @@ def test_commit_run_to_hapy_repo_requires_git_identity_when_none_available(tmp_p
             registry_path=registry_path,
         )
     except HapyRepoError as error:
-        assert "Git commit identity is not configured" in str(error)
+        assert "Git service identity is not configured" in str(error)
     else:
         raise AssertionError("Expected missing git identity error")
 

@@ -395,6 +395,123 @@ def test_inventory_refresh_apply_recovers_hidden_ha_group_from_devices(tmp_path)
     assert ports["GE1"].switch_standby_port == "gigabitethernet1/20"
 
 
+def test_inventory_refresh_apply_keeps_multiple_hidden_groups_that_share_switches(tmp_path):
+    class SharedSwitchStubClient:
+        def close(self):
+            return None
+
+        def search(self, query):
+            if query == "access-sw":
+                return [{"id": 11, "name": "access-sw", "ip_address": "10.0.0.10", "device_model": "Dell-3048", "device_type": "switch"}]
+            if query == "agg-sw":
+                return [{"id": 22, "name": "agg-sw", "ip_address": "10.0.0.11", "device_model": "Dell-4048", "device_type": "switch"}]
+            if query == "esxi-01":
+                return [{"id": 33, "name": "esxi-01", "ip_address": "10.0.0.20", "device_model": "ESXi", "device_type": "server"}]
+            return []
+
+        def get_wiremap(self, device_id):
+            if device_id == 101:
+                return {
+                    "connections": [
+                        {
+                            "interface_name": "GE1",
+                            "remote_device": {
+                                "id": 11,
+                                "name": "access-sw",
+                                "ip_address": "10.0.0.10",
+                                "device_type": "switch",
+                                "device_model": "Dell-3048",
+                            },
+                            "remote_interface_name": "Gi1/10",
+                        }
+                    ]
+                }
+            if device_id == 102:
+                return {
+                    "connections": [
+                        {
+                            "interface_name": "GE1",
+                            "remote_device": {
+                                "id": 11,
+                                "name": "access-sw",
+                                "ip_address": "10.0.0.10",
+                                "device_type": "switch",
+                                "device_model": "Dell-3048",
+                            },
+                            "remote_interface_name": "Gi1/20",
+                        }
+                    ]
+                }
+            if device_id == 11:
+                return {
+                    "connections": [
+                        {
+                            "interface_name": "Te1/1",
+                            "remote_device": "agg-sw",
+                            "remote_interface": "Te1/49",
+                        }
+                    ]
+                }
+            if device_id == 22:
+                return {
+                    "connections": [
+                        {
+                            "interface_name": "Te1/49",
+                            "remote_device": "access-sw",
+                            "remote_interface": "Te1/1",
+                        },
+                        {
+                            "interface_name": "Te1/50",
+                            "remote_device": "esxi-01",
+                            "remote_interface": "vmnic0",
+                        },
+                    ]
+                }
+            return {"connections": []}
+
+    inventory_path = tmp_path / "inventory.json"
+    inventory_path.write_text(
+        json.dumps(
+            {
+                "devices": {
+                    "edge-1": {
+                        "id": "edge-1",
+                        "type": "edge",
+                        "display_name": "Edge 1",
+                        "model": "edge6X0",
+                        "model_suffix": "680",
+                        "serial_number": "SERIAL1",
+                        "lab_navigator_id": 101,
+                    },
+                    "edge-2": {
+                        "id": "edge-2",
+                        "type": "edge",
+                        "display_name": "Edge 2",
+                        "model": "edge6X0",
+                        "model_suffix": "680",
+                        "serial_number": "SERIAL2",
+                        "lab_navigator_id": 102,
+                    },
+                },
+                "connections": [],
+            }
+        )
+    )
+
+    result = apply_inventory_refresh(
+        InventoryRefreshRequest(hardware_ids=["edge-1", "edge-2"]),
+        inventory_path=inventory_path,
+        client=SharedSwitchStubClient(),
+    )
+
+    hardware_ids = {item.id for item in result.inventory.hardware}
+    assert {"edge-1", "edge-2"} <= hardware_ids
+
+    ports_by_hardware = {item.id: {port.logical_interface: port for port in item.ports} for item in result.inventory.hardware}
+    assert ports_by_hardware["edge-1"]["GE1"].switch_active_port == "gigabitethernet1/10"
+    assert ports_by_hardware["edge-2"]["GE1"].switch_active_port == "gigabitethernet1/20"
+
+
 def test_lab_navigator_client_allows_anonymous_reads():
     client = LabNavigatorClient(api_key="")
     try:

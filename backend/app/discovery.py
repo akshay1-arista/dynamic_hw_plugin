@@ -420,7 +420,8 @@ def _drop_lab_navigator_wiremap_connections(
             connection.get("a", {}).get("device_id"),
             connection.get("b", {}).get("device_id"),
         }
-        if "Lab Navigator wiremap" in notes and endpoints & inventory_device_ids:
+        endpoint_ids = {endpoint for endpoint in endpoints if endpoint}
+        if "Lab Navigator wiremap" in notes and endpoint_ids and endpoint_ids <= inventory_device_ids:
             removed += 1
             continue
         retained.append(connection)

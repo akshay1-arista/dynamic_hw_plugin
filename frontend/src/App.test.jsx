@@ -999,8 +999,13 @@ describe('App', () => {
     expect(window.confirm).toHaveBeenCalled();
   });
 
-  test('publishes generated topology from a selected base branch and copies the branch name', async () => {
+  test('publishes generated topology from a selected base branch and copies topology and branch names', async () => {
     const user = userEvent.setup();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText }
+    });
     render(<App />);
 
     await screen.findAllByText('CHN 3800 HA Pair 8');
@@ -1011,6 +1016,8 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: /generate zip/i }));
 
     await waitFor(() => expect(screen.getByText(/path resolved/i)).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: /copy topology name/i }));
+    expect(writeText).toHaveBeenCalledWith('3-site-hw-a1b2c3');
 
     await user.selectOptions(screen.getByLabelText('Base branch for Gerrit private branch'), 'release_6.4');
     await user.click(screen.getByRole('button', { name: /commit and push gerrit private branch/i }));
@@ -1027,6 +1034,33 @@ describe('App', () => {
     expect(screen.getByText(/Remote ref: refs\/heads\/hw_topo_gen_private_abc123/)).toBeInTheDocument();
     expect(screen.getByText(/pushed \/ release_6.4 \/ run abc123/i)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /copy branch name/i }));
+    expect(writeText).toHaveBeenCalledWith('hw_topo_gen_private_abc123');
+    expect(await screen.findByText('Copied')).toBeInTheDocument();
+  });
+
+  test('falls back to execCommand when copying topology name without the Clipboard API', async () => {
+    const user = userEvent.setup();
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: undefined
+    });
+    Object.defineProperty(document, 'execCommand', {
+      configurable: true,
+      value: vi.fn(() => true)
+    });
+    render(<App />);
+
+    await screen.findAllByText('CHN 3800 HA Pair 8');
+    await chooseHardware(user, 'a01 680', /A01 680 Standalone/i);
+    await user.selectOptions(screen.getByLabelText('Branch'), 'branch1');
+    await user.type(screen.getByRole('combobox', { name: 'Hypervisor IP' }), '10.68.136.50');
+    await user.type(screen.getByRole('combobox', { name: 'Hypervisor interface' }), 'vmnic0');
+    await user.click(screen.getByRole('button', { name: /generate zip/i }));
+
+    await waitFor(() => expect(screen.getByText(/path resolved/i)).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: /copy topology name/i }));
+
+    expect(document.execCommand).toHaveBeenCalledWith('copy');
     expect(await screen.findByText('Copied')).toBeInTheDocument();
   });
 

@@ -40,11 +40,35 @@ const emptyMapping = {
   edge_name: '',
   target_branch_name: '',
   target_edge_name: '',
-  interface_overrides: []
+  interface_overrides: [],
+  saved_hardware: null
 };
 
 const hapyBaseBranches = ['release_5.2', 'release_6.1', 'release_6.4', 'release_7.0', 'master'];
 const userStorageKey = 'dynamic-topology-user';
+
+async function copyTextToClipboard(text) {
+  if (navigator?.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+  const textArea = document.createElement('textarea');
+  textArea.value = text;
+  textArea.setAttribute('readonly', '');
+  textArea.style.position = 'fixed';
+  textArea.style.top = '0';
+  textArea.style.left = '0';
+  textArea.style.opacity = '0';
+  document.body.appendChild(textArea);
+  textArea.focus();
+  textArea.select();
+  textArea.setSelectionRange(0, text.length);
+  const copied = document.execCommand?.('copy');
+  document.body.removeChild(textArea);
+  if (!copied) {
+    throw new Error('Clipboard is unavailable');
+  }
+}
 
 export function App() {
   const hypervisorIpFieldId = useId();
@@ -69,7 +93,7 @@ export function App() {
   const [publishingAction, setPublishingAction] = useState('');
   const [deletingPrivateBranchNames, setDeletingPrivateBranchNames] = useState([]);
   const [privateBranchFeedback, setPrivateBranchFeedback] = useState(null);
-  const [copyState, setCopyState] = useState('');
+  const [copyState, setCopyState] = useState({});
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(Boolean(loadStoredUser()));
   const [loadingSavedRunId, setLoadingSavedRunId] = useState('');
@@ -146,7 +170,7 @@ export function App() {
   const previewRows = useMemo(() => {
     return mappings
       .map((mapping) => {
-        const hardware = inventory.hardware.find((item) => item.id === mapping.hardware_id);
+        const hardware = resolveMappingHardware(mapping, inventory.hardware);
         if (!hardware || !mapping.branch_name || !mapping.edge_name) {
           return null;
         }
@@ -277,7 +301,7 @@ export function App() {
       setResult(savedRun.result);
       setPublishResult(savedRun.publish_result);
       setPublishBaseBranch(savedRun.publish_result?.base_branch || 'master');
-      setCopyState('');
+      setCopyState({});
     } catch (loadError) {
       setError(loadError.message);
     } finally {
@@ -294,6 +318,9 @@ export function App() {
         const next = { ...mapping, [field]: value };
         if (field === 'hardware_id' || field === 'branch_name' || field === 'edge_name') {
           next.interface_overrides = [];
+        }
+        if (field === 'hardware_id') {
+          next.saved_hardware = null;
         }
         if (field === 'branch_name') {
           const branch = selectedReference?.branches.find((item) => item.name === value);
@@ -438,6 +465,7 @@ export function App() {
     setResult(null);
     setPublishResult(null);
     setSwitchPreview(null);
+    setCopyState({});
     setError('');
     try {
       const duplicateTarget = mappings.find(
@@ -477,6 +505,9 @@ export function App() {
           edge_name: mapping.edge_name,
           target_branch_name: mapping.target_branch_name || null,
           target_edge_name: mapping.target_edge_name || null,
+          ...(mapping.saved_hardware && mapping.saved_hardware.id === mapping.hardware_id
+            ? { saved_hardware: mapping.saved_hardware }
+            : {}),
           ...(mapping.interface_overrides?.length
             ? {
                 interface_overrides: mapping.interface_overrides.map((override) => {
@@ -531,7 +562,7 @@ export function App() {
       setGeneratedRuns(generatedRunData.runs || []);
       setPrivateBranches(refreshed.branches || []);
       setAuditTrail(auditData.events || []);
-      setCopyState('');
+      setCopyState({});
     } catch (publishError) {
       setError(publishError.message);
     } finally {
@@ -616,18 +647,38 @@ export function App() {
     }
   }
 
-  async function copyPrivateBranchName() {
-    if (!publishResult?.private_branch_name) {
+  function setCopyFeedback(copyKey, status) {
+    setCopyState((current) => ({ ...current, [copyKey]: status }));
+    window.setTimeout(() => {
+      setCopyState((current) => {
+        if (!current[copyKey]) {
+          return current;
+        }
+        const next = { ...current };
+        delete next[copyKey];
+        return next;
+      });
+    }, status === 'copied' ? 1500 : 2000);
+  }
+
+  async function copyValue(text, copyKey) {
+    if (!text) {
       return;
     }
     try {
-      await navigator.clipboard.writeText(publishResult.private_branch_name);
-      setCopyState('copied');
-      window.setTimeout(() => setCopyState(''), 1500);
+      await copyTextToClipboard(text);
+      setCopyFeedback(copyKey, 'copied');
     } catch {
-      setCopyState('failed');
-      window.setTimeout(() => setCopyState(''), 2000);
+      setCopyFeedback(copyKey, 'failed');
     }
+  }
+
+  async function copyPrivateBranchName() {
+    await copyValue(publishResult?.private_branch_name, 'branch');
+  }
+
+  async function copyTopologyName() {
+    await copyValue(result?.topology_name, 'topology');
   }
 
   async function submitPreviewSwitches() {
@@ -1281,6 +1332,14 @@ export function App() {
                   </small>
                 ))}
               </div>
+              <div className="copyRow">
+                <button className="secondary" onClick={copyTopologyName} type="button">
+                  <Copy size={16} />
+                  Copy topology name
+                </button>
+                {copyState.topology === 'copied' && <small className="muted">Copied</small>}
+                {copyState.topology === 'failed' && <small className="message error">Copy failed</small>}
+              </div>
               <div className="publishControls">
                 <label className="publishField">
                   Base branch for Gerrit private branch
@@ -1312,12 +1371,12 @@ export function App() {
                   {publishResult.fetch_command && <small>Fetch command: {publishResult.fetch_command}</small>}
                   {publishResult.private_branch_pushed && (
                     <div className="copyRow">
-                      <button className="secondary" onClick={copyPrivateBranchName}>
+                      <button className="secondary" onClick={copyPrivateBranchName} type="button">
                         <Copy size={16} />
                         Copy branch name
                       </button>
-                      {copyState === 'copied' && <small className="muted">Copied</small>}
-                      {copyState === 'failed' && <small className="message error">Copy failed</small>}
+                      {copyState.branch === 'copied' && <small className="muted">Copied</small>}
+                      {copyState.branch === 'failed' && <small className="message error">Copy failed</small>}
                     </div>
                   )}
                   {publishResult.messages?.length > 0 && (
@@ -1460,12 +1519,20 @@ function savedMappingToEditorState(mapping) {
     edge_name: mapping.edge_name || '',
     target_branch_name: mapping.target_branch_name || '',
     target_edge_name: mapping.target_edge_name || '',
+    saved_hardware: mapping.saved_hardware || null,
     interface_overrides: (mapping.interface_overrides || []).map((override) => ({
       reference_interface: override.reference_interface,
       hardware_interface: override.hardware_interface || '',
       switch_vlans_text: Array.isArray(override.switch_vlans) ? override.switch_vlans.join(', ') : ''
     }))
   };
+}
+
+function resolveMappingHardware(mapping, hardwareOptions) {
+  return (
+    hardwareOptions.find((item) => item.id === mapping.hardware_id) ||
+    (mapping.saved_hardware?.id === mapping.hardware_id ? mapping.saved_hardware : null)
+  );
 }
 
 function formatAuditAction(action) {
@@ -2430,13 +2497,13 @@ function SearchableTextCombobox({
   );
 }
 
-function HardwareCombobox({ index, hardwareOptions, selectedHardwareId, onSelect }) {
+function HardwareCombobox({ index, hardwareOptions, selectedHardwareId, selectedHardwareFallback, onSelect }) {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const selectedHardware = useMemo(
-    () => hardwareOptions.find((hardware) => hardware.id === selectedHardwareId),
-    [hardwareOptions, selectedHardwareId]
+    () => hardwareOptions.find((hardware) => hardware.id === selectedHardwareId) || selectedHardwareFallback || null,
+    [hardwareOptions, selectedHardwareFallback, selectedHardwareId]
   );
   const selectedLabel = selectedHardware ? hardwareOptionLabel(selectedHardware) : '';
   const listId = `hardware-options-${index}`;
@@ -2577,8 +2644,12 @@ function HardwareCombobox({ index, hardwareOptions, selectedHardwareId, onSelect
 function MappingRow({ index, mapping, mappings, reference, inventory, onChange, onRemove, canRemove }) {
   const [interfaceOverridesOpen, setInterfaceOverridesOpen] = useState(false);
   const branch = reference?.branches.find((item) => item.name === mapping.branch_name);
-  const selectedHardware = inventory.hardware.find((item) => item.id === mapping.hardware_id);
+  const selectedHardware = resolveMappingHardware(mapping, inventory.hardware);
   const selectedEdge = branch?.edges.find((edge) => edge.name === mapping.edge_name);
+  const usingSavedHardwareSnapshot =
+    Boolean(selectedHardware) &&
+    !inventory.hardware.some((item) => item.id === mapping.hardware_id) &&
+    mapping.saved_hardware?.id === mapping.hardware_id;
   const haMismatch = selectedHardware && selectedEdge?.ha_enabled && !selectedHardware.ha;
   const usedEdgeNames = useMemo(
     () =>
@@ -2673,6 +2744,7 @@ function MappingRow({ index, mapping, mappings, reference, inventory, onChange, 
           index={index}
           hardwareOptions={inventory.hardware}
           selectedHardwareId={mapping.hardware_id}
+          selectedHardwareFallback={selectedHardware}
           onSelect={(hardwareId) => onChange(index, 'hardware_id', hardwareId)}
         />
       </label>
@@ -2850,6 +2922,12 @@ function MappingRow({ index, mapping, mappings, reference, inventory, onChange, 
         <div className="mappingCaveat">
           <TriangleAlert size={16} aria-hidden="true" />
           Reference edge is HA enabled, but selected hardware is standalone. Generation will convert this branch edge to standalone.
+        </div>
+      )}
+      {usingSavedHardwareSnapshot && (
+        <div className="mappingCaveat">
+          <TriangleAlert size={16} aria-hidden="true" />
+          Current inventory no longer derives this hardware entry. Regeneration will reuse the saved run&apos;s hardware snapshot and stored switch mappings.
         </div>
       )}
       {!haMismatch && manualMappingPorts.length > 0 && (

@@ -2,6 +2,7 @@ import json
 import subprocess
 
 from app.models import InventoryDevice, InventoryFile, SwitchConfigureRequest
+from app.switch_config import _merge_shared_os10_tagged_vlans
 from app.switch_config import _run_ssh_script, configure_switches_for_run
 from app.switch_config import SSH_COMMAND_TIMEOUT_SECONDS, SSH_CONNECT_TIMEOUT_SECONDS, SwitchConfigError
 
@@ -187,6 +188,9 @@ interface Vlan 103
 interface Vlan 104
  tagged GigabitEthernet 1/2
  no shutdown
+interface Vlan 200
+ tagged TenGigabitEthernet 1/51
+ no shutdown
 """
             if device.id == "access_sw"
             else """
@@ -211,15 +215,17 @@ interface Vlan 103
     access_commands = next(item.commands for item in result.devices if item.device_id == "access_sw")
     upstream_commands = next(item.commands for item in result.devices if item.device_id == "upstream_sw")
 
-    assert access_commands[:12] == [
+    assert access_commands[:14] == [
         "interface Vlan 101",
         " no member GigabitEthernet 1/1,1/6",
         " exit",
         "interface Vlan 102",
         " no untagged GigabitEthernet 1/2,1/7",
+        " no tagged TenGigabitEthernet 1/51",
         " exit",
         "interface Vlan 103",
         " no tagged GigabitEthernet 1/2,1/7",
+        " no tagged TenGigabitEthernet 1/51",
         " exit",
         "interface Vlan 104",
         " no tagged GigabitEthernet 1/2",
@@ -238,7 +244,9 @@ interface Vlan 103
     assert " tagged TenGigabitEthernet 1/51" not in vlan101_block
     assert " untagged GigabitEthernet 1/2,1/7" in vlan102_block
     assert " tagged TenGigabitEthernet 1/51" in vlan102_block
+    assert "interface Vlan 200" not in access_commands
     assert "interface TenGigabitEthernet 1/43" in upstream_commands
+    assert " no tagged TenGigabitEthernet 1/9,1/43" in upstream_commands
     assert " tagged TenGigabitEthernet 1/9,1/43" in upstream_commands
 
 
@@ -594,6 +602,16 @@ interface ethernet1/1/54
     assert " switchport trunk allowed vlan 202-203,214-216" in access_commands
     assert "interface ethernet1/1/54" in upstream_commands
     assert " switchport trunk allowed vlan 202-216,402-416" in upstream_commands
+
+
+def test_merge_shared_os10_tagged_vlans_replaces_only_targeted_shared_vlans():
+    merged = _merge_shared_os10_tagged_vlans(
+        existing_tagged={202, 203, 214, 215, 216},
+        desired_tagged={214},
+        cleanup_target_vlans={214, 215, 216},
+    )
+
+    assert merged == {202, 203, 214}
 
 
 def test_configure_switches_routes_mixed_allocations_to_their_actual_switches(tmp_path, monkeypatch):

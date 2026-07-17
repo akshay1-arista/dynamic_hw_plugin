@@ -173,6 +173,7 @@ def _build_plans(
                 description=_switch_link_description(upstream_switch, path.upstream_access_port),
             )
             _add_shared_transport(access_state, path.access_uplink_port, access_transport_vlans)
+            _add_shared_cleanup_vlans(access_state, path.access_uplink_port, access_transport_vlans)
             _add_access_uplink_vlan_state(access_state, path.access_uplink_port, access_transport_vlans)
 
         if path.upstream_access_port:
@@ -190,6 +191,7 @@ def _build_plans(
                 native_vlan=uplink_native,
             )
             _add_shared_transport(upstream_state, path.upstream_access_port, access_transport_vlans)
+            _add_shared_cleanup_vlans(upstream_state, path.upstream_access_port, access_transport_vlans)
 
         if path.upstream_hypervisor_port:
             hypervisor_native = _connection_native_vlan(
@@ -206,6 +208,7 @@ def _build_plans(
                 native_vlan=hypervisor_native,
             )
             _add_shared_transport(upstream_state, path.upstream_hypervisor_port, hypervisor_transport_vlans)
+            _add_shared_cleanup_vlans(upstream_state, path.upstream_hypervisor_port, hypervisor_transport_vlans)
             _add_upstream_vlan_state(upstream_state, path, access_transport_vlans)
             _add_hypervisor_vlan_state(upstream_state, path.upstream_hypervisor_port, hypervisor_transport_vlans)
 
@@ -242,6 +245,7 @@ def _ensure_device_state(
             "port_configs": {},
             "os9_vlans": defaultdict(lambda: {"member": set(), "untagged": set(), "tagged": set()}),
             "cleanup_ports": set(),
+            "shared_cleanup_vlans": defaultdict(set),
         }
     return states[device.id]
 
@@ -355,6 +359,13 @@ def _add_shared_transport(state: dict[str, object], interface_name: str, vlans: 
         config["tagged_vlans"].discard(config["native_vlan"])
 
 
+def _add_shared_cleanup_vlans(state: dict[str, object], interface_name: str, vlans: list[int]) -> None:
+    if not interface_name or not vlans:
+        return
+    cleanup_targets = state["shared_cleanup_vlans"][interface_name]
+    cleanup_targets.update(vlans)
+
+
 def _add_access_uplink_vlan_state(
     state: dict[str, object],
     interface_name: str,
@@ -420,7 +431,11 @@ def _render_commands(state: dict[str, object]) -> list[str]:
 def _render_os9_commands(state: dict[str, object]) -> list[str]:
     device = state["device"]
     running_config = _fetch_running_config(device)
-    cleanup_memberships = _find_os9_cleanup_memberships(running_config, state["cleanup_ports"])
+    cleanup_memberships = _find_os9_cleanup_memberships(
+        running_config,
+        state["cleanup_ports"],
+        state["shared_cleanup_vlans"],
+    )
     commands = _render_os9_cleanup_commands(cleanup_memberships)
 
     for interface_name in sorted(state["port_configs"], key=_interface_sort_key):
@@ -476,7 +491,11 @@ def _render_os10_commands(state: dict[str, object]) -> list[str]:
             native_vlan = existing_native if existing_native is not None else native_vlan
             if native_vlan is None:
                 native_vlan = 1
-            tagged_vlans.update(existing_tagged)
+            tagged_vlans = _merge_shared_os10_tagged_vlans(
+                existing_tagged,
+                tagged_vlans,
+                state["shared_cleanup_vlans"].get(interface_name, set()),
+            )
         if native_vlan in tagged_vlans:
             tagged_vlans.discard(native_vlan)
 
@@ -604,15 +623,25 @@ def _connection_native_vlan(
 def _find_os9_cleanup_memberships(
     running_config: str,
     interfaces: set[str],
+    shared_cleanup_vlans: dict[str, set[int]],
 ) -> dict[int, dict[str, set[str]]]:
-    if not running_config or not interfaces:
+    if not running_config or (not interfaces and not shared_cleanup_vlans):
         return {}
     formatted_interfaces = {_format_os9_interface(interface) for interface in interfaces}
+    formatted_shared_vlan_interfaces: dict[int, set[str]] = defaultdict(set)
+    for interface_name, vlans in shared_cleanup_vlans.items():
+        formatted_name = _format_os9_interface(interface_name)
+        for vlan in vlans:
+            formatted_shared_vlan_interfaces[vlan].add(formatted_name)
     cleanup_memberships: dict[int, dict[str, set[str]]] = {}
     for vlan, section in _iter_os9_vlan_sections(running_config):
+        cleanup_interfaces = set(formatted_interfaces)
+        cleanup_interfaces.update(formatted_shared_vlan_interfaces.get(vlan, set()))
+        if not cleanup_interfaces:
+            continue
         existing_memberships = _extract_os9_memberships(section)
         vlan_cleanup = {
-            command: members & formatted_interfaces
+            command: members & cleanup_interfaces
             for command, members in existing_memberships.items()
         }
         # Moving a port to another untagged VLAN is the supported way to
@@ -622,6 +651,17 @@ def _find_os9_cleanup_memberships(
         if any(vlan_cleanup.values()):
             cleanup_memberships[vlan] = vlan_cleanup
     return cleanup_memberships
+
+
+def _merge_shared_os10_tagged_vlans(
+    existing_tagged: set[int],
+    desired_tagged: set[int],
+    cleanup_target_vlans: set[int],
+) -> set[int]:
+    merged = set(existing_tagged)
+    merged.difference_update(cleanup_target_vlans)
+    merged.update(desired_tagged)
+    return merged
 
 
 def _iter_os9_vlan_sections(running_config: str) -> list[tuple[int, str]]:

@@ -165,6 +165,140 @@ def test_generated_json_files_parse(tmp_path):
             json.load(fh)
 
 
+def test_generate_uses_saved_hardware_snapshot_when_inventory_no_longer_derives_hardware(tmp_path):
+    inventory_path = copy_inventory(tmp_path)
+    request = GenerateRequest.model_validate(
+        {
+            "topology_name": "saved-snapshot-710",
+            "reference_topology_id": "5-site-cluster/spirent",
+            "hypervisor_ip": "10.68.136.221",
+            "hypervisor_interface": "vmnic0",
+            "requested_by": {
+                "name": "Test User",
+                "email": "test@example.com",
+            },
+            "mappings": [
+                {
+                    "hardware_id": STANDALONE_SOURCE_HARDWARE_ID,
+                    "branch_name": "branch2",
+                    "edge_name": "b2-edge1",
+                    "saved_hardware": {
+                        "id": STANDALONE_SOURCE_HARDWARE_ID,
+                        "short_name": "a02-710-ha-236254370-236254372",
+                        "display_name": "HA Pair chn-rnd-edge-710-6254370 + chn-rnd-edge-710-6254372",
+                        "model": "edge710",
+                        "model_suffix": "710",
+                        "ha": True,
+                        "active_serial": "236254370",
+                        "standby_serial": "236254372",
+                        "free_vlans": list(range(361, 381)),
+                        "vlan_range": {"start": 361, "end": 380},
+                        "switch": {
+                            "name": "chn-rnd-sw-3048-FCTD9Z2",
+                            "model": "Dell-3048",
+                            "connections": {"ip": "10.68.136.111", "port": None},
+                        },
+                        "switches": [
+                            {
+                                "name": "chn-rnd-sw-3048-FCTD9Z2",
+                                "model": "Dell-3048",
+                                "connections": {"ip": "10.68.136.111", "port": None},
+                            }
+                        ],
+                        "ports": [
+                            {
+                                "logical_name": "GE1",
+                                "name": "ge1",
+                                "logical_interface": "GE1",
+                                "link": "B2E1_HA",
+                                "switch_name": "chn-rnd-sw-3048-FCTD9Z2",
+                                "switch_active_port": "gigabitethernet1/16",
+                                "switch_vlans": [361],
+                                "tagged_vlans": [],
+                                "untagged_vlan": 361,
+                                "manual_mapping_required": True,
+                                "port_warning": "GE1 has only an active-member switch connection. Review interface mapping before generation.",
+                            },
+                            {
+                                "logical_name": "GE2",
+                                "name": "ge2",
+                                "logical_interface": "GE2",
+                                "link": "B2E1C1",
+                                "switch_name": "chn-rnd-sw-3048-FCTD9Z2",
+                                "switch_active_port": "gigabitethernet1/17",
+                                "switch_vlans": [362, 363, 364],
+                                "tagged_vlans": [363, 364],
+                                "untagged_vlan": 362,
+                                "manual_mapping_required": True,
+                                "port_warning": "GE2 has only an active-member switch connection. Review interface mapping before generation.",
+                            },
+                            {
+                                "logical_name": "GE3",
+                                "name": "ge3",
+                                "logical_interface": "GE3",
+                                "link": "cr1b12",
+                                "switch_name": "chn-rnd-sw-3048-FCTD9Z2",
+                                "switch_active_port": "gigabitethernet1/18",
+                                "switch_vlans": [365],
+                                "tagged_vlans": [],
+                                "untagged_vlan": 365,
+                                "manual_mapping_required": True,
+                                "port_warning": "GE3 has only an active-member switch connection. Review interface mapping before generation.",
+                            },
+                            {
+                                "logical_name": "GE4",
+                                "name": "ge4",
+                                "logical_interface": "GE4",
+                                "link": "cr2b2e",
+                                "switch_name": "chn-rnd-sw-3048-FCTD9Z2",
+                                "switch_active_port": "gigabitethernet1/19",
+                                "switch_vlans": [366],
+                                "tagged_vlans": [],
+                                "untagged_vlan": 366,
+                                "manual_mapping_required": True,
+                                "port_warning": "GE4 has only an active-member switch connection. Review interface mapping before generation.",
+                            },
+                            {
+                                "logical_name": "SFP1",
+                                "name": "sfp1",
+                                "logical_interface": "SFP1",
+                                "link": "l3b5h1",
+                                "switch_name": "chn-rnd-sw-3048-FCTD9Z2",
+                                "switch_active_port": "gigabitethernet1/20",
+                                "switch_vlans": [367, 368, 369],
+                                "tagged_vlans": [368, 369],
+                                "untagged_vlan": 367,
+                                "manual_mapping_required": True,
+                                "port_warning": "SFP1 has only an active-member switch connection. Review interface mapping before generation.",
+                            },
+                        ],
+                        "available": True,
+                        "reservation": None,
+                    },
+                    "interface_overrides": [
+                        {"reference_interface": "GE1", "hardware_interface": "GE1", "switch_vlans": [361]},
+                        {"reference_interface": "GE2", "hardware_interface": "GE2", "switch_vlans": [362, 363, 364]},
+                        {"reference_interface": "GE3", "hardware_interface": "GE3", "switch_vlans": [365]},
+                        {"reference_interface": "GE4", "hardware_interface": "GE4", "switch_vlans": [366]},
+                        {"reference_interface": "GE5", "hardware_interface": "SFP1", "switch_vlans": [367, 368, 369]},
+                    ],
+                }
+            ],
+        }
+    )
+
+    result = generate_topology(request, inventory_path=inventory_path, outputs_root=tmp_path)
+    config = load_config(result)
+    branch = next(item for item in config["topology"]["branches"] if item["name"] == "branch2")
+    edge = next(item for item in branch["edges"] if item["name"] == "b2-edge1-710")
+
+    assert result.run_id
+    assert Path(result.zip_path).exists()
+    assert edge["slno"] == "236254370"
+    assert edge["standby_slno"] == "236254372"
+    assert any("Using saved hardware snapshot" in message.message for message in result.messages)
+
+
 def test_apply_inventory_free_vlans_to_edge_emits_empty_list():
     inventory = InventoryFile.model_validate(
         {

@@ -290,6 +290,7 @@ class MappingRequest(BaseModel):
     target_branch_name: Optional[str] = None
     target_edge_name: Optional[str] = None
     interface_overrides: list["InterfaceOverride"] = Field(default_factory=list)
+    saved_hardware: Optional[HardwareEdge] = None
 
 
 class InterfaceOverride(BaseModel):

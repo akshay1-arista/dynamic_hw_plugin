@@ -54,6 +54,7 @@ def generate_topology(
 
     inventory = load_inventory(inventory_path)
     hardware_by_id = {item.id: item for item in inventory.hardware}
+    recovered_hardware_ids = _merge_saved_hardware_snapshots(request.mappings, hardware_by_id)
     _validate_request(request, hardware_by_id)
 
     topology_suffix = uuid.uuid4().hex[:6]
@@ -97,6 +98,16 @@ def generate_topology(
 
     for mapping in request.mappings:
         hardware = hardware_by_id[mapping.hardware_id]
+        if mapping.hardware_id in recovered_hardware_ids:
+            messages.append(
+                ValidationMessage(
+                    level="warning",
+                    message=(
+                        f"Using saved hardware snapshot for {hardware.display_name} because the current inventory "
+                        "no longer derives this hardware entry. Stored port mappings and VLAN assignments were reused."
+                    ),
+                )
+            )
         branch = _find_branch(config, mapping.branch_name)
         edge = _find_edge(branch, mapping.edge_name)
         reference_branch = _clone_json(branch)
@@ -273,6 +284,24 @@ def _validate_request(request: GenerateRequest, hardware_by_id: dict[str, Hardwa
             )
         if not _topology_ports(hardware):
             raise GenerationError(f"No connected switch ports found for {hardware.id}")
+
+
+def _merge_saved_hardware_snapshots(
+    mappings,
+    hardware_by_id: dict[str, HardwareEdge],
+) -> set[str]:
+    recovered_hardware_ids: set[str] = set()
+    for mapping in mappings:
+        if mapping.hardware_id in hardware_by_id or mapping.saved_hardware is None:
+            continue
+        if mapping.saved_hardware.id != mapping.hardware_id:
+            raise GenerationError(
+                f"Saved hardware snapshot id mismatch for {mapping.branch_name}/{mapping.edge_name}: "
+                f"{mapping.saved_hardware.id} != {mapping.hardware_id}"
+            )
+        hardware_by_id[mapping.hardware_id] = mapping.saved_hardware
+        recovered_hardware_ids.add(mapping.hardware_id)
+    return recovered_hardware_ids
 
 
 def _load_json(path: Path) -> JsonObject:

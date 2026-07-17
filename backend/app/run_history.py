@@ -4,15 +4,18 @@ import json
 import re
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 from .config import INVENTORY_PATH, OUTPUTS_ROOT
 from .generator import GenerationError, resolve_run_root
 from .inventory import load_inventory, path_has_credentials
 from .models import (
+    EdgePortMapping,
     GenerateMappingStatus,
     GenerateResult,
     HapyCommitResult,
     HapyPublishMetadata,
+    HardwareEdge,
     InterfaceOverride,
     MappingRequest,
     RunMetadata,
@@ -88,6 +91,7 @@ def load_saved_run(
     metadata = _read_run_metadata(metadata_path)
     inventory = load_inventory(inventory_path)
     saved_request = metadata.request or _reconstruct_request(metadata, run_root, inventory)
+    saved_request = _attach_saved_hardware_snapshots(saved_request, metadata, inventory)
     return SavedRunLoadResult(
         request=saved_request,
         result=_build_generate_result(metadata, run_root, inventory),
@@ -222,6 +226,37 @@ def _reconstruct_request(metadata: RunMetadata, run_root: Path, inventory) -> Sa
     )
 
 
+def _attach_saved_hardware_snapshots(
+    request: SavedGenerateRequest,
+    metadata: RunMetadata,
+    inventory,
+) -> SavedGenerateRequest:
+    hardware_by_id = {item.id: item for item in inventory.hardware}
+    metadata_by_key = {
+        (item.hardware_id, item.branch_name, item.edge_name): item for item in metadata.mappings
+    }
+    saved_statuses = {
+        (item.hardware_id, item.branch_name, item.edge_name): item for item in metadata.mapping_statuses
+    }
+
+    hydrated_mappings: list[MappingRequest] = []
+    for mapping in request.mappings:
+        if mapping.hardware_id in hardware_by_id or mapping.saved_hardware is not None:
+            hydrated_mappings.append(mapping)
+            continue
+
+        key = (mapping.hardware_id, mapping.branch_name, mapping.edge_name)
+        snapshot = _build_saved_hardware_snapshot(
+            mapping.hardware_id,
+            metadata_by_key.get(key),
+            saved_statuses.get(key),
+            inventory,
+        )
+        hydrated_mappings.append(mapping.model_copy(update={"saved_hardware": snapshot}))
+
+    return request.model_copy(update={"mappings": hydrated_mappings})
+
+
 def _load_generated_targets(config_path: Path) -> list[dict[str, str]]:
     if not config_path.exists():
         return []
@@ -248,6 +283,8 @@ def _load_generated_targets(config_path: Path) -> list[dict[str, str]]:
                     "edge_name": edge_name,
                     "serial": serial,
                     "standby_serial": standby_serial,
+                    "model": str(edge.get("model") or "").strip(),
+                    "ha_enabled": bool(edge.get("ha_enabled")),
                 }
             )
     return targets
@@ -284,6 +321,173 @@ def _resolve_hypervisor_interface(path, inventory) -> str:
             if not path.hypervisor_id or connection.a.device_id == path.hypervisor_id:
                 return connection.a.interface
     return ""
+
+
+def _build_saved_hardware_snapshot(
+    hardware_id: str,
+    mapping_metadata,
+    saved_status,
+    inventory,
+) -> HardwareEdge | None:
+    if mapping_metadata is None or not mapping_metadata.allocations:
+        return None
+
+    members = [
+        device
+        for device in inventory.devices.values()
+        if device.type == "edge" and (device.ha_group_id or device.id) == hardware_id
+    ]
+    if not members:
+        return None
+
+    active = next((device for device in members if device.ha_role == "active"), members[0])
+    standby = next((device for device in members if device.ha_role == "standby"), None)
+    is_ha = standby is not None and standby.id != active.id
+
+    reservation = active.reservation or (standby.reservation if standby else None)
+    available = active.available and (standby.available if standby else True)
+    if available:
+        reservation = None
+
+    switches = _build_saved_switch_metadata(mapping_metadata, inventory)
+    ports = [
+        _build_saved_port_snapshot(hardware_id, allocation, is_ha=is_ha).model_dump(mode="json")
+        for allocation in mapping_metadata.allocations
+    ]
+    if not switches or not ports:
+        return None
+
+    notes = "Recovered from saved run metadata because the current inventory no longer derives this hardware entry."
+    if active.notes:
+        notes = f"{notes} {active.notes}"
+
+    display_name = (
+        saved_status.hardware_display_name
+        if saved_status and saved_status.hardware_display_name
+        else _saved_hardware_display_name(active.display_name, standby.display_name if is_ha and standby else None)
+    )
+    model = active.model or ""
+    model_suffix = active.model_suffix or _model_suffix(model)
+    snapshot: dict[str, Any] = {
+        "id": hardware_id,
+        "short_name": active.short_name,
+        "display_name": display_name,
+        "model": model,
+        "model_suffix": model_suffix,
+        "ha": is_ha,
+        "dpdk_enabled": active.dpdk_enabled,
+        "active_serial": active.serial_number or "",
+        "standby_serial": standby.serial_number if is_ha and standby else None,
+        "free_vlans": list(active.free_vlans),
+        "vlan_range": active.vlan_range.model_dump(mode="json") if active.vlan_range else None,
+        "switch": switches[0],
+        "switches": switches,
+        "ports": ports,
+        "allocations": [],
+        "path": mapping_metadata.path.model_dump(mode="json") if mapping_metadata.path else None,
+        "path_complete": bool(mapping_metadata.path and mapping_metadata.path.complete),
+        "auto_config_ready": bool(mapping_metadata.path and mapping_metadata.path.complete and path_has_credentials(mapping_metadata.path, inventory)),
+        "hypervisor_ip": mapping_metadata.path.hypervisor_ip if mapping_metadata.path else active.hypervisor_ip,
+        "available": available,
+        "reservation": reservation.model_dump(mode="json") if reservation else None,
+        "notes": notes,
+    }
+    return HardwareEdge.model_validate(snapshot)
+
+
+def _build_saved_port_snapshot(
+    hardware_id: str,
+    allocation,
+    *,
+    is_ha: bool,
+) -> EdgePortMapping:
+    logical_interface = allocation.logical_interface.upper()
+    active_only = bool(allocation.switch_active_port and not allocation.switch_standby_port)
+    standby_only = bool(allocation.switch_standby_port and not allocation.switch_active_port)
+    port_warning = None
+    if is_ha and active_only:
+        port_warning = (
+            f"{logical_interface} has only an active-member switch connection. "
+            "Review interface mapping before generation."
+        )
+    elif is_ha and standby_only:
+        port_warning = (
+            f"{logical_interface} has only a standby-member switch connection. "
+            "Review interface mapping before generation."
+        )
+
+    return EdgePortMapping.model_validate(
+        {
+            "logical_name": logical_interface,
+            "name": logical_interface.lower(),
+            "logical_interface": logical_interface,
+            "link": allocation.link or f"{_safe_id(hardware_id)}_{logical_interface.lower()}",
+            "switch_name": allocation.switch_name,
+            "switch_active_port": allocation.switch_active_port,
+            "switch_standby_port": allocation.switch_standby_port,
+            "switch_vlans": list(allocation.switch_vlans),
+            "tagged_vlans": list(allocation.tagged_vlans),
+            "untagged_vlan": allocation.untagged_vlan,
+            "segment_vlans": dict(allocation.segment_vlans),
+            "manual_mapping_required": bool(is_ha and (active_only or standby_only)),
+            "port_warning": port_warning,
+        }
+    )
+
+
+def _build_saved_switch_metadata(mapping_metadata, inventory) -> list[dict[str, Any]]:
+    switch_names: list[str] = []
+    for allocation in mapping_metadata.allocations:
+        if allocation.switch_name and allocation.switch_name not in switch_names:
+            switch_names.append(allocation.switch_name)
+    if not switch_names and mapping_metadata.path and mapping_metadata.path.access_switch_name:
+        switch_names.append(mapping_metadata.path.access_switch_name)
+
+    switches: list[dict[str, Any]] = []
+    for switch_name in switch_names:
+        device = _find_switch_device_by_name(inventory.devices, switch_name)
+        if device and device.switch_metadata:
+            switches.append(device.switch_metadata.model_dump(mode="json"))
+            continue
+        switches.append(
+            {
+                "name": switch_name,
+                "device_type": "DELL",
+                "model": device.model if device and device.model else "Dell",
+                "connections": {
+                    "ip": device.ip_address if device and device.ip_address else "",
+                    "port": None,
+                },
+            }
+        )
+    return switches
+
+
+def _find_switch_device_by_name(devices: dict[str, Any], switch_name: str):
+    for device in devices.values():
+        if device.type != "switch":
+            continue
+        metadata_name = device.switch_metadata.name if device.switch_metadata else None
+        if device.display_name == switch_name or metadata_name == switch_name:
+            return device
+    return None
+
+
+def _saved_hardware_display_name(active_name: str, standby_name: str | None) -> str:
+    if standby_name:
+        return f"HA Pair {active_name} + {standby_name}"
+    return active_name
+
+
+def _model_suffix(model: str | None) -> str:
+    if not model:
+        return ""
+    match = re.search(r"(\d+[a-z]*)", model.lower())
+    return match.group(1) if match else model.removeprefix("edge")
+
+
+def _safe_id(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "_", value.lower()).strip("_")
 
 
 def _build_publish_result(publish: HapyPublishMetadata | None) -> HapyCommitResult | None:

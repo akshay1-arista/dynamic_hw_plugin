@@ -838,6 +838,144 @@ def test_build_l2_switches_excludes_unallocated_hardware_ports():
     assert all(interface["link"] != "ln_ha_a01_327_dgd10q2_a01_328_16c10q2_ge5" for interface in switch_interfaces)
 
 
+def test_build_l2_switches_keeps_whichever_ha_member_link_exists():
+    hardware = HardwareEdge.model_validate(
+        {
+            "id": "edge-1",
+            "display_name": "edge-1",
+            "model": "edge6X0",
+            "model_suffix": "680",
+            "ha": True,
+            "active_serial": "SERIAL1",
+            "standby_serial": "SERIAL2",
+            "switch": {
+                "name": "switch1",
+                "connections": {"ip": "10.0.0.1"},
+            },
+            "ports": [
+                {
+                    "logical_name": "GE1",
+                    "name": "ge1",
+                    "logical_interface": "GE1",
+                    "link": "edge1-ge1",
+                    "switch_name": "switch1",
+                    "switch_active_port": "gigabitethernet1/3",
+                    "switch_vlans": [105],
+                    "tagged_vlans": [],
+                    "untagged_vlan": 105,
+                    "manual_mapping_required": True,
+                    "port_warning": "GE1 has only an active-member switch connection.",
+                },
+                {
+                    "logical_name": "GE2",
+                    "name": "ge2",
+                    "logical_interface": "GE2",
+                    "link": "edge1-ge2",
+                    "switch_name": "switch1",
+                    "switch_standby_port": "gigabitethernet1/8",
+                    "switch_vlans": [106],
+                    "tagged_vlans": [],
+                    "untagged_vlan": 106,
+                    "manual_mapping_required": True,
+                    "port_warning": "GE2 has only a standby-member switch connection.",
+                },
+            ],
+        }
+    )
+
+    l2_switches = _build_l2_switches(hardware, "10.0.0.50", "vmnic0")
+
+    switch_interfaces = l2_switches[0]["interfaces"]
+    assert [interface["link"] for interface in switch_interfaces[:-1]] == [
+        "edge1-ge1",
+        "standby_edge1-ge2",
+    ]
+    assert switch_interfaces[0]["name"] == "gigabitethernet1/3"
+    assert switch_interfaces[1]["name"] == "gigabitethernet1/8"
+
+
+def test_apply_port_mappings_skips_manual_only_ha_ports_until_explicitly_overridden():
+    hardware = HardwareEdge.model_validate(
+        {
+            "id": "edge-1",
+            "display_name": "edge-1",
+            "model": "edge6X0",
+            "model_suffix": "680",
+            "ha": True,
+            "active_serial": "SERIAL1",
+            "standby_serial": "SERIAL2",
+            "switch": {
+                "name": "switch1",
+                "connections": {"ip": "10.0.0.1"},
+            },
+            "ports": [
+                {
+                    "logical_name": "GE1",
+                    "name": "ge1",
+                    "logical_interface": "GE1",
+                    "link": "edge1-ge1",
+                    "switch_name": "switch1",
+                    "switch_active_port": "Gi1/3",
+                    "switch_standby_port": "Gi1/8",
+                    "switch_vlans": [200],
+                    "tagged_vlans": [],
+                    "untagged_vlan": 200,
+                },
+                {
+                    "logical_name": "GE2",
+                    "name": "ge2",
+                    "logical_interface": "GE2",
+                    "link": "edge1-ge2",
+                    "switch_name": "switch1",
+                    "switch_active_port": "Gi1/4",
+                    "switch_vlans": [201],
+                    "tagged_vlans": [],
+                    "untagged_vlan": 201,
+                    "manual_mapping_required": True,
+                    "port_warning": "GE2 has only an active-member switch connection.",
+                },
+            ],
+        }
+    )
+    edge = {
+        "interfaces": [
+            {"name": "eth0", "logical_name": "LAN1", "logical_interface": "GE1", "link": "lan1-link", "mode": "switched", "vlans": [1]},
+            {"name": "eth1", "logical_name": "LAN2", "logical_interface": "GE2", "link": "lan2-link", "mode": "switched", "vlans": [1]},
+        ],
+        "vlans": [{"segment_name": "Global Segment", "vlan": 1}],
+    }
+
+    _remote_updates, _dropped_links, messages, allocation = _apply_port_mappings(
+        edge,
+        hardware,
+        "branch1",
+        "edge1",
+    )
+
+    assert [interface["logical_interface"] for interface in edge["interfaces"]] == ["GE1"]
+    assert [port.logical_interface for port in allocation.ports] == ["GE1"]
+    assert any("Dropped 1 unassigned reference interface" in message.message for message in messages)
+
+    edge_with_override = {
+        "interfaces": [
+            {"name": "eth0", "logical_name": "LAN1", "logical_interface": "GE1", "link": "lan1-link", "mode": "switched", "vlans": [1]},
+            {"name": "eth1", "logical_name": "LAN2", "logical_interface": "GE2", "link": "lan2-link", "mode": "switched", "vlans": [1]},
+        ],
+        "vlans": [{"segment_name": "Global Segment", "vlan": 1}],
+    }
+
+    _remote_updates, _dropped_links, _messages, overridden_allocation = _apply_port_mappings(
+        edge_with_override,
+        hardware,
+        "branch1",
+        "edge1",
+        [InterfaceOverride(reference_interface="GE2", hardware_interface="GE2")],
+    )
+
+    assert [interface["logical_interface"] for interface in edge_with_override["interfaces"]] == ["GE1", "GE2"]
+    assert [port.logical_interface for port in overridden_allocation.ports] == ["GE1", "GE2"]
+
+
 def test_switch_only_interface_manual_override_accepts_single_native_vlan():
     edge = {
         "interfaces": [

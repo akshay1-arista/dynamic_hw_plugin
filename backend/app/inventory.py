@@ -393,8 +393,11 @@ def _derive_ports(
     standby_by_signature = {
         _standby_signature(connection, standby.id): connection for connection in standby_connections
     }
+    standby_by_vlan_signature: dict[tuple[str, tuple[int, ...], tuple[int, ...], int | None], list[InventoryConnection]] = {}
+    for connection in standby_connections:
+        standby_by_vlan_signature.setdefault(_standby_vlan_signature(connection, standby.id), []).append(connection)
 
-    ports: list[dict[str, Any]] = []
+    active_port_rows: list[tuple[InventoryConnection, Any, Any, InventoryDevice]] = []
     for connection in sorted(
         active_connections,
         key=lambda item: _interface_sort_key(_edge_endpoint(item, active.id).interface),
@@ -404,6 +407,11 @@ def _derive_ports(
         switch = devices.get(switch_endpoint.device_id)
         if not switch or switch.type != "switch":
             continue
+        active_port_rows.append((connection, edge_endpoint, switch_endpoint, switch))
+
+    matched_standby_connections: dict[str, InventoryConnection] = {}
+    used_standby_connection_ids: set[str] = set()
+    for connection, edge_endpoint, switch_endpoint, _switch in active_port_rows:
         standby_connection = standby_by_signature.get(
             (
                 edge_endpoint.interface.upper(),
@@ -411,6 +419,26 @@ def _derive_ports(
                 tuple(connection.vlans),
             )
         )
+        if standby_connection:
+            matched_standby_connections[connection.id] = standby_connection
+            used_standby_connection_ids.add(standby_connection.id)
+
+    for connection, _edge_port, _switch_port, _switch in active_port_rows:
+        if connection.id in matched_standby_connections:
+            continue
+        candidates = [
+            candidate
+            for candidate in standby_by_vlan_signature.get(_standby_vlan_signature(connection, active.id), [])
+            if candidate.id not in used_standby_connection_ids
+        ]
+        if len(candidates) != 1:
+            continue
+        matched_standby_connections[connection.id] = candidates[0]
+        used_standby_connection_ids.add(candidates[0].id)
+
+    ports: list[dict[str, Any]] = []
+    for connection, edge_endpoint, switch_endpoint, switch in active_port_rows:
+        standby_connection = matched_standby_connections.get(connection.id)
         standby_port = None
         if standby_connection and standby:
             standby_port = _other_endpoint(standby_connection, standby.id).interface
@@ -431,6 +459,64 @@ def _derive_ports(
                 "edge_vlans": None,
                 "segment_vlans": {},
                 "wanlink_name": None,
+                "manual_mapping_required": bool(standby and not standby_port),
+                "port_warning": (
+                    _ha_port_warning(logical_interface, active_port=True, standby_port=False)
+                    if standby and not standby_port
+                    else None
+                ),
+            }
+        )
+
+    standby_only_rows: list[tuple[InventoryConnection, Any, Any, InventoryDevice]] = []
+    for connection in sorted(
+        standby_connections,
+        key=lambda item: _interface_sort_key(_edge_endpoint(item, standby.id).interface),
+    ):
+        if connection.id in used_standby_connection_ids:
+            continue
+        edge_endpoint = _edge_endpoint(connection, standby.id)
+        switch_endpoint = _other_endpoint(connection, standby.id)
+        switch = devices.get(switch_endpoint.device_id)
+        if not switch or switch.type != "switch":
+            continue
+        standby_only_rows.append((connection, edge_endpoint, switch_endpoint, switch))
+
+    for connection, edge_endpoint, switch_endpoint, switch in standby_only_rows:
+        logical_interface = edge_endpoint.interface.upper()
+        existing_port = next(
+            (
+                port
+                for port in ports
+                if port["logical_interface"] == logical_interface and not port.get("switch_standby_port")
+            ),
+            None,
+        )
+        if existing_port is not None:
+            existing_port["switch_standby_port"] = switch_endpoint.interface
+            existing_port["manual_mapping_required"] = True
+            existing_port["port_warning"] = (
+                f"{logical_interface} active and standby switch connections differ. "
+                "Review interface mapping before generation."
+            )
+            continue
+        ports.append(
+            {
+                "logical_name": logical_interface,
+                "name": logical_interface.lower(),
+                "logical_interface": logical_interface,
+                "link": f"{_safe_id(group_id)}_{logical_interface.lower()}",
+                "switch_name": switch.display_name,
+                "switch_active_port": None,
+                "switch_standby_port": switch_endpoint.interface,
+                "switch_vlans": connection.vlans,
+                "tagged_vlans": connection.tagged_vlans,
+                "untagged_vlan": connection.untagged_vlan,
+                "edge_vlans": None,
+                "segment_vlans": {},
+                "wanlink_name": None,
+                "manual_mapping_required": True,
+                "port_warning": _ha_port_warning(logical_interface, active_port=False, standby_port=True),
             }
         )
     return ports
@@ -476,6 +562,35 @@ def _standby_signature(connection: InventoryConnection, edge_id: str) -> tuple[s
     edge_endpoint = _edge_endpoint(connection, edge_id)
     switch_endpoint = _other_endpoint(connection, edge_id)
     return (edge_endpoint.interface.upper(), switch_endpoint.device_id, tuple(connection.vlans))
+
+
+def _standby_vlan_signature(
+    connection: InventoryConnection,
+    edge_id: str,
+) -> tuple[str, tuple[int, ...], tuple[int, ...], int | None]:
+    switch_endpoint = _other_endpoint(connection, edge_id)
+    return (
+        switch_endpoint.device_id,
+        tuple(connection.vlans),
+        tuple(connection.tagged_vlans),
+        connection.untagged_vlan,
+    )
+
+
+def _ha_port_warning(logical_interface: str, *, active_port: bool, standby_port: bool) -> str | None:
+    if active_port and standby_port:
+        return None
+    if active_port:
+        return (
+            f"{logical_interface} has only an active-member switch connection. "
+            "Review interface mapping before generation."
+        )
+    if standby_port:
+        return (
+            f"{logical_interface} has only a standby-member switch connection. "
+            "Review interface mapping before generation."
+        )
+    return None
 
 
 def _derive_switches(ports: list[dict[str, Any]], devices: dict[str, InventoryDevice]) -> list[dict[str, Any]]:
@@ -725,17 +840,18 @@ def _legacy_hardware_to_graph(hardware: list[HardwareEdge]) -> dict[str, Any]:
             }
         for port in item.ports:
             switch_id = _safe_id(port.switch_name or (item.switches[0].name if item.switches else item.switch.name))
-            connections.append(
-                {
-                    "id": f"{active_id}-{port.logical_interface}-{switch_id}",
-                    "a": {"device_id": active_id, "interface": port.logical_interface},
-                    "b": {"device_id": switch_id, "interface": port.switch_active_port},
-                    "vlans": port.switch_vlans,
-                    "tagged_vlans": port.tagged_vlans or list(port.segment_vlans.values()),
-                    "untagged_vlan": port.untagged_vlan or (port.switch_vlans[0] if port.switch_vlans else None),
-                    "role": "edge-access",
-                }
-            )
+            if port.switch_active_port:
+                connections.append(
+                    {
+                        "id": f"{active_id}-{port.logical_interface}-{switch_id}",
+                        "a": {"device_id": active_id, "interface": port.logical_interface},
+                        "b": {"device_id": switch_id, "interface": port.switch_active_port},
+                        "vlans": port.switch_vlans,
+                        "tagged_vlans": port.tagged_vlans or list(port.segment_vlans.values()),
+                        "untagged_vlan": port.untagged_vlan or (port.switch_vlans[0] if port.switch_vlans else None),
+                        "role": "edge-access",
+                    }
+                )
             if standby_id and port.switch_standby_port:
                 connections.append(
                     {

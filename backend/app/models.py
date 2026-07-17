@@ -77,7 +77,7 @@ class EdgePortMapping(BaseModel):
     logical_interface: str
     link: str
     switch_name: Optional[str] = None
-    switch_active_port: str
+    switch_active_port: Optional[str] = None
     switch_standby_port: Optional[str] = None
     switch_vlans: list[int] = Field(default_factory=list)
     tagged_vlans: list[int] = Field(default_factory=list)
@@ -85,6 +85,14 @@ class EdgePortMapping(BaseModel):
     edge_vlans: Optional[list[int]] = None
     segment_vlans: dict[str, int] = Field(default_factory=dict)
     wanlink_name: Optional[str] = None
+    manual_mapping_required: bool = False
+    port_warning: Optional[str] = None
+
+    @model_validator(mode="after")
+    def validate_switch_ports(self) -> "EdgePortMapping":
+        if not self.switch_active_port and not self.switch_standby_port:
+            raise ValueError("edge port mapping must define at least one switch member port")
+        return self
 
     @property
     def global_vlan(self) -> Optional[int]:
@@ -96,12 +104,18 @@ class HardwarePortAllocation(BaseModel):
     logical_interface: str
     link: Optional[str] = None
     switch_name: str
-    switch_active_port: str
+    switch_active_port: Optional[str] = None
     switch_standby_port: Optional[str] = None
     switch_vlans: list[int] = Field(default_factory=list)
     tagged_vlans: list[int] = Field(default_factory=list)
     untagged_vlan: Optional[int] = None
     segment_vlans: dict[str, int] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def validate_switch_ports(self) -> "HardwarePortAllocation":
+        if not self.switch_active_port and not self.switch_standby_port:
+            raise ValueError("hardware port allocation must define at least one switch member port")
+        return self
 
 
 class HardwareAllocation(BaseModel):

@@ -75,7 +75,7 @@ export function App() {
   const [loadingSavedRunId, setLoadingSavedRunId] = useState('');
   const [generating, setGenerating] = useState(false);
   const [savingInventory, setSavingInventory] = useState(false);
-  const [refreshingHardwareId, setRefreshingHardwareId] = useState('');
+  const [refreshingHardwareIds, setRefreshingHardwareIds] = useState([]);
   const [updatingAvailabilityId, setUpdatingAvailabilityId] = useState('');
   const [configuringSwitches, setConfiguringSwitches] = useState(false);
   const [previewingSwitches, setPreviewingSwitches] = useState(false);
@@ -182,6 +182,7 @@ export function App() {
     }
     return auditTrail.filter((event) => auditSearchText(event).includes(query));
   }, [auditTrail, auditSearch]);
+  const refreshingInventory = refreshingHardwareIds.length > 0;
 
   const configureSwitchState = useMemo(() => {
     if (!result) {
@@ -401,23 +402,34 @@ export function App() {
     }
   }
 
-  async function refreshHardwareFromLabNavigator(hardwareId) {
-    setRefreshingHardwareId(hardwareId);
+  async function refreshHardwareFromLabNavigator(hardwareIds) {
+    const targets = [...new Set((Array.isArray(hardwareIds) ? hardwareIds : [hardwareIds]).filter(Boolean))];
+    if (!targets.length) {
+      return;
+    }
+    setRefreshingHardwareIds(targets);
     setError('');
     try {
-      const preview = await previewInventoryRefresh([hardwareId]);
+      const preview = await previewInventoryRefresh(targets);
       const summary = preview.changes.length
-        ? preview.changes.map((item) => item.summary).join('\n')
+        ? [
+            ...preview.changes.slice(0, 20).map((item) => item.summary),
+            ...(preview.changes.length > 20 ? [`...and ${preview.changes.length - 20} more changes`] : [])
+          ].join('\n')
         : 'No inventory changes detected.';
-      if (!window.confirm(`Apply Lab Navigator refresh for ${hardwareId}?\n\n${summary}`)) {
+      const prompt =
+        targets.length === 1
+          ? `Apply Lab Navigator refresh for ${targets[0]}?\n\n${summary}`
+          : `Apply Lab Navigator refresh for ${targets.length} inventory devices?\n\n${summary}`;
+      if (!window.confirm(prompt)) {
         return;
       }
-      const applied = await applyInventoryRefresh([hardwareId]);
+      const applied = await applyInventoryRefresh(targets);
       setInventory(applied.inventory);
     } catch (refreshError) {
       setError(refreshError.message);
     } finally {
-      setRefreshingHardwareId('');
+      setRefreshingHardwareIds([]);
     }
   }
 
@@ -826,6 +838,17 @@ export function App() {
                 Reserved
               </button>
             </div>
+            <button
+              className="secondary"
+              onClick={() => refreshHardwareFromLabNavigator(filteredHardware.map((hardware) => hardware.id))}
+              disabled={refreshingInventory || filteredHardware.length === 0}
+              type="button"
+            >
+              {refreshingInventory ? <Loader2 className="spin" size={16} /> : <RefreshCw size={16} />}
+              {refreshingInventory
+                ? `Refreshing ${refreshingHardwareIds.length} device${refreshingHardwareIds.length === 1 ? '' : 's'}`
+                : `Refresh ${filteredHardware.length === inventory.hardware.length ? 'all' : 'visible'} from Lab Navigator`}
+            </button>
             <div className="inventoryList">
               {filteredHardware.map((hardware) => (
                 <div key={hardware.id} className="inventoryItem">
@@ -849,9 +872,6 @@ export function App() {
                         <StatusBadge tone={hardware.ha ? 'accent' : 'neutral'}>
                           {hardware.ha ? 'HA' : 'Standalone'}
                         </StatusBadge>
-                        {hardware.path_complete && (
-                          <StatusBadge tone="success">Path complete</StatusBadge>
-                        )}
                       </span>
                       <small>{hardware.model} / {hardware.ports.length} switch links</small>
                     </span>
@@ -869,7 +889,7 @@ export function App() {
                   {expandedHardwareId === hardware.id && (
                     <HardwareDetails
                       hardware={hardware}
-                      refreshing={refreshingHardwareId === hardware.id}
+                      refreshing={refreshingHardwareIds.includes(hardware.id)}
                       onVlanRangeChange={(boundary, value) => updateHardwareVlanRange(hardware.id, boundary, value)}
                       onRefresh={() => refreshHardwareFromLabNavigator(hardware.id)}
                     />
@@ -1866,7 +1886,7 @@ function buildAutoVlanAllocationPreview(referenceInterfaces, assignments, hardwa
 }
 
 function hardwareInterfaceOptionLabel(port) {
-  return `${port.logical_interface} / ${port.switch_active_port} / ${hardwarePortModeSummary(port)}`;
+  return `${port.logical_interface} / ${hardwarePortConnectionSummary(port)} / ${hardwarePortModeSummary(port)}`;
 }
 
 function hardwarePortModeSummary(port) {
@@ -1885,6 +1905,19 @@ function hardwarePortModeSummary(port) {
   return `${port.switch_vlans.length} tagged`;
 }
 
+function hardwarePortConnectionSummary(port) {
+  if (port.switch_active_port && port.switch_standby_port) {
+    return `${port.switch_active_port} / standby ${port.switch_standby_port}`;
+  }
+  if (port.switch_active_port) {
+    return port.manual_mapping_required ? `${port.switch_active_port} / active only` : port.switch_active_port;
+  }
+  if (port.switch_standby_port) {
+    return `standby ${port.switch_standby_port} only`;
+  }
+  return 'no switch connection';
+}
+
 function hardwarePortHint(port, plannedVlans = []) {
   if (!port) {
     return 'This reference interface will be dropped from the generated topology.';
@@ -1899,7 +1932,10 @@ function hardwarePortHint(port, plannedVlans = []) {
     : plannedVlans.length
       ? `Will auto-assign VLAN${plannedVlans.length > 1 ? 's' : ''} ${plannedVlans.join(', ')} from hardware range`
       : 'No hardware VLAN range available for auto-allocation';
-  return `${port.logical_interface}${port.logical_name ? ` (${port.logical_name})` : ''} on ${port.switch_active_port}${port.switch_standby_port ? ` / standby ${port.switch_standby_port}` : ''}. ${vlanSummary}.`;
+  const warning = port.port_warning
+    ? ` ${port.port_warning} Generation adds only the available switch member connection.`
+    : '';
+  return `${port.logical_interface}${port.logical_name ? ` (${port.logical_name})` : ''} on ${hardwarePortConnectionSummary(port)}. ${vlanSummary}.${warning}`;
 }
 
 function parseSwitchVlanOverride(value, referenceInterface) {
@@ -2034,7 +2070,7 @@ function buildDefaultInterfaceAssignments(edge, hardware) {
   const referenceInterfaces = (edge?.interfaces || []).filter(
     (item) => getReferenceInterfaceKey(item) && !isLoopbackInterface(item)
   );
-  const hardwarePorts = topologyHardwarePorts(hardware);
+  const hardwarePorts = topologyHardwarePorts(hardware).filter((port) => !port.manual_mapping_required);
   const mappedCount = Math.min(referenceInterfaces.length, hardwarePorts.length);
   const mappedInterfaces = referenceInterfaces.slice(0, mappedCount);
   const matchedPorts = matchPortsToReferenceInterfaces(mappedInterfaces, hardwarePorts);
@@ -2113,10 +2149,6 @@ function HardwareDetails({ hardware, refreshing, onVlanRangeChange, onRefresh })
           <strong>{formatSwitchSummary(hardware)}</strong>
         </span>
         <span>
-          <small>Path status</small>
-          <strong>{hardware.path_complete ? 'complete' : 'incomplete'}</strong>
-        </span>
-        <span>
           <small>Reservation</small>
           <strong>
             {hardware.available
@@ -2163,9 +2195,8 @@ function HardwareDetails({ hardware, refreshing, onVlanRangeChange, onRefresh })
 
       <div className="portList">
         {hardware.ports.map((port) => (
-          <small key={`${port.logical_name}-${port.switch_active_port}`}>
-            {port.logical_name} {port.logical_interface}: {port.switch_active_port}
-            {port.switch_standby_port ? ` / standby ${port.switch_standby_port}` : ''} /{' '}
+          <small key={`${port.logical_name}-${port.switch_active_port || port.switch_standby_port || 'none'}`}>
+            {port.logical_name} {port.logical_interface}: {hardwarePortConnectionSummary(port)} /{' '}
             {port.switch_vlans?.length ? `VLANs ${port.switch_vlans.join(', ')}` : 'dynamic VLAN allocation'}
           </small>
         ))}
@@ -2173,6 +2204,7 @@ function HardwareDetails({ hardware, refreshing, onVlanRangeChange, onRefresh })
 
       {hardware.path && (
         <div className="switchList">
+          <small>Imported path links</small>
           <small>
             uplink: {hardware.path.access_switch_name || 'unknown'} {hardware.path.access_uplink_port || 'n/a'} {'->'}{' '}
             {hardware.path.upstream_switch_name || 'unknown'} {hardware.path.upstream_access_port || 'n/a'}
@@ -2567,6 +2599,17 @@ function MappingRow({ index, mapping, mappings, reference, inventory, onChange, 
     [selectedEdge]
   );
   const hardwarePorts = useMemo(() => topologyHardwarePorts(selectedHardware), [selectedHardware]);
+  const manualMappingPorts = useMemo(
+    () => (selectedHardware?.ha ? hardwarePorts.filter((port) => port.manual_mapping_required) : []),
+    [hardwarePorts, selectedHardware]
+  );
+  const manualMappingPortSummary = useMemo(
+    () =>
+      manualMappingPorts
+        .map((port) => port.port_warning || `${port.logical_interface} requires manual review.`)
+        .join(' '),
+    [manualMappingPorts]
+  );
   const defaultInterfaceAssignments = useMemo(
     () => buildDefaultInterfaceAssignments(selectedEdge, selectedHardware),
     [selectedEdge, selectedHardware]
@@ -2717,6 +2760,12 @@ function MappingRow({ index, mapping, mappings, reference, inventory, onChange, 
               <p className="muted">
                 Review one row at a time. Keep the suggested hardware port to use automatic matching, change it to pin or drop the interface, and only fill VLANs when you want to override the generated allocation.
               </p>
+              {manualMappingPorts.length > 0 && (
+                <div className="mappingCaveat">
+                  <TriangleAlert size={16} aria-hidden="true" />
+                  Selected HA hardware has member-specific switch links on {manualMappingPorts.map((port) => port.logical_interface).join(', ')}. Review these interface mappings explicitly. Generation adds only the available switch member connection.
+                </div>
+              )}
               <div className="interfaceOverrideList">
                 {referenceInterfaces.map((interfaceSummary) => {
                   const referenceInterface = getReferenceInterfaceKey(interfaceSummary);
@@ -2801,6 +2850,12 @@ function MappingRow({ index, mapping, mappings, reference, inventory, onChange, 
         <div className="mappingCaveat">
           <TriangleAlert size={16} aria-hidden="true" />
           Reference edge is HA enabled, but selected hardware is standalone. Generation will convert this branch edge to standalone.
+        </div>
+      )}
+      {!haMismatch && manualMappingPorts.length > 0 && (
+        <div className="mappingCaveat">
+          <TriangleAlert size={16} aria-hidden="true" />
+          {manualMappingPortSummary}
         </div>
       )}
     </div>

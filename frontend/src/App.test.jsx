@@ -202,6 +202,41 @@ const inventory = {
       notes: 'standalone inventory entry'
     },
     {
+      id: 'a01-3800-asymmetric-ha',
+      short_name: 'a01-3800-asym',
+      display_name: 'A01 3800 Asymmetric HA',
+      model: 'edge3X00',
+      model_suffix: '3800',
+      ha: true,
+      active_serial: 'ASYM001',
+      standby_serial: 'ASYM002',
+      available: true,
+      switch: { name: 'a01-access-switch', model: 'Dell-3048', connections: { ip: '10.68.136.71' } },
+      ports: [
+        {
+          logical_name: 'LAN1',
+          logical_interface: 'GE1',
+          switch_active_port: 'gigabitethernet1/31',
+          switch_vlans: [1601],
+          tagged_vlans: [],
+          untagged_vlan: 1601,
+          manual_mapping_required: true,
+          port_warning: 'GE1 has only an active-member switch connection. Review interface mapping before generation.'
+        },
+        {
+          logical_name: 'LAN2',
+          logical_interface: 'GE2',
+          switch_standby_port: 'gigabitethernet1/32',
+          switch_vlans: [1602],
+          tagged_vlans: [],
+          untagged_vlan: 1602,
+          manual_mapping_required: true,
+          port_warning: 'GE2 has only a standby-member switch connection. Review interface mapping before generation.'
+        }
+      ],
+      notes: 'asymmetric ha inventory entry'
+    },
+    {
       id: 'internet-dynamic-680',
       short_name: 'internet-dyn-680',
       display_name: 'Internet Dynamic 680',
@@ -400,6 +435,44 @@ beforeEach(() => {
         ...auditTrail
       ];
       return Response.json(inventoryState);
+    }
+    if (url === '/api/hardware/refresh-preview' && options.method === 'POST') {
+      const payload = JSON.parse(options.body);
+      return Response.json({
+        hardware_ids: payload.hardware_ids,
+        changes: payload.hardware_ids.map((hardwareId) => ({
+          change_type: 'update-connection',
+          target: hardwareId,
+          summary: `Update edge-access connection data for ${hardwareId}`
+        })),
+        inventory: inventoryState,
+        messages: [{ level: 'info', message: 'Previewed inventory refresh.' }]
+      });
+    }
+    if (url === '/api/hardware/refresh-apply' && options.method === 'POST') {
+      const payload = JSON.parse(options.body);
+      inventoryState = {
+        ...inventoryState,
+        hardware: inventoryState.hardware.map((hardware) =>
+          payload.hardware_ids.includes(hardware.id)
+            ? {
+                ...hardware,
+                path_complete: true,
+                notes: `Refreshed from Lab Navigator for ${hardware.id}`
+              }
+            : hardware
+        )
+      };
+      return Response.json({
+        hardware_ids: payload.hardware_ids,
+        changes: payload.hardware_ids.map((hardwareId) => ({
+          change_type: 'update-connection',
+          target: hardwareId,
+          summary: `Update edge-access connection data for ${hardwareId}`
+        })),
+        inventory: inventoryState,
+        messages: [{ level: 'info', message: 'Applied Lab Navigator inventory refresh.' }]
+      });
     }
     if (url === '/api/generate') {
       const payload = JSON.parse(options.body);
@@ -768,6 +841,40 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: 'All' }));
     expect(within(inventoryPanel).getAllByText('CHN 3800 HA Pair 8').length).toBeGreaterThan(0);
     expect(within(inventoryPanel).getByText('A01 680 Standalone')).toBeInTheDocument();
+  });
+
+  test('refreshes visible inventory hardware from lab navigator', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    const refreshButton = await screen.findByRole('button', { name: 'Refresh all from Lab Navigator' });
+    await user.click(refreshButton);
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/hardware/refresh-preview',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({
+            hardware_ids: ['chn-3800-8-ha', 'a01-680-standalone', 'a01-3800-asymmetric-ha', 'internet-dynamic-680']
+          })
+        })
+      );
+    });
+    expect(window.confirm).toHaveBeenCalledWith(
+      expect.stringContaining('Apply Lab Navigator refresh for 4 inventory devices?')
+    );
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/hardware/refresh-apply',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({
+            hardware_ids: ['chn-3800-8-ha', 'a01-680-standalone', 'a01-3800-asymmetric-ha', 'internet-dynamic-680']
+          })
+        })
+      );
+    });
   });
 
   test('loads a previously generated run into the editor and delivery panel', async () => {
@@ -1150,5 +1257,26 @@ describe('App', () => {
     await user.selectOptions(screen.getByLabelText('Branch'), 'branch2');
 
     expect(screen.getByText(/Reference edge is HA enabled, but selected hardware is standalone/i)).toBeInTheDocument();
+  });
+
+  test('warns when HA hardware has member-specific switch links that require manual mapping', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await screen.findAllByText('A01 3800 Asymmetric HA');
+    await chooseHardware(user, 'asym', /A01 3800 Asymmetric HA/i);
+    await user.selectOptions(screen.getByLabelText('Branch'), 'branch2');
+
+    expect(
+      screen.getByText(/GE1 has only an active-member switch connection\. Review interface mapping before generation\./i)
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /optional interface mapping/i }));
+
+    expect(
+      screen.getByText(/Selected HA hardware has member-specific switch links on GE1, GE2\./i)
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText('Hardware interface for GE1')).toHaveValue('');
+    expect(screen.getByLabelText('Hardware interface for GE2')).toHaveValue('');
   });
 });

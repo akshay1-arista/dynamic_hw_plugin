@@ -58,9 +58,26 @@ def test_a02_710_pair_keeps_no_vlan_sfp1_connection():
 
     ports = {port.logical_interface: port for port in hardware.ports}
     assert ports["SFP1"].switch_active_port == "gigabitethernet1/20"
-    assert ports["SFP1"].switch_standby_port == "gigabitethernet1/25"
     assert ports["SFP1"].switch_vlans == []
     assert ports["SFP1"].untagged_vlan is None
+
+
+def test_a01_3800_pair_falls_back_to_vlan_matching_for_shifted_standby_ports():
+    inventory = load_inventory()
+    hardware = next(
+        item
+        for item in inventory.hardware
+        if item.id == "user-ha-chn_rnd_edge_3800_150q363-chn_rnd_edge_3800_f4z00q2"
+    )
+
+    ports = {port.logical_interface: port for port in hardware.ports}
+    assert hardware.active_serial == "150Q363"
+    assert hardware.standby_serial == "F4Z00Q2"
+    assert ports["GE1"].switch_standby_port is None
+    assert ports["GE2"].switch_standby_port == "gigabitethernet1/12"
+    assert ports["GE3"].switch_standby_port == "gigabitethernet1/13"
+    assert ports["GE4"].switch_standby_port == "gigabitethernet1/14"
+    assert ports["GE5"].switch_standby_port == "gigabitethernet1/15"
 
 
 def test_connected_ports_without_vlans_are_kept_in_inventory(tmp_path):

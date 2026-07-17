@@ -795,10 +795,11 @@ def _resolve_port_assignments(
     reference_interfaces = [
         interface for interface in reference_interfaces if not _is_loopback_interface(interface)
     ]
+    auto_assignable_hardware_ports = [port for port in hardware_ports if not port.manual_mapping_required]
     if not interface_overrides:
-        mapped_count = min(len(reference_interfaces), len(hardware_ports))
+        mapped_count = min(len(reference_interfaces), len(auto_assignable_hardware_ports))
         mapped_interfaces = reference_interfaces[:mapped_count]
-        mapped_ports = _match_ports_to_reference_interfaces(mapped_interfaces, hardware_ports)
+        mapped_ports = _match_ports_to_reference_interfaces(mapped_interfaces, auto_assignable_hardware_ports)
         dropped_interfaces = reference_interfaces[mapped_count:]
         return mapped_interfaces, mapped_ports, dropped_interfaces
 
@@ -810,7 +811,7 @@ def _resolve_port_assignments(
             f"{', '.join(loopback_overrides)}"
         )
 
-    hardware_ports_by_name = {port.logical_interface.upper(): port for port in hardware_ports}
+    hardware_ports_by_name = {port.logical_interface.upper(): port for port in auto_assignable_hardware_ports}
     all_ports_by_name = {port.logical_interface.upper(): port for port in _ordered_ports(hardware)}
     reference_keys = [_reference_interface_key(interface) for interface in reference_interfaces]
     missing_reference = sorted(
@@ -822,20 +823,12 @@ def _resolve_port_assignments(
         )
 
     invalid_hardware = []
-    excluded_hardware = []
     for hardware_key in [override.hardware_interface for override in override_map.values() if override.hardware_interface]:
         if hardware_key not in all_ports_by_name:
             invalid_hardware.append(hardware_key)
-        elif hardware_key not in hardware_ports_by_name:
-            excluded_hardware.append(hardware_key)
     if invalid_hardware:
         raise GenerationError(
             f"Unknown hardware interface override(s): {', '.join(sorted(invalid_hardware))}"
-        )
-    if excluded_hardware:
-        raise GenerationError(
-            "Hardware interface override(s) lack VLAN metadata and cannot be used in generated topology: "
-            f"{', '.join(sorted(excluded_hardware))}"
         )
 
     explicit_pairs: dict[str, EdgePortMapping] = {}
@@ -849,7 +842,7 @@ def _resolve_port_assignments(
         hardware_key = override.hardware_interface
         if hardware_key is None:
             continue
-        explicit_pairs[reference_key] = hardware_ports_by_name[hardware_key]
+        explicit_pairs[reference_key] = all_ports_by_name[hardware_key]
         used_hardware_keys.add(hardware_key)
 
     remaining_interfaces = [
@@ -858,7 +851,7 @@ def _resolve_port_assignments(
         if (reference_key := _reference_interface_key(interface)) and reference_key not in override_map
     ]
     remaining_hardware_ports = [
-        port for port in hardware_ports if port.logical_interface.upper() not in used_hardware_keys
+        port for port in auto_assignable_hardware_ports if port.logical_interface.upper() not in used_hardware_keys
     ]
     auto_count = min(len(remaining_interfaces), len(remaining_hardware_ports))
     auto_interfaces = remaining_interfaces[:auto_count]
@@ -1083,14 +1076,15 @@ def _build_l2_switches(
         switch_name = port.switch_name or default_switch_name
         if switch_name not in interfaces_by_switch:
             switch_name = default_switch_name
-        interfaces_by_switch[switch_name].append(
-            {
-                "name": port.switch_active_port,
-                "link": port.link,
-                "mode": "switched",
-                "vlans": port.switch_vlans,
-            }
-        )
+        if port.switch_active_port:
+            interfaces_by_switch[switch_name].append(
+                {
+                    "name": port.switch_active_port,
+                    "link": port.link,
+                    "mode": "switched",
+                    "vlans": port.switch_vlans,
+                }
+            )
         if hardware.ha and port.switch_standby_port:
             interfaces_by_switch[switch_name].append(
                 {

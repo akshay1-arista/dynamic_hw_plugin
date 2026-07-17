@@ -130,13 +130,14 @@ def _build_plans(
                     f"Run {metadata.run_id} contains an unsupported switch allocation for {port.switch_name}"
                 )
             port_state = _ensure_device_state(device_states, port_switch)
-            _add_edge_port_to_state(
-                port_state,
-                hardware,
-                port,
-                standby=False,
-                generated_switch_links=generated_switch_links,
-            )
+            if port.switch_active_port:
+                _add_edge_port_to_state(
+                    port_state,
+                    hardware,
+                    port,
+                    standby=False,
+                    generated_switch_links=generated_switch_links,
+                )
             if port.switch_standby_port:
                 _add_edge_port_to_state(
                     port_state,
@@ -308,9 +309,9 @@ def _add_access_vlan_state(
 ) -> None:
     if state["family"] != "os9":
         return
-    interface_names = [port.switch_active_port]
-    if port.switch_standby_port:
-        interface_names.append(port.switch_standby_port)
+    interface_names = [name for name in [port.switch_active_port, port.switch_standby_port] if name]
+    if not interface_names:
+        return
 
     if port.tagged_vlans:
         if port.untagged_vlan is not None:

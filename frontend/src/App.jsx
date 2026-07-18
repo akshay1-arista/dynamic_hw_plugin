@@ -211,8 +211,13 @@ export function App() {
     [inventory.hardware, inventoryRefreshStatusByHardwareId]
   );
   const inventoryLabelFilterOptions = useMemo(
-    () => buildInventoryLabelFilterOptions(inventory.hardware, inventoryBadgesByHardwareId),
-    [inventory.hardware, inventoryBadgesByHardwareId]
+    () =>
+      buildInventoryLabelFilterOptions(
+        inventory.hardware,
+        inventoryBadgesByHardwareId,
+        inventoryAvailabilityFilter === 'reserved'
+      ),
+    [inventory.hardware, inventoryAvailabilityFilter, inventoryBadgesByHardwareId]
   );
 
   useEffect(() => {
@@ -1680,11 +1685,19 @@ function buildInventoryBadges(hardware, refreshStatus) {
   return badges.filter(Boolean);
 }
 
-function buildInventoryLabelFilterOptions(hardwareList, badgesByHardwareId) {
+function buildInventoryLabelFilterOptions(hardwareList, badgesByHardwareId, includeReservedByFilters = false) {
   const options = new Map();
   hardwareList.forEach((hardware) => {
     (badgesByHardwareId[hardware.id] || [])
-      .filter((badge) => !['available', 'reserved'].includes(badge.key))
+      .filter((badge) => {
+        if (['available', 'reserved'].includes(badge.key)) {
+          return false;
+        }
+        if (badge.key.startsWith('reserved-by:')) {
+          return includeReservedByFilters;
+        }
+        return true;
+      })
       .forEach((badge) => {
         const existing = options.get(badge.key);
         if (existing) {

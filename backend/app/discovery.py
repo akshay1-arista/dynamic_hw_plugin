@@ -355,8 +355,6 @@ def _discover_lab_navigator_subgraph(
     discovered_connections: list[dict[str, Any]] = []
     stats = RefreshBuildStats()
     unresolved_interfaces: set[str] = set()
-    unsupported_interfaces: set[str] = set()
-    missing_interface_data_interfaces: set[str] = set()
 
     # Phase 1: walk each root edge's wiremap to find edge-access connections and
     # the set of directly connected switches. Issues here are reported as partial failures.
@@ -401,13 +399,11 @@ def _discover_lab_navigator_subgraph(
 
             remote_inventory_device = _wiremap_remote_inventory_device(edge, remote_device, devices, discovered_devices)
             if remote_inventory_device is None:
-                if interface_name:
-                    unsupported_interfaces.add(interface_name)
-                    stats.skipped_unsupported_peer_count += 1
                 _log(
                     logging.INFO,
-                    "Skipping unsupported wiremap peer for inventory_device=%s remote_name=%s remote_device_type=%s remote_model=%s",
+                    "Skipping unsupported wiremap peer for inventory_device=%s interface=%s remote_name=%s remote_device_type=%s remote_model=%s",
                     edge.id,
+                    interface_name or item.get("interface_name"),
                     remote_device.get("name"),
                     remote_device.get("device_type"),
                     _device_model(remote_device),
@@ -431,11 +427,8 @@ def _discover_lab_navigator_subgraph(
                     connection["b"]["interface"],
                 )
             else:
-                if interface_name:
-                    missing_interface_data_interfaces.add(interface_name)
-                    stats.skipped_missing_interface_count += 1
                 _log(
-                    logging.WARNING,
+                    logging.INFO,
                     "Skipped wiremap connection for local_device=%s remote_device=%s due to missing or unsupported interface data",
                     edge.id,
                     remote_inventory_device.id,
@@ -509,14 +502,10 @@ def _discover_lab_navigator_subgraph(
 
     labels: list[str] = []
     if unresolved_interfaces:
+        # Only named devices that LN couldn't find at all are a real gap.
+        # Unsupported peer types (other edges, WAN peers) and missing interface
+        # data are expected for WAN/SFP ports and are not surfaced as warnings.
         labels.append(f"unresolved interfaces: {', '.join(sorted(unresolved_interfaces, key=_refresh_issue_sort_key))}")
-    if unsupported_interfaces:
-        labels.append(f"unsupported peers on: {', '.join(sorted(unsupported_interfaces, key=_refresh_issue_sort_key))}")
-    if missing_interface_data_interfaces:
-        labels.append(
-            "incomplete interface data on: "
-            + ", ".join(sorted(missing_interface_data_interfaces, key=_refresh_issue_sort_key))
-        )
     stats.target_statuses.append(
         InventoryRefreshTargetStatus(
             hardware_id=hardware_id,

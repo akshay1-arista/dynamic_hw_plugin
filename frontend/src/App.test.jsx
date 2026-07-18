@@ -963,6 +963,27 @@ describe('App', () => {
     expect(within(inventoryPanel).queryByText('A01 680 Standalone')).not.toBeInTheDocument();
   });
 
+  test('shows reservation owner label filters only for reserved inventory', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await screen.findAllByText('CHN 3800 HA Pair 8');
+    await chooseHardware(user, '3800', /CHN 3800 HA Pair 8/i);
+    await user.selectOptions(screen.getByLabelText('Branch'), 'branch2');
+    await user.type(screen.getByRole('combobox', { name: 'Hypervisor IP' }), '10.68.136.50');
+    await user.type(screen.getByRole('combobox', { name: 'Hypervisor interface' }), 'vmnic0');
+    await user.click(screen.getByRole('button', { name: /generate zip/i }));
+
+    await screen.findAllByText('By Test User');
+    expect(screen.queryByRole('button', { name: 'By Test User' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Reserved' }));
+    expect(screen.getByRole('button', { name: 'By Test User' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Available' }));
+    expect(screen.queryByRole('button', { name: 'By Test User' })).not.toBeInTheDocument();
+  });
+
   test('refreshes visible inventory hardware from lab navigator', async () => {
     const user = userEvent.setup();
     render(<App />);

@@ -170,7 +170,7 @@ class HardwareEdge(BaseModel):
     vlan_range: Optional[VlanRange] = None
     switch: Optional[SwitchMetadata] = None
     switches: list[SwitchMetadata] = Field(default_factory=list)
-    ports: list[EdgePortMapping]
+    ports: list[EdgePortMapping] = Field(default_factory=list)
     allocations: list[HardwareAllocation] = Field(default_factory=list)
     path: Optional[HardwarePathSummary] = None
     path_complete: bool = False
@@ -180,19 +180,10 @@ class HardwareEdge(BaseModel):
     reservation: Optional[HardwareReservation] = None
     notes: Optional[str] = None
 
-    @field_validator("ports")
-    @classmethod
-    def require_ports(cls, value: list[EdgePortMapping]) -> list[EdgePortMapping]:
-        if not value:
-            raise ValueError("hardware entry must define at least one port mapping")
-        return value
-
     @model_validator(mode="after")
     def validate_ha_serials(self) -> "HardwareEdge":
         if self.ha and not self.standby_serial:
             raise ValueError("HA hardware requires standby_serial")
-        if not self.switch and not self.switches:
-            raise ValueError("hardware entry must define switch or switches")
         return self
 
 

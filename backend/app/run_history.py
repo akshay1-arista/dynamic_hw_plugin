@@ -241,7 +241,11 @@ def _attach_saved_hardware_snapshots(
 
     hydrated_mappings: list[MappingRequest] = []
     for mapping in request.mappings:
-        if mapping.hardware_id in hardware_by_id or mapping.saved_hardware is not None:
+        current_hardware = hardware_by_id.get(mapping.hardware_id)
+        if mapping.saved_hardware is not None:
+            hydrated_mappings.append(mapping)
+            continue
+        if current_hardware is not None and current_hardware.ports:
             hydrated_mappings.append(mapping)
             continue
 
@@ -357,7 +361,10 @@ def _build_saved_hardware_snapshot(
     if not switches or not ports:
         return None
 
-    notes = "Recovered from saved run metadata because the current inventory no longer derives this hardware entry."
+    notes = (
+        "Recovered from saved run metadata because the current inventory could not provide usable "
+        "switch connection data for this hardware."
+    )
     if active.notes:
         notes = f"{notes} {active.notes}"
 

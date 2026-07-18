@@ -244,6 +244,46 @@ def test_build_inventory_keeps_asymmetric_ha_ports_for_manual_mapping():
     assert "standby-member switch connection" in ports["GE2"].port_warning
 
 
+def test_build_inventory_keeps_unconnected_edge_group_visible():
+    inventory = build_inventory(
+        {
+            "edge-active": {
+                "id": "edge-active",
+                "type": "edge",
+                "display_name": "Edge Active",
+                "model": "edge710",
+                "model_suffix": "710",
+                "serial_number": "ACTIVE1",
+                "ha_group_id": "edge-ha",
+                "ha_role": "active",
+                "free_vlans": [101, 102],
+            },
+            "edge-standby": {
+                "id": "edge-standby",
+                "type": "edge",
+                "display_name": "Edge Standby",
+                "model": "edge710",
+                "model_suffix": "710",
+                "serial_number": "STANDBY1",
+                "ha_group_id": "edge-ha",
+                "ha_role": "standby",
+                "free_vlans": [101, 102],
+            },
+        },
+        [],
+    )
+
+    assert len(inventory.hardware) == 1
+    hardware = inventory.hardware[0]
+    assert hardware.id == "edge-ha"
+    assert hardware.ha is True
+    assert hardware.active_serial == "ACTIVE1"
+    assert hardware.standby_serial == "STANDBY1"
+    assert hardware.switch is None
+    assert hardware.switches == []
+    assert hardware.ports == []
+
+
 def test_reserve_generated_hardware_and_release_round_trip(tmp_path):
     inventory_path = tmp_path / "inventory.json"
     inventory_path.write_text(

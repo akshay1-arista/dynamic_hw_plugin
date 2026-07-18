@@ -104,7 +104,8 @@ def generate_topology(
                     level="warning",
                     message=(
                         f"Using saved hardware snapshot for {hardware.display_name} because the current inventory "
-                        "no longer derives this hardware entry. Stored port mappings and VLAN assignments were reused."
+                        "could not provide usable switch connection data. Stored port mappings and VLAN assignments "
+                        "were reused."
                     ),
                 )
             )
@@ -292,13 +293,17 @@ def _merge_saved_hardware_snapshots(
 ) -> set[str]:
     recovered_hardware_ids: set[str] = set()
     for mapping in mappings:
-        if mapping.hardware_id in hardware_by_id or mapping.saved_hardware is None:
+        if mapping.saved_hardware is None:
             continue
         if mapping.saved_hardware.id != mapping.hardware_id:
             raise GenerationError(
                 f"Saved hardware snapshot id mismatch for {mapping.branch_name}/{mapping.edge_name}: "
                 f"{mapping.saved_hardware.id} != {mapping.hardware_id}"
             )
+        current_hardware = hardware_by_id.get(mapping.hardware_id)
+        if current_hardware is not None:
+            if _topology_ports(current_hardware) or not _topology_ports(mapping.saved_hardware):
+                continue
         hardware_by_id[mapping.hardware_id] = mapping.saved_hardware
         recovered_hardware_ids.add(mapping.hardware_id)
     return recovered_hardware_ids

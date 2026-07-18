@@ -7,9 +7,20 @@ from app.run_history import load_saved_run
 MISSING_HARDWARE_ID = "ln-ha-a02-314-236254370-a02-315-236254372"
 
 
-def test_load_saved_run_attaches_saved_hardware_snapshot_for_missing_derived_inventory(tmp_path):
+def test_load_saved_run_attaches_saved_hardware_snapshot_when_inventory_has_no_connections(tmp_path):
     inventory_path = tmp_path / "inventory.json"
-    inventory_path.write_text(INVENTORY_PATH.read_text())
+    inventory = json.loads(INVENTORY_PATH.read_text())
+    member_ids = {
+        device_id
+        for device_id, device in inventory["devices"].items()
+        if device.get("type") == "edge" and (device.get("ha_group_id") or device_id) == MISSING_HARDWARE_ID
+    }
+    inventory["connections"] = [
+        connection
+        for connection in inventory["connections"]
+        if connection["a"]["device_id"] not in member_ids and connection["b"]["device_id"] not in member_ids
+    ]
+    inventory_path.write_text(json.dumps(inventory))
     outputs_root = tmp_path / "outputs"
     run_root = outputs_root / "run123-saved01"
     topology_path = run_root / "saved-topology-saved01"

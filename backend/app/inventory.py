@@ -448,11 +448,7 @@ def _derive_hardware(
             standby = None
 
         ports = _derive_ports(active, standby, devices, connections, group_id)
-        if not ports:
-            continue
         switches = _derive_switches(ports, devices)
-        if not switches:
-            continue
 
         vlan_range = active.vlan_range or _range_from_pool(active.free_vlans)
         free_vlans = _vlan_pool(active)
@@ -475,7 +471,7 @@ def _derive_hardware(
                 "standby_serial": standby.serial_number if standby else None,
                 "free_vlans": free_vlans,
                 "vlan_range": vlan_range,
-                "switch": switches[0],
+                "switch": switches[0] if switches else None,
                 "switches": switches,
                 "ports": ports,
                 "allocations": [],

@@ -15,7 +15,7 @@ from app.generator import (
     generate_topology,
 )
 from app.config import INVENTORY_PATH
-from app.inventory import build_inventory, resolve_mapping_path
+from app.inventory import build_inventory, load_inventory, resolve_mapping_path
 from app.models import GenerateRequest, HardwareEdge, InterfaceOverride, InventoryFile
 
 DEFAULT_3800_HARDWARE_ID = "ln-ha-a01-327-dgd10q2-a01-328-16c10q2"
@@ -61,13 +61,29 @@ def copy_inventory(tmp_path):
     return inventory_path
 
 
+def strip_hardware_connections(inventory_path, hardware_id):
+    inventory = json.loads(inventory_path.read_text())
+    member_ids = {
+        device_id
+        for device_id, device in inventory["devices"].items()
+        if device.get("type") == "edge" and (device.get("ha_group_id") or device_id) == hardware_id
+    }
+    inventory["connections"] = [
+        connection
+        for connection in inventory["connections"]
+        if connection["a"]["device_id"] not in member_ids and connection["b"]["device_id"] not in member_ids
+    ]
+    inventory_path.write_text(json.dumps(inventory))
+    return inventory_path
+
+
 def build_standalone_inventory(tmp_path):
     with INVENTORY_PATH.open() as fh:
         inventory = json.load(fh)
 
-    source_active_id = f"{STANDALONE_SOURCE_HARDWARE_ID}-active"
-    source_standby_id = f"{STANDALONE_SOURCE_HARDWARE_ID}-standby"
-    standalone_id = "test-standalone-710"
+    source_active_id = f"{DEFAULT_3800_HARDWARE_ID}-active"
+    source_standby_id = f"{DEFAULT_3800_HARDWARE_ID}-standby"
+    standalone_id = "test-standalone-3800"
 
     source_active = inventory["devices"][source_active_id]
     inventory["devices"].pop(source_active_id)
@@ -165,8 +181,13 @@ def test_generated_json_files_parse(tmp_path):
             json.load(fh)
 
 
-def test_generate_uses_saved_hardware_snapshot_when_inventory_no_longer_derives_hardware(tmp_path):
+def test_generate_uses_saved_hardware_snapshot_when_inventory_has_no_imported_switch_connections(tmp_path):
     inventory_path = copy_inventory(tmp_path)
+    strip_hardware_connections(inventory_path, STANDALONE_SOURCE_HARDWARE_ID)
+    inventory = load_inventory(inventory_path)
+    current_hardware = next(item for item in inventory.hardware if item.id == STANDALONE_SOURCE_HARDWARE_ID)
+    assert current_hardware.ports == []
+
     request = GenerateRequest.model_validate(
         {
             "topology_name": "saved-snapshot-710",
@@ -1347,7 +1368,7 @@ def test_generate_resolves_switch_config_path_from_generation_hypervisor_ip(tmp_
         [
             {
                 "id": "b2e1-upstream",
-                "a": {"device_id": "b2e1_l2_switch", "interface": "Te1/51"},
+                "a": {"device_id": "chn_rnd_sw_3048_j8f10q2", "interface": "Te1/51"},
                 "b": {"device_id": "upstream_switch", "interface": "Te1/43"},
                 "role": "switch-uplink",
             },
@@ -1374,13 +1395,13 @@ def test_generate_resolves_switch_config_path_from_generation_hypervisor_ip(tmp_
     config = load_config(result)
     branch = next(item for item in config["topology"]["branches"] if item["name"] == "branch2")
     edge = branch["edges"][0]
-    assert edge["l2_switches"][0]["interfaces"][-1]["name"] == "tengigabitethernet1/51"
+    assert edge["l2_switches"][0]["interfaces"][-1]["name"] == "Te1/51"
     assert edge["l2_switches"][0]["interfaces"][-1]["link"] == "vmnic0"
     metadata_path = Path(result.topology_path).parent / "run_metadata.json"
     metadata = json.loads(metadata_path.read_text())
     assert metadata["mappings"][0]["path"]["access_switch_id"] == "chn_rnd_sw_3048_j8f10q2"
     assert metadata["mappings"][0]["path"]["hypervisor_ip"] == "10.68.136.221"
-    assert metadata["mappings"][0]["path"]["upstream_hypervisor_port"] == "tengigabitethernet1/10"
+    assert metadata["mappings"][0]["path"]["upstream_hypervisor_port"] == "Te1/10"
 
 
 def test_resolve_mapping_path_uses_hypervisor_interface_to_disambiguate_links():
@@ -1537,11 +1558,11 @@ def test_standalone_hardware_on_ha_reference_warns_and_drops_extra_interfaces(tm
 
     assert edge["ha_enabled"] is False
     assert "standby_slno" not in edge
-    assert len(edge["interfaces"]) == 6
+    assert len(edge["interfaces"]) == 8
     assert any(interface.get("type") == "loopback" for interface in edge["interfaces"])
     assert any("converts it to standalone" in message for message in messages)
     assert any("reference edge has 8 physical interface(s)" in message for message in messages)
-    assert any("Dropped 3 unassigned reference interface" in message for message in messages)
+    assert any("Dropped 1 unassigned reference interface" in message for message in messages)
 
 
 def test_duplicate_hardware_mapping_rejected():

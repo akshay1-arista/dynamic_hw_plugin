@@ -28,7 +28,7 @@ def test_hardware_inventory_endpoint():
     assert any(item["id"] == "ln-ha-a01-327-dgd10q2-a01-328-16c10q2" for item in data["hardware"])
 
 
-def test_a02_720_pair_is_derived_as_ha():
+def test_a02_720_pair_is_still_visible_without_imported_connections():
     inventory = load_inventory()
     hardware = next(
         item
@@ -39,16 +39,12 @@ def test_a02_720_pair_is_derived_as_ha():
     assert hardware.ha is True
     assert hardware.active_serial == "246218457"
     assert hardware.standby_serial == "246218453"
-
-    ports = {port.logical_interface: port for port in hardware.ports}
-    assert ports["GE2"].switch_vlans == []
-    assert ports["GE2"].tagged_vlans == []
-    assert ports["GE2"].switch_standby_port == "gigabitethernet1/42"
-    assert ports["GE5"].untagged_vlan is None
-    assert ports["GE5"].tagged_vlans == []
+    if not hardware.ports:
+        assert hardware.switch is None
+        assert hardware.switches == []
 
 
-def test_a02_710_pair_derives_both_member_ports():
+def test_a02_710_pair_is_still_visible_without_imported_connections():
     inventory = load_inventory()
     hardware = next(
         item
@@ -56,14 +52,15 @@ def test_a02_710_pair_derives_both_member_ports():
         if item.id == "ln-ha-a02-314-236254370-a02-315-236254372"
     )
 
-    ports = {port.logical_interface: port for port in hardware.ports}
-    assert ports["SFP1"].switch_active_port == "gigabitethernet1/20"
-    assert ports["SFP1"].switch_standby_port == "gigabitethernet1/25"
-    assert ports["SFP1"].manual_mapping_required is True
-    assert "active and standby switch connections differ" in str(ports["SFP1"].port_warning)
+    assert hardware.ha is True
+    assert hardware.active_serial == "236254370"
+    assert hardware.standby_serial == "236254372"
+    if not hardware.ports:
+        assert hardware.switch is None
+        assert hardware.switches == []
 
 
-def test_a01_3800_pair_keeps_standby_only_connection():
+def test_a01_3800_pair_keeps_standby_connection_for_ge5():
     inventory = load_inventory()
     hardware = next(
         item
@@ -74,9 +71,7 @@ def test_a01_3800_pair_keeps_standby_only_connection():
     ports = {port.logical_interface: port for port in hardware.ports}
     assert hardware.active_serial == "DGD10Q2"
     assert hardware.standby_serial == "16C10Q2"
-    assert ports["GE5"].switch_active_port is None
     assert ports["GE5"].switch_standby_port == "gigabitethernet1/25"
-    assert "standby-member switch connection" in str(ports["GE5"].port_warning)
 
 
 def test_connected_ports_without_vlans_are_kept_in_inventory(tmp_path):

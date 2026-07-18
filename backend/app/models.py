@@ -426,6 +426,7 @@ class InventoryRefreshSummary(BaseModel):
     change_count: int = 0
     discovered_connection_count: int = 0
     preserved_connection_count: int = 0
+    skipped_conflicting_endpoint_count: int = 0
     skipped_unresolved_remote_count: int = 0
     skipped_unsupported_peer_count: int = 0
     skipped_missing_interface_count: int = 0

@@ -62,6 +62,7 @@ class RefreshBuildStats:
     refreshed_device_ids: set[str] = field(default_factory=set)
     requested_edge_ids: set[str] = field(default_factory=set)
     preserved_connection_count: int = 0
+    skipped_conflicting_endpoint_count: int = 0
     skipped_unresolved_remote_count: int = 0
     skipped_unsupported_peer_count: int = 0
     skipped_missing_interface_count: int = 0
@@ -72,6 +73,7 @@ class RefreshBuildStats:
         self.refreshed_device_ids.update(other.refreshed_device_ids)
         self.requested_edge_ids.update(other.requested_edge_ids)
         self.preserved_connection_count += other.preserved_connection_count
+        self.skipped_conflicting_endpoint_count += other.skipped_conflicting_endpoint_count
         self.skipped_unresolved_remote_count += other.skipped_unresolved_remote_count
         self.skipped_unsupported_peer_count += other.skipped_unsupported_peer_count
         self.skipped_missing_interface_count += other.skipped_missing_interface_count
@@ -86,6 +88,7 @@ class RefreshBuildStats:
         return any(
             (
                 self.preserved_connection_count,
+                self.skipped_conflicting_endpoint_count,
                 self.skipped_unresolved_remote_count,
                 self.skipped_unsupported_peer_count,
                 self.skipped_missing_interface_count,
@@ -176,7 +179,8 @@ def preview_inventory_refresh(
         _log(
             logging.INFO,
             "Inventory refresh preview completed for hardware_ids=%s changes=%d devices=%d connections=%d partial=%s "
-            "discovered_connections=%d preserved_connections=%d skipped_unresolved=%d skipped_unsupported=%d skipped_missing_interface=%d",
+            "discovered_connections=%d preserved_connections=%d skipped_conflicting=%d skipped_unresolved=%d "
+            "skipped_unsupported=%d skipped_missing_interface=%d",
             request.hardware_ids,
             len(changes),
             len(proposed.devices),
@@ -184,6 +188,7 @@ def preview_inventory_refresh(
             summary.status == "partial",
             summary.discovered_connection_count,
             summary.preserved_connection_count,
+            summary.skipped_conflicting_endpoint_count,
             summary.skipped_unresolved_remote_count,
             summary.skipped_unsupported_peer_count,
             summary.skipped_missing_interface_count,
@@ -262,6 +267,7 @@ def _build_refreshed_inventory(
         members = _hardware_members(devices, hardware_id)
         if not members:
             raise DiscoveryError(f"{hardware_id} is missing edge devices in inventory")
+        requested_edge_ids = {member.id for member in members}
         stats.requested_edge_ids.update(member.id for member in members)
         hardware_display_name = (
             hardware_by_id[hardware_id].display_name
@@ -302,14 +308,35 @@ def _build_refreshed_inventory(
             refresh_stats.skipped_unsupported_peer_count,
             refresh_stats.skipped_missing_interface_count,
         )
+        target_status = next(
+            (target for target in refresh_stats.target_statuses if target.hardware_id == hardware_id),
+            None,
+        )
+        conflicting_interfaces: set[str] = set()
         for device in refreshed_devices.values():
             _merge_device(devices, device)
         for connection in refreshed_connections:
             if _is_lab_navigator_wiremap_connection(connection):
+                if _find_unrelated_wiremap_endpoint_conflict(
+                    connections,
+                    connection,
+                    requested_edge_ids=requested_edge_ids,
+                ):
+                    stats.skipped_conflicting_endpoint_count += 1
+                    conflict_interface = _requested_edge_interface(connection, requested_edge_ids)
+                    if conflict_interface:
+                        conflicting_interfaces.add(conflict_interface)
+                    continue
                 _prune_conflicting_wiremap_connections(connections, connection)
             _merge_connection(connections, connection)
             if _is_lab_navigator_wiremap_connection(connection):
                 stats.discovered_connection_signatures.add(_connection_signature(connection))
+        if target_status and conflicting_interfaces:
+            target_status.status = "partial"
+            target_status.labels.append(
+                "conflicting switch ports preserved for other inventory hardware: "
+                + ", ".join(sorted(conflicting_interfaces, key=_refresh_issue_sort_key))
+            )
 
     proposed = build_inventory(devices, connections)
     stats.preserved_connection_count = _count_preserved_wiremap_connections(
@@ -733,6 +760,38 @@ def _prune_conflicting_wiremap_connections(
     connections[:] = retained
 
 
+def _find_unrelated_wiremap_endpoint_conflict(
+    connections: list[dict[str, Any]],
+    discovered_connection: dict[str, Any],
+    *,
+    requested_edge_ids: set[str],
+) -> dict[str, Any] | None:
+    discovered_endpoints = _connection_endpoint_set(discovered_connection)
+    if not discovered_endpoints:
+        return None
+
+    for existing in connections:
+        if not _is_lab_navigator_wiremap_connection(existing):
+            continue
+        if existing.get("id") == discovered_connection.get("id"):
+            continue
+        if not discovered_endpoints & _connection_endpoint_set(existing):
+            continue
+        if _connection_touches_requested_edges(existing, requested_edge_ids):
+            continue
+        return existing
+    return None
+
+
+def _requested_edge_interface(connection: dict[str, Any], requested_edge_ids: set[str]) -> str | None:
+    for endpoint_name in ("a", "b"):
+        endpoint = connection.get(endpoint_name, {})
+        if endpoint.get("device_id") in requested_edge_ids:
+            interface_name = str(endpoint.get("interface") or "").strip().upper()
+            return interface_name or None
+    return None
+
+
 def _existing_inventory_device(
     devices: dict[str, dict[str, Any]],
     device_id: str,
@@ -814,11 +873,16 @@ def _build_refresh_summary(
 ) -> InventoryRefreshSummary:
     partial_targets = [target for target in stats.target_statuses if target.status == "partial"]
     return InventoryRefreshSummary(
-        status="partial" if partial_targets or stats.preserved_connection_count else "success",
+        status=(
+            "partial"
+            if partial_targets or stats.preserved_connection_count or stats.skipped_conflicting_endpoint_count
+            else "success"
+        ),
         requested_hardware_count=len(hardware_ids),
         change_count=len(changes),
         discovered_connection_count=stats.discovered_connection_count,
         preserved_connection_count=stats.preserved_connection_count,
+        skipped_conflicting_endpoint_count=stats.skipped_conflicting_endpoint_count,
         skipped_unresolved_remote_count=stats.skipped_unresolved_remote_count,
         skipped_unsupported_peer_count=stats.skipped_unsupported_peer_count,
         skipped_missing_interface_count=stats.skipped_missing_interface_count,
@@ -846,6 +910,13 @@ def _build_refresh_messages(
             ValidationMessage(
                 level="warning",
                 message="Kept existing Lab Navigator connections where rediscovery did not return a replacement.",
+            )
+        )
+    if summary.skipped_conflicting_endpoint_count:
+        messages.append(
+            ValidationMessage(
+                level="warning",
+                message="Preserved existing inventory links where Lab Navigator reported overlapping switch ports.",
             )
         )
     return messages

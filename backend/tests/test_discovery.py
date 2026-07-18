@@ -682,6 +682,156 @@ def test_inventory_refresh_apply_keeps_multiple_hidden_groups_that_share_switche
     assert ports_by_hardware["edge-2"]["GE1"].switch_active_port == "gigabitethernet1/20"
 
 
+def test_inventory_refresh_apply_preserves_unrelated_hardware_when_wiremap_ports_overlap(tmp_path):
+    class OverlappingPortsStubClient:
+        def close(self):
+            return None
+
+        def get_wiremap(self, device_id):
+            if device_id == 201:
+                return {
+                    "connections": [
+                        {
+                            "interface_name": "GE1",
+                            "remote_device": {
+                                "id": 11,
+                                "name": "access-sw",
+                                "ip_address": "10.0.0.10",
+                                "device_type": "switch",
+                                "device_model": "Dell-3048",
+                            },
+                            "remote_interface_name": "Gi1/20",
+                        }
+                    ]
+                }
+            if device_id == 202:
+                return {
+                    "connections": [
+                        {
+                            "interface_name": "GE1",
+                            "remote_device": {
+                                "id": 11,
+                                "name": "access-sw",
+                                "ip_address": "10.0.0.10",
+                                "device_type": "switch",
+                                "device_model": "Dell-3048",
+                            },
+                            "remote_interface_name": "Gi1/21",
+                        }
+                    ]
+                }
+            return {"connections": []}
+
+    inventory_path = tmp_path / "inventory.json"
+    inventory_path.write_text(
+        json.dumps(
+            {
+                "devices": {
+                    "edge-a-active": {
+                        "id": "edge-a-active",
+                        "type": "edge",
+                        "display_name": "Edge A Active",
+                        "model": "edge6X0",
+                        "model_suffix": "680",
+                        "serial_number": "A1",
+                        "lab_navigator_id": 101,
+                        "ha_group_id": "edge-a",
+                        "ha_role": "active",
+                    },
+                    "edge-a-standby": {
+                        "id": "edge-a-standby",
+                        "type": "edge",
+                        "display_name": "Edge A Standby",
+                        "model": "edge6X0",
+                        "model_suffix": "680",
+                        "serial_number": "A2",
+                        "lab_navigator_id": 102,
+                        "ha_group_id": "edge-a",
+                        "ha_role": "standby",
+                    },
+                    "edge-b-active": {
+                        "id": "edge-b-active",
+                        "type": "edge",
+                        "display_name": "Edge B Active",
+                        "model": "edge6X0",
+                        "model_suffix": "680",
+                        "serial_number": "B1",
+                        "lab_navigator_id": 201,
+                        "ha_group_id": "edge-b",
+                        "ha_role": "active",
+                    },
+                    "edge-b-standby": {
+                        "id": "edge-b-standby",
+                        "type": "edge",
+                        "display_name": "Edge B Standby",
+                        "model": "edge6X0",
+                        "model_suffix": "680",
+                        "serial_number": "B2",
+                        "lab_navigator_id": 202,
+                        "ha_group_id": "edge-b",
+                        "ha_role": "standby",
+                    },
+                    "access_sw": {
+                        "id": "access_sw",
+                        "type": "switch",
+                        "display_name": "access-sw",
+                        "model": "Dell-3048",
+                        "ip_address": "10.0.0.10",
+                        "switch_metadata": {
+                            "name": "access-sw",
+                            "model": "Dell-3048",
+                            "connections": {"ip": "10.0.0.10", "port": None},
+                            "credentials": {"username": "velocloud", "password": "N#1sdwan"},
+                        },
+                    },
+                },
+                "connections": [
+                    {
+                        "id": "edge-a-active-ge1",
+                        "a": {"device_id": "edge-a-active", "interface": "GE1"},
+                        "b": {"device_id": "access_sw", "interface": "gigabitethernet1/10"},
+                        "role": "edge-access",
+                        "notes": "Imported from Lab Navigator wiremap.",
+                    },
+                    {
+                        "id": "edge-a-standby-ge1",
+                        "a": {"device_id": "edge-a-standby", "interface": "GE1"},
+                        "b": {"device_id": "access_sw", "interface": "gigabitethernet1/20"},
+                        "role": "edge-access",
+                        "notes": "Imported from Lab Navigator wiremap.",
+                    },
+                ],
+            }
+        )
+    )
+
+    result = apply_inventory_refresh(
+        InventoryRefreshRequest(hardware_ids=["edge-b"]),
+        inventory_path=inventory_path,
+        client=OverlappingPortsStubClient(),
+    )
+
+    hardware_by_id = {item.id: item for item in result.inventory.hardware}
+    ports_a = {port.logical_interface: port for port in hardware_by_id["edge-a"].ports}
+    ports_b = {port.logical_interface: port for port in hardware_by_id["edge-b"].ports}
+
+    assert ports_a["GE1"].switch_active_port == "gigabitethernet1/10"
+    assert ports_a["GE1"].switch_standby_port == "gigabitethernet1/20"
+    assert ports_b["GE1"].switch_active_port is None
+    assert ports_b["GE1"].switch_standby_port == "gigabitethernet1/21"
+    assert ports_b["GE1"].port_warning == "GE1 has only a standby-member switch connection. Review interface mapping before generation."
+
+    assert result.summary.status == "partial"
+    assert result.summary.skipped_conflicting_endpoint_count == 1
+    assert result.summary.targets[0].hardware_id == "edge-b"
+    assert result.summary.targets[0].status == "partial"
+    assert result.summary.targets[0].labels == [
+        "conflicting switch ports preserved for other inventory hardware: GE1"
+    ]
+    warning_messages = [message.message for message in result.messages if message.level == "warning"]
+    assert "Preserved existing inventory links where Lab Navigator reported overlapping switch ports." in warning_messages
+
+
 def test_lab_navigator_client_allows_anonymous_reads():
     client = LabNavigatorClient(api_key="")
     try:

@@ -447,6 +447,13 @@ button:disabled {
   color: var(--primary-strong);
 }
 
+.compactButton {
+  font-size: 12px;
+  font-weight: 700;
+  min-height: 34px;
+  padding: 7px 11px;
+}
+
 .iconButton {
   aspect-ratio: 1;
   background: #ffffff;
@@ -694,22 +701,51 @@ button:disabled {
 .quickFilterRow {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin: -2px 0 14px;
+  gap: 7px;
+}
+
+.inventoryFilterGroup {
+  display: grid;
+  gap: 7px;
+  margin: -2px 0 12px;
+}
+
+.inventoryFilterLabel {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 760;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
 
 .quickFilterButton {
-  background: var(--surface-subtle);
+  background: rgba(247, 250, 252, 0.92);
   border: 1px solid var(--border);
+  border-radius: 999px;
+  box-shadow: none;
   color: var(--text-soft);
-  min-height: 34px;
-  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  min-height: 31px;
+  padding: 6px 11px;
 }
 
 .quickFilterButton.active {
   background: var(--primary-soft);
   border-color: #b9ded8;
   color: var(--primary-strong);
+}
+
+.quickFilterChip {
+  gap: 7px;
+}
+
+.quickFilterChip small {
+  color: inherit;
+  font-size: 11px;
+  font-weight: 760;
+  line-height: 1;
+  opacity: 0.78;
 }
 
 .combobox {

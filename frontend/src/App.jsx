@@ -498,8 +498,18 @@ export function App() {
           `Reference edge ${duplicateTarget.branch_name}/${duplicateTarget.edge_name} is already mapped in another row.`
         );
       }
+      const hardwareMissingConnections = mappings.find((mapping) => {
+        const hardware = resolveMappingHardware(mapping, inventory.hardware);
+        return hardware && !hardwareHasConnectionData(hardware);
+      });
       if (!hypervisorIp.trim() || !hypervisorInterface.trim() || missingMapping) {
         throw new Error('Select Hypervisor IP, Hypervisor interface, hardware, branch, and edge before generating.');
+      }
+      if (hardwareMissingConnections) {
+        const hardware = resolveMappingHardware(hardwareMissingConnections, inventory.hardware);
+        throw new Error(
+          `${hardware.display_name} has no imported switch connections in inventory. Refresh it from Lab Navigator before generating.`
+        );
       }
       const payload = {
         topology_name: topologyName,
@@ -931,8 +941,19 @@ export function App() {
                         <StatusBadge tone={hardware.ha ? 'accent' : 'neutral'}>
                           {hardware.ha ? 'HA' : 'Standalone'}
                         </StatusBadge>
+                        {hardwareHasAsymmetricHaLinks(hardware) && (
+                          <StatusBadge tone="warning">Asymmetric HA</StatusBadge>
+                        )}
+                        {!hardwareHasConnectionData(hardware) && (
+                          <StatusBadge tone="warning">No connections</StatusBadge>
+                        )}
                       </span>
-                      <small>{hardware.model} / {hardware.ports.length} switch links</small>
+                      <small>
+                        {hardware.model} /{' '}
+                        {hardwareHasConnectionData(hardware)
+                          ? `${hardware.ports.length} switch links`
+                          : 'no imported switch connections'}
+                      </small>
                     </span>
                     <ChevronDown size={16} aria-hidden="true" />
                   </button>
@@ -1494,6 +1515,36 @@ function formatSwitchSummary(hardware) {
   return `${switches.length} switches`;
 }
 
+function hardwareHasConnectionData(hardware) {
+  return Boolean(hardware?.ports?.length);
+}
+
+function hardwareManualMappingPorts(hardware) {
+  if (!hardware?.ha) {
+    return [];
+  }
+  return topologyHardwarePorts(hardware).filter((port) => port.manual_mapping_required);
+}
+
+function hardwareHasAsymmetricHaLinks(hardware) {
+  return hardwareManualMappingPorts(hardware).length > 0;
+}
+
+function hardwareAsymmetricHaSummary(hardware) {
+  const manualMappingPorts = hardwareManualMappingPorts(hardware);
+  if (!manualMappingPorts.length) {
+    return '';
+  }
+  return `Member-specific HA links on ${manualMappingPorts.map((port) => port.logical_interface).join(', ')}. Review interface mapping before generation.`;
+}
+
+function hardwareConnectionWarning(hardware) {
+  if (hardwareHasConnectionData(hardware)) {
+    return '';
+  }
+  return 'No imported switch connections in inventory. Refresh from Lab Navigator before using this hardware for mapping.';
+}
+
 function loadStoredUser() {
   try {
     const raw = getSafeStorage()?.getItem(userStorageKey);
@@ -1537,10 +1588,12 @@ function savedMappingToEditorState(mapping) {
 }
 
 function resolveMappingHardware(mapping, hardwareOptions) {
-  return (
-    hardwareOptions.find((item) => item.id === mapping.hardware_id) ||
-    (mapping.saved_hardware?.id === mapping.hardware_id ? mapping.saved_hardware : null)
-  );
+  const currentHardware = hardwareOptions.find((item) => item.id === mapping.hardware_id) || null;
+  const savedHardware = mapping.saved_hardware?.id === mapping.hardware_id ? mapping.saved_hardware : null;
+  if (currentHardware && (!hardwareHasConnectionData(currentHardware) && hardwareHasConnectionData(savedHardware))) {
+    return savedHardware;
+  }
+  return currentHardware || savedHardware;
 }
 
 function formatAuditAction(action) {
@@ -1602,6 +1655,7 @@ function hardwareSearchText(hardware) {
     hardware.model_suffix,
     hardware.active_serial,
     hardware.standby_serial,
+    hardwareConnectionWarning(hardware),
     hardware.reservation?.actor?.name,
     hardware.reservation?.actor?.email,
     hardware.notes,
@@ -1770,10 +1824,12 @@ function editorTextToCommands(value) {
 function hardwareOptionLabel(hardware) {
   const prefix = hardware.short_name ? `${hardware.short_name} - ` : '';
   const state = hardware.ha ? 'HA' : 'standalone';
+  const asymmetry = hardwareHasAsymmetricHaLinks(hardware) ? ', asymmetric HA links' : '';
+  const connectivity = hardwareHasConnectionData(hardware) ? 'connected' : 'missing imported connections';
   const reservation = hardware.available
     ? 'available'
     : `reserved by ${hardware.reservation?.actor?.name || 'unknown user'}`;
-  return `${prefix}${hardware.display_name} (${hardware.model}, ${state}, ${reservation})`;
+  return `${prefix}${hardware.display_name} (${hardware.model}, ${state}${asymmetry}, ${connectivity}, ${reservation})`;
 }
 
 function getReferenceInterfaceKey(interfaceSummary) {
@@ -2219,8 +2275,22 @@ function interfaceAssignmentsEqual(left, right) {
 
 function HardwareDetails({ hardware, refreshing, onVlanRangeChange, onRefresh }) {
   const switches = hardware.switches?.length ? hardware.switches : hardware.switch ? [hardware.switch] : [];
+  const connectionWarning = hardwareConnectionWarning(hardware);
+  const asymmetricHaSummary = hardwareAsymmetricHaSummary(hardware);
   return (
     <div className="hardwareDetails">
+      {connectionWarning && (
+        <div className="mappingCaveat">
+          <TriangleAlert size={16} aria-hidden="true" />
+          {connectionWarning}
+        </div>
+      )}
+      {asymmetricHaSummary && (
+        <div className="mappingCaveat">
+          <TriangleAlert size={16} aria-hidden="true" />
+          {asymmetricHaSummary}
+        </div>
+      )}
       <div className="detailGrid">
         <span>
           <small>Active serial</small>
@@ -2272,20 +2342,28 @@ function HardwareDetails({ hardware, refreshing, onVlanRangeChange, onRefresh })
       </div>
 
       <div className="switchList">
-        {switches.map((item) => (
-          <small key={item.name}>
-            {item.name} / {item.model} / {item.connections?.ip || 'no ip'}
-          </small>
-        ))}
+        {switches.length ? (
+          switches.map((item) => (
+            <small key={item.name}>
+              {item.name} / {item.model} / {item.connections?.ip || 'no ip'}
+            </small>
+          ))
+        ) : (
+          <small>No imported switch metadata yet.</small>
+        )}
       </div>
 
       <div className="portList">
-        {hardware.ports.map((port) => (
-          <small key={`${port.logical_name}-${port.switch_active_port || port.switch_standby_port || 'none'}`}>
-            {port.logical_name} {port.logical_interface}: {hardwarePortConnectionSummary(port)} /{' '}
-            {port.switch_vlans?.length ? `VLANs ${port.switch_vlans.join(', ')}` : 'dynamic VLAN allocation'}
-          </small>
-        ))}
+        {hardware.ports.length ? (
+          hardware.ports.map((port) => (
+            <small key={`${port.logical_name}-${port.switch_active_port || port.switch_standby_port || 'none'}`}>
+              {port.logical_name} {port.logical_interface}: {hardwarePortConnectionSummary(port)} /{' '}
+              {port.switch_vlans?.length ? `VLANs ${port.switch_vlans.join(', ')}` : 'dynamic VLAN allocation'}
+            </small>
+          ))
+        ) : (
+          <small>No imported edge-to-switch links yet.</small>
+        )}
       </div>
 
       {hardware.path && (
@@ -2663,12 +2741,16 @@ function HardwareCombobox({ index, hardwareOptions, selectedHardwareId, selected
 function MappingRow({ index, mapping, mappings, reference, inventory, onChange, onRemove, canRemove }) {
   const [interfaceOverridesOpen, setInterfaceOverridesOpen] = useState(false);
   const branch = reference?.branches.find((item) => item.name === mapping.branch_name);
+  const currentInventoryHardware =
+    inventory.hardware.find((item) => item.id === mapping.hardware_id) || null;
   const selectedHardware = resolveMappingHardware(mapping, inventory.hardware);
   const selectedEdge = branch?.edges.find((edge) => edge.name === mapping.edge_name);
   const usingSavedHardwareSnapshot =
     Boolean(selectedHardware) &&
-    !inventory.hardware.some((item) => item.id === mapping.hardware_id) &&
-    mapping.saved_hardware?.id === mapping.hardware_id;
+    mapping.saved_hardware?.id === mapping.hardware_id &&
+    (!currentInventoryHardware || !hardwareHasConnectionData(currentInventoryHardware)) &&
+    hardwareHasConnectionData(mapping.saved_hardware);
+  const missingConnectionData = Boolean(selectedHardware && !hardwareHasConnectionData(selectedHardware));
   const haMismatch = selectedHardware && selectedEdge?.ha_enabled && !selectedHardware.ha;
   const usedEdgeNames = useMemo(
     () =>
@@ -2690,8 +2772,8 @@ function MappingRow({ index, mapping, mappings, reference, inventory, onChange, 
   );
   const hardwarePorts = useMemo(() => topologyHardwarePorts(selectedHardware), [selectedHardware]);
   const manualMappingPorts = useMemo(
-    () => (selectedHardware?.ha ? hardwarePorts.filter((port) => port.manual_mapping_required) : []),
-    [hardwarePorts, selectedHardware]
+    () => hardwareManualMappingPorts(selectedHardware),
+    [selectedHardware]
   );
   const manualMappingPortSummary = useMemo(
     () =>
@@ -2830,7 +2912,7 @@ function MappingRow({ index, mapping, mappings, reference, inventory, onChange, 
       >
         <Trash2 size={16} />
       </button>
-      {selectedHardware && selectedEdge && referenceInterfaces.length > 0 && (
+      {selectedHardware && selectedEdge && referenceInterfaces.length > 0 && hardwarePorts.length > 0 && (
         <div className="interfaceOverrideCard">
           <button
             type="button"
@@ -2943,10 +3025,16 @@ function MappingRow({ index, mapping, mappings, reference, inventory, onChange, 
           Reference edge is HA enabled, but selected hardware is standalone. Generation will convert this branch edge to standalone.
         </div>
       )}
+      {missingConnectionData && (
+        <div className="mappingCaveat">
+          <TriangleAlert size={16} aria-hidden="true" />
+          {hardwareConnectionWarning(selectedHardware)}
+        </div>
+      )}
       {usingSavedHardwareSnapshot && (
         <div className="mappingCaveat">
           <TriangleAlert size={16} aria-hidden="true" />
-          Current inventory no longer derives this hardware entry. Regeneration will reuse the saved run&apos;s hardware snapshot and stored switch mappings.
+          Current inventory cannot provide usable switch connection data for this hardware. Regeneration will reuse the saved run&apos;s hardware snapshot and stored switch mappings.
         </div>
       )}
       {!haMismatch && manualMappingPorts.length > 0 && (

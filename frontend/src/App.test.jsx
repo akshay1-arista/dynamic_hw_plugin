@@ -288,6 +288,20 @@ const inventory = {
         }
       ],
       notes: 'dynamic internet ports'
+    },
+    {
+      id: 'hidden-ha-pair',
+      short_name: 'hidden-ha-pair',
+      display_name: 'Hidden HA Pair',
+      model: 'edge7X0',
+      model_suffix: '740',
+      ha: true,
+      active_serial: 'HIDDEN1',
+      standby_serial: 'HIDDEN2',
+      available: true,
+      switches: [],
+      ports: [],
+      notes: 'missing imported switch connections'
     }
   ]
 };
@@ -1323,6 +1337,60 @@ describe('App', () => {
     await user.selectOptions(screen.getByLabelText('Branch'), 'branch2');
 
     expect(screen.getByText(/Reference edge is HA enabled, but selected hardware is standalone/i)).toBeInTheDocument();
+  });
+
+  test('shows unconnected hardware in inventory and warns in its details', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await screen.findAllByText('Hidden HA Pair');
+    expect(screen.getByText('No connections')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /hidden-ha-pair/i }));
+
+    expect(
+      screen.getByText(/No imported switch connections in inventory\. Refresh from Lab Navigator before using this hardware for mapping\./i)
+    ).toBeInTheDocument();
+    expect(screen.getByText('No imported switch metadata yet.')).toBeInTheDocument();
+    expect(screen.getByText('No imported edge-to-switch links yet.')).toBeInTheDocument();
+  });
+
+  test('labels asymmetric HA hardware in inventory', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await screen.findAllByText('A01 3800 Asymmetric HA');
+    const inventoryPanel = screen.getByRole('heading', { name: 'Inventory' }).closest('.panel');
+
+    expect(within(inventoryPanel).getByText('Asymmetric HA')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /a01-3800-asym/i }));
+
+    expect(
+      screen.getByText(/Member-specific HA links on GE1, GE2\. Review interface mapping before generation\./i)
+    ).toBeInTheDocument();
+  });
+
+  test('warns and blocks generation when selected hardware has no imported switch connections', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await screen.findAllByText('Hidden HA Pair');
+    await chooseHardware(user, 'hidden', /Hidden HA Pair/i);
+    await user.selectOptions(screen.getByLabelText('Branch'), 'branch2');
+
+    expect(
+      screen.getByText(/No imported switch connections in inventory\. Refresh from Lab Navigator before using this hardware for mapping\./i)
+    ).toBeInTheDocument();
+
+    await user.type(screen.getByRole('combobox', { name: 'Hypervisor IP' }), '10.68.136.50');
+    await user.type(screen.getByRole('combobox', { name: 'Hypervisor interface' }), 'vmnic0');
+    await user.click(screen.getByRole('button', { name: /generate zip/i }));
+
+    expect(
+      screen.getByText(/Hidden HA Pair has no imported switch connections in inventory\. Refresh it from Lab Navigator before generating\./i)
+    ).toBeInTheDocument();
+    expect(global.fetch).not.toHaveBeenCalledWith('/api/generate', expect.anything());
   });
 
   test('warns when HA hardware has member-specific switch links that require manual mapping', async () => {

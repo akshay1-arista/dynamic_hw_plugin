@@ -413,8 +413,28 @@ class InventoryRefreshChange(BaseModel):
     summary: str
 
 
+class InventoryRefreshTargetStatus(BaseModel):
+    hardware_id: str
+    hardware_display_name: str
+    status: Literal["success", "partial"]
+    labels: list[str] = Field(default_factory=list)
+
+
+class InventoryRefreshSummary(BaseModel):
+    status: Literal["success", "partial"]
+    requested_hardware_count: int
+    change_count: int = 0
+    discovered_connection_count: int = 0
+    preserved_connection_count: int = 0
+    skipped_unresolved_remote_count: int = 0
+    skipped_unsupported_peer_count: int = 0
+    skipped_missing_interface_count: int = 0
+    targets: list[InventoryRefreshTargetStatus] = Field(default_factory=list)
+
+
 class InventoryRefreshResult(BaseModel):
     hardware_ids: list[str]
+    summary: InventoryRefreshSummary
     changes: list[InventoryRefreshChange] = Field(default_factory=list)
     inventory: InventoryFile
     messages: list[ValidationMessage] = Field(default_factory=list)

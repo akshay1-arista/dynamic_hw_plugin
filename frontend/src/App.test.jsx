@@ -472,19 +472,54 @@ beforeEach(() => {
     }
     if (url === '/api/hardware/refresh-preview' && options.method === 'POST') {
       const payload = JSON.parse(options.body);
+      const partial = payload.hardware_ids.length > 1;
       return Response.json({
         hardware_ids: payload.hardware_ids,
+        summary: {
+          status: partial ? 'partial' : 'success',
+          requested_hardware_count: payload.hardware_ids.length,
+          change_count: payload.hardware_ids.length,
+          discovered_connection_count: payload.hardware_ids.length,
+          preserved_connection_count: partial ? 1 : 0,
+          skipped_unresolved_remote_count: partial ? 1 : 0,
+          skipped_unsupported_peer_count: 0,
+          skipped_missing_interface_count: 0,
+          targets: partial
+            ? [
+                {
+                  hardware_id: 'a01-680-standalone',
+                  hardware_display_name: 'A01 680 Standalone',
+                  status: 'partial',
+                  labels: ['unresolved interfaces: GE6, SFP1']
+                }
+              ]
+            : payload.hardware_ids.map((hardwareId) => ({
+                hardware_id: hardwareId,
+                hardware_display_name: hardwareId,
+                status: 'success',
+                labels: []
+              }))
+        },
         changes: payload.hardware_ids.map((hardwareId) => ({
           change_type: 'update-connection',
           target: hardwareId,
           summary: `Update edge-access connection data for ${hardwareId}`
         })),
         inventory: inventoryState,
-        messages: [{ level: 'info', message: 'Previewed inventory refresh.' }]
+        messages: partial
+          ? [
+              { level: 'info', message: `Previewed ${payload.hardware_ids.length} inventory change(s) across ${payload.hardware_ids.length} hardware selection(s).` },
+              {
+                level: 'warning',
+                message: 'Connection discovery incomplete for A01 680 Standalone: unresolved interfaces: GE6, SFP1.'
+              }
+            ]
+          : [{ level: 'info', message: 'Previewed 1 inventory change(s) across 1 hardware selection(s).' }]
       });
     }
     if (url === '/api/hardware/refresh-apply' && options.method === 'POST') {
       const payload = JSON.parse(options.body);
+      const partial = payload.hardware_ids.length > 1;
       inventoryState = {
         ...inventoryState,
         hardware: inventoryState.hardware.map((hardware) =>
@@ -499,13 +534,47 @@ beforeEach(() => {
       };
       return Response.json({
         hardware_ids: payload.hardware_ids,
+        summary: {
+          status: partial ? 'partial' : 'success',
+          requested_hardware_count: payload.hardware_ids.length,
+          change_count: payload.hardware_ids.length,
+          discovered_connection_count: payload.hardware_ids.length,
+          preserved_connection_count: partial ? 1 : 0,
+          skipped_unresolved_remote_count: partial ? 1 : 0,
+          skipped_unsupported_peer_count: 0,
+          skipped_missing_interface_count: 0,
+          targets: partial
+            ? [
+                {
+                  hardware_id: 'a01-680-standalone',
+                  hardware_display_name: 'A01 680 Standalone',
+                  status: 'partial',
+                  labels: ['unresolved interfaces: GE6, SFP1']
+                }
+              ]
+            : payload.hardware_ids.map((hardwareId) => ({
+                hardware_id: hardwareId,
+                hardware_display_name: hardwareId,
+                status: 'success',
+                labels: []
+              }))
+        },
         changes: payload.hardware_ids.map((hardwareId) => ({
           change_type: 'update-connection',
           target: hardwareId,
           summary: `Update edge-access connection data for ${hardwareId}`
         })),
         inventory: inventoryState,
-        messages: [{ level: 'info', message: 'Applied Lab Navigator inventory refresh.' }]
+        messages: partial
+          ? [
+              { level: 'info', message: `Previewed ${payload.hardware_ids.length} inventory change(s) across ${payload.hardware_ids.length} hardware selection(s).` },
+              {
+                level: 'warning',
+                message: 'Connection discovery incomplete for A01 680 Standalone: unresolved interfaces: GE6, SFP1.'
+              },
+              { level: 'warning', message: 'Applied Lab Navigator inventory refresh with partial results.' }
+            ]
+          : [{ level: 'info', message: 'Applied Lab Navigator inventory refresh.' }]
       });
     }
     if (url === '/api/generate') {
@@ -904,6 +973,11 @@ describe('App', () => {
     expect(window.confirm).toHaveBeenCalledWith(
       expect.stringContaining('Apply Lab Navigator refresh for 5 inventory devices?')
     );
+    expect(window.confirm).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'warning: Connection discovery incomplete for A01 680 Standalone: unresolved interfaces: GE6, SFP1.'
+      )
+    );
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
         '/api/hardware/refresh-apply',
@@ -921,6 +995,15 @@ describe('App', () => {
         })
       );
     });
+    expect(
+      await screen.findByText(
+        'warning: Connection discovery incomplete for A01 680 Standalone: unresolved interfaces: GE6, SFP1.'
+      )
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('warning: Applied Lab Navigator inventory refresh with partial results.')
+    ).toBeInTheDocument();
+    expect(screen.getByText('Discovery issue')).toBeInTheDocument();
   });
 
   test('loads a previously generated run into the editor and delivery panel', async () => {

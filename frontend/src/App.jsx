@@ -100,6 +100,7 @@ export function App() {
   const [generating, setGenerating] = useState(false);
   const [savingInventory, setSavingInventory] = useState(false);
   const [refreshingHardwareIds, setRefreshingHardwareIds] = useState([]);
+  const [inventoryRefreshFeedback, setInventoryRefreshFeedback] = useState(null);
   const [updatingAvailabilityId, setUpdatingAvailabilityId] = useState('');
   const [configuringSwitches, setConfiguringSwitches] = useState(false);
   const [previewingSwitches, setPreviewingSwitches] = useState(false);
@@ -215,6 +216,10 @@ export function App() {
     [filteredHardware, inventory.hardware.length, refreshAllHardwareIds]
   );
   const refreshingInventory = refreshingHardwareIds.length > 0;
+  const inventoryRefreshStatusByHardwareId = useMemo(
+    () => buildInventoryRefreshStatusMap(inventoryRefreshFeedback?.summary),
+    [inventoryRefreshFeedback]
+  );
 
   const configureSwitchState = useMemo(() => {
     if (!result) {
@@ -271,6 +276,7 @@ export function App() {
       ]);
       setReferences(referenceData);
       setInventory(inventoryData);
+      setInventoryRefreshFeedback(null);
       setGeneratedRuns(generatedRunData.runs || []);
       setPrivateBranches(privateBranchData.branches || []);
       setAuditTrail(auditData.events || []);
@@ -398,6 +404,7 @@ export function App() {
     setCurrentUser(null);
     setReferences([]);
     setInventory({ hardware: [] });
+    setInventoryRefreshFeedback(null);
     setGeneratedRuns([]);
     setPrivateBranches([]);
     setAuditTrail([]);
@@ -446,12 +453,8 @@ export function App() {
     setError('');
     try {
       const preview = await previewInventoryRefresh(targets);
-      const summary = preview.changes.length
-        ? [
-            ...preview.changes.slice(0, 20).map((item) => item.summary),
-            ...(preview.changes.length > 20 ? [`...and ${preview.changes.length - 20} more changes`] : [])
-          ].join('\n')
-        : 'No inventory changes detected.';
+      setInventoryRefreshFeedback(preview);
+      const summary = buildRefreshPromptSummary(preview);
       const prompt =
         targets.length === 1
           ? `Apply Lab Navigator refresh for ${targets[0]}?\n\n${summary}`
@@ -461,6 +464,7 @@ export function App() {
       }
       const applied = await applyInventoryRefresh(targets);
       setInventory(applied.inventory);
+      setInventoryRefreshFeedback(applied);
     } catch (refreshError) {
       setError(refreshError.message);
     } finally {
@@ -918,64 +922,80 @@ export function App() {
                 ? `Refreshing ${refreshingHardwareIds.length} device${refreshingHardwareIds.length === 1 ? '' : 's'}`
                 : `Refresh ${filteredHardware.length === inventory.hardware.length ? 'all' : 'visible'} from Lab Navigator`}
             </button>
+            {inventoryRefreshFeedback?.messages?.length > 0 && (
+              <div className="messageList branchFeedback" role="status" aria-live="polite">
+                {inventoryRefreshFeedback.messages.map((message, index) => (
+                  <small className={`message ${message.level}`} key={`inventory-refresh-${index}`}>
+                    {message.level}: {message.message}
+                  </small>
+                ))}
+              </div>
+            )}
             <div className="inventoryList">
-              {filteredHardware.map((hardware) => (
-                <div key={hardware.id} className="inventoryItem">
-                  <button
-                    className="inventorySummary"
-                    onClick={() =>
-                      setExpandedHardwareId((current) => (current === hardware.id ? '' : hardware.id))
-                    }
-                    aria-expanded={expandedHardwareId === hardware.id}
-                  >
-                    <span>
-                      <strong>{hardware.short_name || hardware.display_name}</strong>
-                      <small>{hardware.display_name}</small>
-                      <span className="inventoryBadges">
-                        <StatusBadge tone={hardware.available ? 'success' : 'neutral'}>
-                          {hardware.available ? 'Available' : 'Reserved'}
-                        </StatusBadge>
-                        {!hardware.available && hardware.reservation?.actor && (
-                          <StatusBadge tone="warning">By {hardware.reservation.actor.name}</StatusBadge>
-                        )}
-                        <StatusBadge tone={hardware.ha ? 'accent' : 'neutral'}>
-                          {hardware.ha ? 'HA' : 'Standalone'}
-                        </StatusBadge>
-                        {hardwareHasAsymmetricHaLinks(hardware) && (
-                          <StatusBadge tone="warning">Asymmetric HA</StatusBadge>
-                        )}
-                        {!hardwareHasConnectionData(hardware) && (
-                          <StatusBadge tone="warning">No connections</StatusBadge>
-                        )}
+              {filteredHardware.map((hardware) => {
+                const refreshStatus = inventoryRefreshStatusByHardwareId[hardware.id] || null;
+                return (
+                  <div key={hardware.id} className="inventoryItem">
+                    <button
+                      className="inventorySummary"
+                      onClick={() =>
+                        setExpandedHardwareId((current) => (current === hardware.id ? '' : hardware.id))
+                      }
+                      aria-expanded={expandedHardwareId === hardware.id}
+                    >
+                      <span>
+                        <strong>{hardware.short_name || hardware.display_name}</strong>
+                        <small>{hardware.display_name}</small>
+                        <span className="inventoryBadges">
+                          <StatusBadge tone={hardware.available ? 'success' : 'neutral'}>
+                            {hardware.available ? 'Available' : 'Reserved'}
+                          </StatusBadge>
+                          {!hardware.available && hardware.reservation?.actor && (
+                            <StatusBadge tone="warning">By {hardware.reservation.actor.name}</StatusBadge>
+                          )}
+                          <StatusBadge tone={hardware.ha ? 'accent' : 'neutral'}>
+                            {hardware.ha ? 'HA' : 'Standalone'}
+                          </StatusBadge>
+                          {hardwareHasAsymmetricHaLinks(hardware) && (
+                            <StatusBadge tone="warning">Asymmetric HA</StatusBadge>
+                          )}
+                          {!hardwareHasConnectionData(hardware) && (
+                            <StatusBadge tone="warning">No connections</StatusBadge>
+                          )}
+                          {refreshStatus?.status === 'partial' && (
+                            <StatusBadge tone="warning">Discovery issue</StatusBadge>
+                          )}
+                        </span>
+                        <small>
+                          {hardware.model} /{' '}
+                          {hardwareHasConnectionData(hardware)
+                            ? `${hardware.ports.length} switch links`
+                            : 'no imported switch connections'}
+                        </small>
                       </span>
-                      <small>
-                        {hardware.model} /{' '}
-                        {hardwareHasConnectionData(hardware)
-                          ? `${hardware.ports.length} switch links`
-                          : 'no imported switch connections'}
-                      </small>
-                    </span>
-                    <ChevronDown size={16} aria-hidden="true" />
-                  </button>
-                  <label className="toggle">
-                    <input
-                      type="checkbox"
-                      checked={hardware.available}
-                      disabled={updatingAvailabilityId === hardware.id}
-                      onChange={(event) => changeHardwareAvailability(hardware.id, event.target.checked)}
-                    />
-                    {updatingAvailabilityId === hardware.id ? 'Saving' : 'Available'}
-                  </label>
-                  {expandedHardwareId === hardware.id && (
-                    <HardwareDetails
-                      hardware={hardware}
-                      refreshing={refreshingHardwareIds.includes(hardware.id)}
-                      onVlanRangeChange={(boundary, value) => updateHardwareVlanRange(hardware.id, boundary, value)}
-                      onRefresh={() => refreshHardwareFromLabNavigator(hardware.id)}
-                    />
-                  )}
-                </div>
-              ))}
+                      <ChevronDown size={16} aria-hidden="true" />
+                    </button>
+                    <label className="toggle">
+                      <input
+                        type="checkbox"
+                        checked={hardware.available}
+                        disabled={updatingAvailabilityId === hardware.id}
+                        onChange={(event) => changeHardwareAvailability(hardware.id, event.target.checked)}
+                      />
+                      {updatingAvailabilityId === hardware.id ? 'Saving' : 'Available'}
+                    </label>
+                    {expandedHardwareId === hardware.id && (
+                      <HardwareDetails
+                        hardware={hardware}
+                        refreshStatus={refreshStatus}
+                        refreshing={refreshingHardwareIds.includes(hardware.id)}
+                        onVlanRangeChange={(boundary, value) => updateHardwareVlanRange(hardware.id, boundary, value)}
+                        onRefresh={() => refreshHardwareFromLabNavigator(hardware.id)}
+                      />
+                    )}
+                  </div>
+                );
+              })}
               {filteredHardware.length === 0 && <p className="muted">No hardware matches the current search.</p>}
             </div>
             <button className="secondary" onClick={persistInventory} disabled={savingInventory}>
@@ -1543,6 +1563,22 @@ function hardwareConnectionWarning(hardware) {
     return '';
   }
   return 'No imported switch connections in inventory. Refresh from Lab Navigator before using this hardware for mapping.';
+}
+
+function buildRefreshPromptSummary(preview) {
+  const messageLines = (preview.messages || []).map((message) => `${message.level}: ${message.message}`);
+  const changeLines = preview.changes?.length
+    ? [
+        ...preview.changes.slice(0, 20).map((item) => item.summary),
+        ...(preview.changes.length > 20 ? [`...and ${preview.changes.length - 20} more changes`] : [])
+      ]
+    : ['No inventory changes detected.'];
+  return [...messageLines, '', ...changeLines].join('\n');
+}
+
+function buildInventoryRefreshStatusMap(summary) {
+  const targets = summary?.targets || [];
+  return Object.fromEntries(targets.map((target) => [target.hardware_id, target]));
 }
 
 function loadStoredUser() {
@@ -2273,12 +2309,21 @@ function interfaceAssignmentsEqual(left, right) {
   );
 }
 
-function HardwareDetails({ hardware, refreshing, onVlanRangeChange, onRefresh }) {
+function HardwareDetails({ hardware, refreshStatus, refreshing, onVlanRangeChange, onRefresh }) {
   const switches = hardware.switches?.length ? hardware.switches : hardware.switch ? [hardware.switch] : [];
   const connectionWarning = hardwareConnectionWarning(hardware);
   const asymmetricHaSummary = hardwareAsymmetricHaSummary(hardware);
   return (
     <div className="hardwareDetails">
+      {refreshStatus?.status === 'partial' && refreshStatus.labels?.length > 0 && (
+        <div className="messageList branchFeedback" role="status" aria-live="polite">
+          {refreshStatus.labels.map((label, index) => (
+            <small className="message warning" key={`${hardware.id}-refresh-label-${index}`}>
+              warning: {label}
+            </small>
+          ))}
+        </div>
+      )}
       {connectionWarning && (
         <div className="mappingCaveat">
           <TriangleAlert size={16} aria-hidden="true" />

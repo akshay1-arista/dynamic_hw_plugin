@@ -249,6 +249,166 @@ def test_inventory_refresh_apply_updates_edge_access_connections_from_wiremap(tm
     assert "ln-edge-1-old-wiremap" not in connection_ids
 
 
+def test_inventory_refresh_apply_preserves_existing_wiremap_links_on_partial_discovery(tmp_path):
+    class PartialRefreshStubClient:
+        def close(self):
+            return None
+
+        def get_wiremap(self, device_id):
+            if device_id == 101:
+                return {
+                    "connections": [
+                        {
+                            "interface_name": "GE1",
+                            "remote_device": {
+                                "id": 11,
+                                "name": "access-sw",
+                                "ip_address": "10.0.0.10",
+                                "device_type": "switch",
+                                "device_model": "Dell-3048",
+                            },
+                            "remote_interface_name": "Gi1/10",
+                        },
+                        {
+                            "interface_name": "GE2",
+                            "remote_device": None,
+                        },
+                    ]
+                }
+            return {"connections": []}
+
+    inventory_path = tmp_path / "inventory.json"
+    inventory_path.write_text(
+        json.dumps(
+            {
+                "devices": {
+                    "edge-1-active": {
+                        "id": "edge-1-active",
+                        "type": "edge",
+                        "display_name": "Edge 1",
+                        "model": "edge6X0",
+                        "model_suffix": "680",
+                        "serial_number": "SERIAL1",
+                        "lab_navigator_id": 101,
+                        "ha_group_id": "edge-1",
+                        "ha_role": "active",
+                    },
+                    "access_sw": {
+                        "id": "access_sw",
+                        "type": "switch",
+                        "display_name": "access-sw",
+                        "model": "Dell-3048",
+                        "ip_address": "10.0.0.10",
+                        "switch_metadata": {
+                            "name": "access-sw",
+                            "model": "Dell-3048",
+                            "connections": {"ip": "10.0.0.10", "port": None},
+                            "credentials": {"username": "velocloud", "password": "N#1sdwan"},
+                        },
+                    },
+                },
+                "connections": [
+                    {
+                        "id": "ln-edge-1-old-ge2-wiremap",
+                        "a": {"device_id": "edge-1-active", "interface": "GE2"},
+                        "b": {"device_id": "access_sw", "interface": "gigabitethernet1/2"},
+                        "role": "edge-access",
+                        "notes": "Imported from Lab Navigator wiremap.",
+                    }
+                ],
+            }
+        )
+    )
+
+    result = apply_inventory_refresh(
+        InventoryRefreshRequest(hardware_ids=["edge-1"]),
+        inventory_path=inventory_path,
+        client=PartialRefreshStubClient(),
+    )
+
+    connection_ids = {connection.id for connection in result.inventory.connections}
+    assert "ln-edge-1-old-ge2-wiremap" in connection_ids
+    assert result.summary.status == "partial"
+    assert result.summary.preserved_connection_count == 1
+    assert result.summary.skipped_unresolved_remote_count == 1
+    assert result.summary.targets[0].hardware_id == "edge-1"
+    assert result.summary.targets[0].status == "partial"
+    assert result.summary.targets[0].labels == ["unresolved interfaces: GE2"]
+    warning_messages = [message.message for message in result.messages if message.level == "warning"]
+    assert "Applied Lab Navigator inventory refresh with partial results." in warning_messages
+    assert any(
+        "Connection discovery incomplete for Edge 1: unresolved interfaces: GE2." in message
+        for message in warning_messages
+    )
+    assert "Kept existing Lab Navigator connections where rediscovery did not return a replacement." in warning_messages
+
+
+def test_inventory_refresh_apply_ignores_traversed_switch_skips_when_root_edge_links_refresh(tmp_path):
+    class SwitchNoiseStubClient:
+        def close(self):
+            return None
+
+        def get_wiremap(self, device_id):
+            if device_id == 101:
+                return {
+                    "connections": [
+                        {
+                            "interface_name": "GE1",
+                            "remote_device": {
+                                "id": 11,
+                                "name": "access-sw",
+                                "ip_address": "10.0.0.10",
+                                "device_type": "switch",
+                                "device_model": "Dell-3048",
+                            },
+                            "remote_interface_name": "Gi1/10",
+                        }
+                    ]
+                }
+            if device_id == 11:
+                return {
+                    "connections": [
+                        {"interface_name": "Gi1/1", "remote_device": None},
+                        {"interface_name": "Gi1/2", "remote_device": None},
+                        {"interface_name": "Gi1/3", "remote_device": None},
+                    ]
+                }
+            return {"connections": []}
+
+    inventory_path = tmp_path / "inventory.json"
+    inventory_path.write_text(
+        json.dumps(
+            {
+                "devices": {
+                    "edge-1-active": {
+                        "id": "edge-1-active",
+                        "type": "edge",
+                        "display_name": "Edge 1",
+                        "model": "edge6X0",
+                        "model_suffix": "680",
+                        "serial_number": "SERIAL1",
+                        "lab_navigator_id": 101,
+                        "ha_group_id": "edge-1",
+                        "ha_role": "active",
+                    }
+                },
+                "connections": [],
+            }
+        )
+    )
+
+    result = apply_inventory_refresh(
+        InventoryRefreshRequest(hardware_ids=["edge-1"]),
+        inventory_path=inventory_path,
+        client=SwitchNoiseStubClient(),
+    )
+
+    assert result.summary.status == "success"
+    assert result.summary.skipped_unresolved_remote_count == 0
+    assert result.summary.targets[0].status == "success"
+    assert all(message.level != "warning" for message in result.messages)
+
+
 def test_inventory_refresh_apply_does_not_require_hypervisor_ip(tmp_path):
     inventory_path = tmp_path / "inventory.json"
     inventory_path.write_text(

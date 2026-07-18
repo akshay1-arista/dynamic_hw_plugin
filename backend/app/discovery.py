@@ -375,17 +375,28 @@ def _discover_lab_navigator_subgraph(
         _log(logging.INFO, "Walking edge wiremap for inventory_device=%s lab_navigator_id=%s", edge.id, ln_edge["id"])
         for item in client.get_wiremap(ln_edge["id"]).get("connections", []):
             interface_name = _edge_interface_name(item)
+            remote_name = _wiremap_remote_name(item)
             remote_device = _resolve_wiremap_remote_device(client, item)
             if not remote_device:
-                if interface_name:
-                    unresolved_interfaces.add(interface_name)
-                    stats.skipped_unresolved_remote_count += 1
-                _log(
-                    logging.WARNING,
-                    "Skipping wiremap entry for inventory_device=%s because remote device could not be resolved: %s",
-                    edge.id,
-                    item,
-                )
+                if remote_name:
+                    # LN returned a device name but couldn't resolve it — genuine discovery gap.
+                    if interface_name:
+                        unresolved_interfaces.add(interface_name)
+                        stats.skipped_unresolved_remote_count += 1
+                    _log(
+                        logging.WARNING,
+                        "Skipping wiremap entry for inventory_device=%s because remote device %r could not be resolved",
+                        edge.id,
+                        remote_name,
+                    )
+                else:
+                    # No remote device name — LN is saying the port has no connection.
+                    _log(
+                        logging.INFO,
+                        "Skipping unconnected wiremap entry for inventory_device=%s interface=%s",
+                        edge.id,
+                        interface_name or item.get("interface_name"),
+                    )
                 continue
 
             remote_inventory_device = _wiremap_remote_inventory_device(edge, remote_device, devices, discovered_devices)
@@ -625,6 +636,13 @@ def _resolve_inventory_device(client: LabNavigatorClient, device: InventoryDevic
     raise DiscoveryError(f"Could not resolve Lab Navigator device for inventory device {device.id}")
 
 
+def _wiremap_remote_name(wiremap_entry: dict[str, Any]) -> str:
+    remote_device = wiremap_entry.get("remote_device")
+    if isinstance(remote_device, dict):
+        return str(remote_device.get("name") or "").strip()
+    return str(remote_device or "").strip()
+
+
 def _resolve_wiremap_remote_device(
     client: LabNavigatorClient,
     wiremap_entry: dict[str, Any],
@@ -637,9 +655,9 @@ def _resolve_wiremap_remote_device(
     if not remote_name:
         return None
     matches = [item for item in client.search(remote_name) if item.get("name") == remote_name]
-    if len(matches) != 1:
-        raise DiscoveryError(f"Expected exactly one Lab Navigator device named {remote_name}")
-    return matches[0]
+    if len(matches) == 1:
+        return matches[0]
+    return None
 
 
 def _inventory_switch_device(
@@ -834,23 +852,13 @@ def _build_refresh_messages(
             ),
         )
     ]
-    if summary.status == "partial":
-        for target in summary.targets:
-            if target.status != "partial" or not target.labels:
-                continue
-            messages.append(
-                ValidationMessage(
-                    level="warning",
-                    message=f"Connection discovery incomplete for {target.hardware_display_name}: {'; '.join(target.labels)}.",
-                )
+    if summary.preserved_connection_count:
+        messages.append(
+            ValidationMessage(
+                level="warning",
+                message="Kept existing Lab Navigator connections where rediscovery did not return a replacement.",
             )
-        if summary.preserved_connection_count:
-            messages.append(
-                ValidationMessage(
-                    level="warning",
-                    message="Kept existing Lab Navigator connections where rediscovery did not return a replacement.",
-                )
-            )
+        )
     return messages
 
 

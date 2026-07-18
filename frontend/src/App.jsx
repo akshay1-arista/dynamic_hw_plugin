@@ -107,6 +107,7 @@ export function App() {
   const [switchPreview, setSwitchPreview] = useState(null);
   const [inventorySearch, setInventorySearch] = useState('');
   const [inventoryAvailabilityFilter, setInventoryAvailabilityFilter] = useState('all');
+  const [inventoryLabelFilters, setInventoryLabelFilters] = useState([]);
   const [auditSearch, setAuditSearch] = useState('');
   const [expandedHardwareId, setExpandedHardwareId] = useState('');
   const [collapsedDataCards, setCollapsedDataCards] = useState({
@@ -188,6 +189,37 @@ export function App() {
       .filter(Boolean);
   }, [inventory.hardware, mappings]);
 
+  const filteredAuditTrail = useMemo(() => {
+    const query = auditSearch.trim().toLowerCase();
+    if (!query) {
+      return auditTrail;
+    }
+    return auditTrail.filter((event) => auditSearchText(event).includes(query));
+  }, [auditTrail, auditSearch]);
+  const inventoryRefreshStatusByHardwareId = useMemo(
+    () => buildInventoryRefreshStatusMap(inventoryRefreshFeedback?.summary),
+    [inventoryRefreshFeedback]
+  );
+  const inventoryBadgesByHardwareId = useMemo(
+    () =>
+      Object.fromEntries(
+        inventory.hardware.map((hardware) => [
+          hardware.id,
+          buildInventoryBadges(hardware, inventoryRefreshStatusByHardwareId[hardware.id] || null)
+        ])
+      ),
+    [inventory.hardware, inventoryRefreshStatusByHardwareId]
+  );
+  const inventoryLabelFilterOptions = useMemo(
+    () => buildInventoryLabelFilterOptions(inventory.hardware, inventoryBadgesByHardwareId),
+    [inventory.hardware, inventoryBadgesByHardwareId]
+  );
+
+  useEffect(() => {
+    const validFilters = new Set(inventoryLabelFilterOptions.map((option) => option.key));
+    setInventoryLabelFilters((current) => current.filter((filterKey) => validFilters.has(filterKey)));
+  }, [inventoryLabelFilterOptions]);
+
   const filteredHardware = useMemo(() => {
     const query = inventorySearch.trim().toLowerCase();
     return inventory.hardware.filter((hardware) => {
@@ -197,16 +229,21 @@ export function App() {
       if (!matchesAvailability) {
         return false;
       }
+      if (inventoryLabelFilters.length > 0) {
+        const badgeKeys = new Set((inventoryBadgesByHardwareId[hardware.id] || []).map((badge) => badge.key));
+        if (!inventoryLabelFilters.every((filterKey) => badgeKeys.has(filterKey))) {
+          return false;
+        }
+      }
       return !query || hardwareSearchText(hardware).includes(query);
     });
-  }, [inventory.hardware, inventoryAvailabilityFilter, inventorySearch]);
-  const filteredAuditTrail = useMemo(() => {
-    const query = auditSearch.trim().toLowerCase();
-    if (!query) {
-      return auditTrail;
-    }
-    return auditTrail.filter((event) => auditSearchText(event).includes(query));
-  }, [auditTrail, auditSearch]);
+  }, [
+    inventory.hardware,
+    inventoryAvailabilityFilter,
+    inventoryBadgesByHardwareId,
+    inventoryLabelFilters,
+    inventorySearch
+  ]);
   const refreshAllHardwareIds = useMemo(() => allRefreshableHardwareIds(inventory), [inventory]);
   const refreshTargets = useMemo(
     () =>
@@ -216,10 +253,6 @@ export function App() {
     [filteredHardware, inventory.hardware.length, refreshAllHardwareIds]
   );
   const refreshingInventory = refreshingHardwareIds.length > 0;
-  const inventoryRefreshStatusByHardwareId = useMemo(
-    () => buildInventoryRefreshStatusMap(inventoryRefreshFeedback?.summary),
-    [inventoryRefreshFeedback]
-  );
 
   const configureSwitchState = useMemo(() => {
     if (!result) {
@@ -888,31 +921,71 @@ export function App() {
                 />
               </span>
             </label>
-            <div className="quickFilterRow" aria-label="Inventory quick filters" role="group">
-              <button
-                className={`quickFilterButton ${inventoryAvailabilityFilter === 'all' ? 'active' : ''}`}
-                onClick={() => setInventoryAvailabilityFilter('all')}
-                type="button"
-              >
-                All
-              </button>
-              <button
-                className={`quickFilterButton ${inventoryAvailabilityFilter === 'available' ? 'active' : ''}`}
-                onClick={() => setInventoryAvailabilityFilter('available')}
-                type="button"
-              >
-                Available
-              </button>
-              <button
-                className={`quickFilterButton ${inventoryAvailabilityFilter === 'reserved' ? 'active' : ''}`}
-                onClick={() => setInventoryAvailabilityFilter('reserved')}
-                type="button"
-              >
-                Reserved
-              </button>
+            <div className="inventoryFilterGroup">
+              <small className="inventoryFilterLabel">Availability</small>
+              <div className="quickFilterRow" aria-label="Inventory quick filters" role="group">
+                <button
+                  aria-pressed={inventoryAvailabilityFilter === 'all' && inventoryLabelFilters.length === 0}
+                  className={`quickFilterButton ${
+                    inventoryAvailabilityFilter === 'all' && inventoryLabelFilters.length === 0 ? 'active' : ''
+                  }`}
+                  onClick={() => {
+                    setInventoryAvailabilityFilter('all');
+                    setInventoryLabelFilters([]);
+                  }}
+                  type="button"
+                >
+                  All
+                </button>
+                <button
+                  aria-pressed={inventoryAvailabilityFilter === 'available'}
+                  className={`quickFilterButton ${inventoryAvailabilityFilter === 'available' ? 'active' : ''}`}
+                  onClick={() => setInventoryAvailabilityFilter('available')}
+                  type="button"
+                >
+                  Available
+                </button>
+                <button
+                  aria-pressed={inventoryAvailabilityFilter === 'reserved'}
+                  className={`quickFilterButton ${inventoryAvailabilityFilter === 'reserved' ? 'active' : ''}`}
+                  onClick={() => setInventoryAvailabilityFilter('reserved')}
+                  type="button"
+                >
+                  Reserved
+                </button>
+              </div>
             </div>
+            {inventoryLabelFilterOptions.length > 0 && (
+              <div className="inventoryFilterGroup">
+                <small className="inventoryFilterLabel">Labels</small>
+                <div className="quickFilterRow" aria-label="Inventory label filters" role="group">
+                  {inventoryLabelFilterOptions.map((option) => {
+                    const active = inventoryLabelFilters.includes(option.key);
+                    return (
+                      <button
+                        key={option.key}
+                        aria-label={option.label}
+                        aria-pressed={active}
+                        className={`quickFilterButton quickFilterChip ${active ? 'active' : ''}`}
+                        onClick={() =>
+                          setInventoryLabelFilters((current) =>
+                            current.includes(option.key)
+                              ? current.filter((filterKey) => filterKey !== option.key)
+                              : [...current, option.key]
+                          )
+                        }
+                        type="button"
+                      >
+                        <span>{option.label}</span>
+                        <small>{option.count}</small>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             <button
-              className="secondary"
+              className="secondary compactButton"
               onClick={() => refreshHardwareFromLabNavigator(refreshTargets)}
               disabled={refreshingInventory || refreshTargets.length === 0}
               type="button"
@@ -922,18 +995,21 @@ export function App() {
                 ? `Refreshing ${refreshingHardwareIds.length} device${refreshingHardwareIds.length === 1 ? '' : 's'}`
                 : `Refresh ${filteredHardware.length === inventory.hardware.length ? 'all' : 'visible'} from Lab Navigator`}
             </button>
-            {inventoryRefreshFeedback?.messages?.length > 0 && (
+            {inventoryRefreshFeedback?.messages?.some((m) => m.level === 'warning') && (
               <div className="messageList branchFeedback" role="status" aria-live="polite">
-                {inventoryRefreshFeedback.messages.map((message, index) => (
-                  <small className={`message ${message.level}`} key={`inventory-refresh-${index}`}>
-                    {message.level}: {message.message}
-                  </small>
-                ))}
+                {inventoryRefreshFeedback.messages
+                  .filter((m) => m.level === 'warning')
+                  .map((message, index) => (
+                    <small className="message warning" key={`inventory-refresh-warning-${index}`}>
+                      warning: {message.message}
+                    </small>
+                  ))}
               </div>
             )}
             <div className="inventoryList">
               {filteredHardware.map((hardware) => {
                 const refreshStatus = inventoryRefreshStatusByHardwareId[hardware.id] || null;
+                const badges = inventoryBadgesByHardwareId[hardware.id] || [];
                 return (
                   <div key={hardware.id} className="inventoryItem">
                     <button
@@ -947,24 +1023,11 @@ export function App() {
                         <strong>{hardware.short_name || hardware.display_name}</strong>
                         <small>{hardware.display_name}</small>
                         <span className="inventoryBadges">
-                          <StatusBadge tone={hardware.available ? 'success' : 'neutral'}>
-                            {hardware.available ? 'Available' : 'Reserved'}
-                          </StatusBadge>
-                          {!hardware.available && hardware.reservation?.actor && (
-                            <StatusBadge tone="warning">By {hardware.reservation.actor.name}</StatusBadge>
-                          )}
-                          <StatusBadge tone={hardware.ha ? 'accent' : 'neutral'}>
-                            {hardware.ha ? 'HA' : 'Standalone'}
-                          </StatusBadge>
-                          {hardwareHasAsymmetricHaLinks(hardware) && (
-                            <StatusBadge tone="warning">Asymmetric HA</StatusBadge>
-                          )}
-                          {!hardwareHasConnectionData(hardware) && (
-                            <StatusBadge tone="warning">No connections</StatusBadge>
-                          )}
-                          {refreshStatus?.status === 'partial' && (
-                            <StatusBadge tone="warning">Discovery issue</StatusBadge>
-                          )}
+                          {badges.map((badge) => (
+                            <StatusBadge key={`${hardware.id}-${badge.key}`} tone={badge.tone}>
+                              {badge.label}
+                            </StatusBadge>
+                          ))}
                         </span>
                         <small>
                           {hardware.model} /{' '}
@@ -1563,6 +1626,92 @@ function hardwareConnectionWarning(hardware) {
     return '';
   }
   return 'No imported switch connections in inventory. Refresh from Lab Navigator before using this hardware for mapping.';
+}
+
+const inventoryLabelFilterPriority = {
+  ha: 0,
+  standalone: 1,
+  'asymmetric-ha': 2,
+  'no-connections': 3,
+  'discovery-issue': 4
+};
+
+function buildInventoryBadges(hardware, refreshStatus) {
+  const badges = [
+    {
+      key: hardware.available ? 'available' : 'reserved',
+      label: hardware.available ? 'Available' : 'Reserved',
+      tone: hardware.available ? 'success' : 'neutral'
+    },
+    hardware.available || !hardware.reservation?.actor?.name
+      ? null
+      : {
+          key: `reserved-by:${inventoryLabelToken(hardware.reservation.actor.name)}`,
+          label: `By ${hardware.reservation.actor.name}`,
+          tone: 'warning'
+        },
+    {
+      key: hardware.ha ? 'ha' : 'standalone',
+      label: hardware.ha ? 'HA' : 'Standalone',
+      tone: hardware.ha ? 'accent' : 'neutral'
+    },
+    hardwareHasAsymmetricHaLinks(hardware)
+      ? {
+          key: 'asymmetric-ha',
+          label: 'Asymmetric HA',
+          tone: 'warning'
+        }
+      : null,
+    hardwareHasConnectionData(hardware)
+      ? null
+      : {
+          key: 'no-connections',
+          label: 'No connections',
+          tone: 'warning'
+        },
+    refreshStatus?.status === 'partial'
+      ? {
+          key: 'discovery-issue',
+          label: 'Discovery issue',
+          tone: 'warning'
+        }
+      : null
+  ];
+  return badges.filter(Boolean);
+}
+
+function buildInventoryLabelFilterOptions(hardwareList, badgesByHardwareId) {
+  const options = new Map();
+  hardwareList.forEach((hardware) => {
+    (badgesByHardwareId[hardware.id] || [])
+      .filter((badge) => !['available', 'reserved'].includes(badge.key))
+      .forEach((badge) => {
+        const existing = options.get(badge.key);
+        if (existing) {
+          existing.count += 1;
+          return;
+        }
+        options.set(badge.key, { key: badge.key, label: badge.label, count: 1 });
+      });
+  });
+  return [...options.values()].sort(compareInventoryLabelFilterOptions);
+}
+
+function compareInventoryLabelFilterOptions(left, right) {
+  const leftPriority = inventoryLabelFilterPriority[left.key] ?? 99;
+  const rightPriority = inventoryLabelFilterPriority[right.key] ?? 99;
+  if (leftPriority !== rightPriority) {
+    return leftPriority - rightPriority;
+  }
+  return left.label.localeCompare(right.label);
+}
+
+function inventoryLabelToken(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
 }
 
 function buildRefreshPromptSummary(preview) {

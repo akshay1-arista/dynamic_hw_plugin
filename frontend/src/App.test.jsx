@@ -509,10 +509,7 @@ beforeEach(() => {
         messages: partial
           ? [
               { level: 'info', message: `Previewed ${payload.hardware_ids.length} inventory change(s) across ${payload.hardware_ids.length} hardware selection(s).` },
-              {
-                level: 'warning',
-                message: 'Connection discovery incomplete for A01 680 Standalone: unresolved interfaces: GE6, SFP1.'
-              }
+              { level: 'warning', message: 'Kept existing Lab Navigator connections where rediscovery did not return a replacement.' }
             ]
           : [{ level: 'info', message: 'Previewed 1 inventory change(s) across 1 hardware selection(s).' }]
       });
@@ -568,10 +565,7 @@ beforeEach(() => {
         messages: partial
           ? [
               { level: 'info', message: `Previewed ${payload.hardware_ids.length} inventory change(s) across ${payload.hardware_ids.length} hardware selection(s).` },
-              {
-                level: 'warning',
-                message: 'Connection discovery incomplete for A01 680 Standalone: unresolved interfaces: GE6, SFP1.'
-              },
+              { level: 'warning', message: 'Kept existing Lab Navigator connections where rediscovery did not return a replacement.' },
               { level: 'warning', message: 'Applied Lab Navigator inventory refresh with partial results.' }
             ]
           : [{ level: 'info', message: 'Applied Lab Navigator inventory refresh.' }]
@@ -930,7 +924,7 @@ describe('App', () => {
     await user.type(screen.getByRole('combobox', { name: 'Hypervisor interface' }), 'vmnic0');
     await user.click(screen.getByRole('button', { name: /generate zip/i }));
 
-    await screen.findByText('By Test User');
+    await screen.findAllByText('By Test User');
     const inventoryPanel = screen.getByRole('heading', { name: 'Inventory' }).closest('.panel');
 
     await user.click(screen.getByRole('button', { name: 'Reserved' }));
@@ -944,6 +938,29 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: 'All' }));
     expect(within(inventoryPanel).getAllByText('CHN 3800 HA Pair 8').length).toBeGreaterThan(0);
     expect(within(inventoryPanel).getByText('A01 680 Standalone')).toBeInTheDocument();
+  });
+
+  test('filters inventory by derived label chips', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await screen.findAllByText('CHN 3800 HA Pair 8');
+    const inventoryPanel = screen.getByRole('heading', { name: 'Inventory' }).closest('.panel');
+
+    expect(screen.getByRole('button', { name: 'HA' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Standalone' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Asymmetric HA' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'No connections' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Asymmetric HA' }));
+    expect(within(inventoryPanel).getByText('A01 3800 Asymmetric HA')).toBeInTheDocument();
+    expect(within(inventoryPanel).queryByText('CHN 3800 HA Pair 8')).not.toBeInTheDocument();
+    expect(within(inventoryPanel).queryByText('Hidden HA Pair')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'All' }));
+    await user.click(screen.getByRole('button', { name: 'No connections' }));
+    expect(within(inventoryPanel).getByText('Hidden HA Pair')).toBeInTheDocument();
+    expect(within(inventoryPanel).queryByText('A01 680 Standalone')).not.toBeInTheDocument();
   });
 
   test('refreshes visible inventory hardware from lab navigator', async () => {
@@ -975,7 +992,7 @@ describe('App', () => {
     );
     expect(window.confirm).toHaveBeenCalledWith(
       expect.stringContaining(
-        'warning: Connection discovery incomplete for A01 680 Standalone: unresolved interfaces: GE6, SFP1.'
+        'warning: Kept existing Lab Navigator connections where rediscovery did not return a replacement.'
       )
     );
     await waitFor(() => {
@@ -997,13 +1014,14 @@ describe('App', () => {
     });
     expect(
       await screen.findByText(
-        'warning: Connection discovery incomplete for A01 680 Standalone: unresolved interfaces: GE6, SFP1.'
+        'warning: Kept existing Lab Navigator connections where rediscovery did not return a replacement.'
       )
     ).toBeInTheDocument();
     expect(
       screen.getByText('warning: Applied Lab Navigator inventory refresh with partial results.')
     ).toBeInTheDocument();
-    expect(screen.getByText('Discovery issue')).toBeInTheDocument();
+    expect(screen.getAllByText('Discovery issue').length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: 'Discovery issue' })).toBeInTheDocument();
   });
 
   test('loads a previously generated run into the editor and delivery panel', async () => {
@@ -1058,7 +1076,7 @@ describe('App', () => {
       'href',
       '/api/runs/abc123/download'
     );
-    expect(screen.getByText('By Test User')).toBeInTheDocument();
+    expect(screen.getAllByText('By Test User').length).toBeGreaterThan(0);
   });
 
   test('filters audit trail events', async () => {
@@ -1204,7 +1222,7 @@ describe('App', () => {
     await user.type(screen.getByRole('combobox', { name: 'Hypervisor interface' }), 'vmnic0');
     await user.click(screen.getByRole('button', { name: /generate zip/i }));
 
-    await screen.findByText('By Test User');
+    await screen.findAllByText('By Test User');
     await user.click(screen.getByRole('button', { name: /chn-3800-ha-8/i }));
     const availabilityToggle = screen.getAllByRole('checkbox', { name: 'Available' })[0];
     await user.click(availabilityToggle);
@@ -1427,7 +1445,7 @@ describe('App', () => {
     render(<App />);
 
     await screen.findAllByText('Hidden HA Pair');
-    expect(screen.getByText('No connections')).toBeInTheDocument();
+    expect(screen.getAllByText('No connections').length).toBeGreaterThan(0);
 
     await user.click(screen.getByRole('button', { name: /hidden-ha-pair/i }));
 
@@ -1445,7 +1463,7 @@ describe('App', () => {
     await screen.findAllByText('A01 3800 Asymmetric HA');
     const inventoryPanel = screen.getByRole('heading', { name: 'Inventory' }).closest('.panel');
 
-    expect(within(inventoryPanel).getByText('Asymmetric HA')).toBeInTheDocument();
+    expect(within(inventoryPanel).getAllByText('Asymmetric HA').length).toBeGreaterThan(0);
 
     await user.click(screen.getByRole('button', { name: /a01-3800-asym/i }));
 

@@ -250,9 +250,16 @@ def test_inventory_refresh_apply_updates_edge_access_connections_from_wiremap(tm
 
 
 def test_inventory_refresh_apply_preserves_existing_wiremap_links_on_partial_discovery(tmp_path):
+    # GE2 names a device ("unknown-device") that LN cannot resolve — a genuine discovery gap.
+    # GE3 has remote_device=None — LN says the port is unconnected, not a failure.
     class PartialRefreshStubClient:
         def close(self):
             return None
+
+        def search(self, query):
+            if query == "access-sw":
+                return [{"id": 11, "name": "access-sw", "ip_address": "10.0.0.10", "device_type": "switch", "device_model": "Dell-3048"}]
+            return []  # "unknown-device" resolves to nothing
 
         def get_wiremap(self, device_id):
             if device_id == 101:
@@ -271,7 +278,11 @@ def test_inventory_refresh_apply_preserves_existing_wiremap_links_on_partial_dis
                         },
                         {
                             "interface_name": "GE2",
-                            "remote_device": None,
+                            "remote_device": "unknown-device",  # named but LN can't find it
+                        },
+                        {
+                            "interface_name": "GE3",
+                            "remote_device": None,  # LN says no connection — not a failure
                         },
                     ]
                 }
@@ -330,17 +341,16 @@ def test_inventory_refresh_apply_preserves_existing_wiremap_links_on_partial_dis
     assert "ln-edge-1-old-ge2-wiremap" in connection_ids
     assert result.summary.status == "partial"
     assert result.summary.preserved_connection_count == 1
+    # GE2 (named device not found in LN) counts as unresolved; GE3 (null) does not
     assert result.summary.skipped_unresolved_remote_count == 1
     assert result.summary.targets[0].hardware_id == "edge-1"
     assert result.summary.targets[0].status == "partial"
     assert result.summary.targets[0].labels == ["unresolved interfaces: GE2"]
     warning_messages = [message.message for message in result.messages if message.level == "warning"]
     assert "Applied Lab Navigator inventory refresh with partial results." in warning_messages
-    assert any(
-        "Connection discovery incomplete for Edge 1: unresolved interfaces: GE2." in message
-        for message in warning_messages
-    )
     assert "Kept existing Lab Navigator connections where rediscovery did not return a replacement." in warning_messages
+    # Per-device details are in target.labels, not duplicated as top-level messages
+    assert not any("Connection discovery incomplete" in m for m in warning_messages)
 
 
 def test_inventory_refresh_apply_ignores_traversed_switch_skips_when_root_edge_links_refresh(tmp_path):

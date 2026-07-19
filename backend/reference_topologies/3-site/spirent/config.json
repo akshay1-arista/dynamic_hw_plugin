@@ -3376,7 +3376,7 @@
                         "link": "mgmt",
                         "ip": "[[ spirent_chassis_ip ]]",
                         "default_gateway": "[[ spirent_chassis_gw ]]",
-                        "netmask": "255.255.248.0"
+                        "netmask": "[[ spirent_chassis_netmask ]]"
                     },
                     {
                         "name": "port1",

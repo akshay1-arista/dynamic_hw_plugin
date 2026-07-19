@@ -4419,22 +4419,6 @@
       "notes": "Imported from Lab Navigator wiremap."
     },
     {
-      "id": "ln_chn_rnd_sw_3048_6g900q2_tengigabitethernet1_50_chn_rnd_sw_4148_ujx270b_eth1_1_46",
-      "a": {
-        "device_id": "chn_rnd_sw_3048_6g900q2",
-        "interface": "tengigabitethernet1/50"
-      },
-      "b": {
-        "device_id": "chn_rnd_sw_4148_ujx270b",
-        "interface": "eth1/1/46"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": "switch-uplink",
-      "notes": "Imported from Lab Navigator wiremap."
-    },
-    {
       "id": "ln_ln_a01_847_switch_73kzzp2_managementethernet1_1_ln_a01_848_switch_dtrb9z2_gigabitethernet1_45",
       "a": {
         "device_id": "ln_a01_847_switch_73kzzp2",
@@ -4563,54 +4547,6 @@
       "notes": "Imported from Lab Navigator wiremap."
     },
     {
-      "id": "ln_ln_a02_231_switch_crrd9z2_gigabitethernet1_46_ln_a02_232_switch_cnzc9z2_managementethernet1_1",
-      "a": {
-        "device_id": "ln_a02_231_switch_crrd9z2",
-        "interface": "gigabitethernet1/46"
-      },
-      "b": {
-        "device_id": "ln_a02_232_switch_cnzc9z2",
-        "interface": "managementethernet1/1"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": "switch-uplink",
-      "notes": "Imported from Lab Navigator wiremap."
-    },
-    {
-      "id": "ln_chn_rnd_sw_4148_ujx270b_mgmt1_1_1_ln_a02_231_switch_crrd9z2_gigabitethernet1_42",
-      "a": {
-        "device_id": "chn_rnd_sw_4148_ujx270b",
-        "interface": "mgmt1/1/1"
-      },
-      "b": {
-        "device_id": "ln_a02_231_switch_crrd9z2",
-        "interface": "gigabitethernet1/42"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": "switch-uplink",
-      "notes": "Imported from Lab Navigator wiremap."
-    },
-    {
-      "id": "ln_chn_rnd_sw_4048_igcf7dd_managementethernet1_1_ln_a02_231_switch_crrd9z2_gigabitethernet1_45",
-      "a": {
-        "device_id": "chn_rnd_sw_4048_igcf7dd",
-        "interface": "managementethernet1/1"
-      },
-      "b": {
-        "device_id": "ln_a02_231_switch_crrd9z2",
-        "interface": "gigabitethernet1/45"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": "switch-uplink",
-      "notes": "Imported from Lab Navigator wiremap."
-    },
-    {
       "id": "ln_ln_a02_231_switch_crrd9z2_gigabitethernet1_48_ln_a02_231_switch_crrd9z2_managementethernet1_1",
       "a": {
         "device_id": "ln_a02_231_switch_crrd9z2",
@@ -4619,22 +4555,6 @@
       "b": {
         "device_id": "ln_a02_231_switch_crrd9z2",
         "interface": "managementethernet1/1"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": "switch-uplink",
-      "notes": "Imported from Lab Navigator wiremap."
-    },
-    {
-      "id": "ln_ln_a01_340_switch_hfcqxc2_managementethernet1_1_ln_a01_848_switch_dtrb9z2_gigabitethernet1_46",
-      "a": {
-        "device_id": "ln_a01_340_switch_hfcqxc2",
-        "interface": "managementethernet1/1"
-      },
-      "b": {
-        "device_id": "ln_a01_848_switch_dtrb9z2",
-        "interface": "gigabitethernet1/46"
       },
       "vlans": [],
       "tagged_vlans": [],

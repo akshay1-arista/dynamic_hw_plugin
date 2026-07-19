@@ -7969,7 +7969,7 @@
                 "device_type": "SPIRENT",
                 "model": "virtual_regular",
                 "connections": {
-                    "ip": "10.68.141.161",
+                    "ip": "[[ spirent_chassis_ip ]]",
                     "port": 22
                 },
                 "credentials": {
@@ -7990,9 +7990,9 @@
                         "name": "mgmt",
                         "type": "management",
                         "link": "mgmt",
-                        "ip": "10.68.141.161",
-                        "default_gateway": "10.68.136.1",
-                        "netmask": "255.255.248.0"
+                        "ip": "[[ spirent_chassis_ip ]]",
+                        "default_gateway": "[[ spirent_chassis_gw ]]",
+                        "netmask": "[[ spirent_chassis_netmask ]]"
                     },
                     {
                         "name": "port1",

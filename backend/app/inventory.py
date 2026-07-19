@@ -20,6 +20,7 @@ from .models import (
     InventoryDevice,
     InventoryFile,
     InventoryStateFile,
+    SwitchHop,
     SwitchMetadata,
     VlanRange,
 )
@@ -324,72 +325,70 @@ def resolve_mapping_path(
     if not normalized_switch_names or not hypervisor_ip:
         return None
 
+    normalized_interface = (hypervisor_interface or "").strip().lower()
+
+    # Build the list of (terminal_switch_id, hypervisor_link) pairs to consider.
+    # Each pair is one specific switch-port → hypervisor-port connection.
+    # When hypervisor_interface is given, restrict to links where the hypervisor side
+    # matches — this is the primary disambiguator when a switch has multiple NIC links.
+    terminal_links: list[tuple[str, InventoryConnection]] = []
+    for connection in inventory.connections:
+        for sw_id, device in inventory.devices.items():
+            if device.type != "switch":
+                continue
+            if not _is_hypervisor_access_connection(connection, sw_id, inventory.devices, hypervisor_ip):
+                continue
+            hv_port = _other_endpoint(connection, sw_id).interface
+            if normalized_interface and hv_port.strip().lower() != normalized_interface:
+                continue
+            terminal_links.append((sw_id, connection))
+
+    terminal_ids = {sw_id for sw_id, _ in terminal_links}
+
     candidates: list[HardwarePathSummary] = []
+    seen: set[tuple[str, str]] = set()  # (access_switch_id, terminal_egress_port) — deduplicate equivalent paths
     for switch_name in normalized_switch_names:
         access_switch = _find_switch_by_name(inventory.devices, switch_name)
         if not access_switch:
             continue
-        for uplink in _switch_links(access_switch.id, inventory.devices, inventory.connections):
-            access_endpoint = _edge_endpoint(uplink, access_switch.id)
-            upstream_endpoint = _other_endpoint(uplink, access_switch.id)
-            upstream_switch = inventory.devices.get(upstream_endpoint.device_id)
-            if not upstream_switch or upstream_switch.type != "switch":
+        # Skip named switches that are terminals when other non-terminal named switches exist —
+        # they represent the upstream switch, not the access switch.
+        if access_switch.id in terminal_ids and len(normalized_switch_names) > 1:
+            continue
+        for terminal_id, hypervisor_link in terminal_links:
+            egress = _edge_endpoint(hypervisor_link, terminal_id).interface
+            key = (access_switch.id, egress)
+            if key in seen:
                 continue
+            seen.add(key)
 
-            model = str(upstream_switch.model or "")
-            if not any(token in model for token in ("4048", "4148")):
-                continue
-
-            for hypervisor_link in inventory.connections:
-                if not _is_hypervisor_access_connection(
-                    hypervisor_link,
-                    upstream_switch.id,
-                    inventory.devices,
-                    hypervisor_ip,
-                ):
+            if terminal_id == access_switch.id:
+                hops: list[SwitchHop] | None = [SwitchHop(
+                    switch_id=access_switch.id,
+                    switch_name=access_switch.display_name,
+                    switch_ip=access_switch.ip_address,
+                    switch_model=access_switch.model,
+                    egress_port=egress,
+                )]
+            else:
+                hops = _dfs_path(access_switch.id, terminal_id, inventory.devices, inventory.connections, visited={access_switch.id})
+                if hops is None:
                     continue
-                upstream_hypervisor_endpoint = _edge_endpoint(hypervisor_link, upstream_switch.id)
-                hypervisor_endpoint = _other_endpoint(hypervisor_link, upstream_switch.id)
-                hypervisor = inventory.devices.get(hypervisor_endpoint.device_id)
-                candidates.append(
-                    HardwarePathSummary(
-                        access_switch_id=access_switch.id,
-                        access_switch_name=access_switch.display_name,
-                        access_switch_ip=access_switch.ip_address,
-                        access_uplink_port=access_endpoint.interface,
-                        upstream_switch_id=upstream_switch.id,
-                        upstream_switch_name=upstream_switch.display_name,
-                        upstream_switch_model=upstream_switch.model,
-                        upstream_switch_ip=upstream_switch.ip_address,
-                        upstream_access_port=upstream_endpoint.interface,
-                        upstream_hypervisor_port=upstream_hypervisor_endpoint.interface,
-                        hypervisor_id=hypervisor.id if hypervisor else None,
-                        hypervisor_name=hypervisor.display_name if hypervisor else None,
-                        hypervisor_ip=hypervisor_ip,
-                        complete=True,
-                    )
+                hops[-1] = hops[-1].model_copy(update={"egress_port": egress})
+
+            hypervisor_endpoint = _other_endpoint(hypervisor_link, terminal_id)
+            hypervisor = inventory.devices.get(hypervisor_endpoint.device_id)
+            candidates.append(
+                HardwarePathSummary(
+                    hops=hops,
+                    hypervisor_id=hypervisor.id if hypervisor else None,
+                    hypervisor_name=hypervisor.display_name if hypervisor else None,
+                    hypervisor_ip=hypervisor_ip,
+                    complete=True,
                 )
-
-    if len(candidates) == 1:
-        return candidates[0]
-
-    normalized_interface = (hypervisor_interface or "").strip().lower()
-    if normalized_interface:
-        matched_candidates = [
-            candidate
-            for candidate in candidates
-            if _candidate_matches_hypervisor_interface(
-                candidate,
-                inventory.connections,
-                normalized_interface,
             )
-        ]
-        if len(matched_candidates) == 1:
-            return matched_candidates[0]
 
-    if len(candidates) != 1:
-        return None
-    return candidates[0]
+    return candidates[0] if len(candidates) == 1 else None
 
 
 def _candidate_matches_hypervisor_interface(
@@ -743,50 +742,158 @@ def _derive_path_summary(
         return None
 
     access_switch_ids = sorted({_other_endpoint(connection, active.id).device_id for connection in edge_connections})
-    access_switch_id = access_switch_ids[0] if len(access_switch_ids) == 1 else None
-    access_switch = devices.get(access_switch_id) if access_switch_id else None
-    summary = HardwarePathSummary(
-        access_switch_id=access_switch_id,
-        access_switch_name=access_switch.display_name if access_switch else None,
-        access_switch_ip=access_switch.ip_address if access_switch else None,
-        hypervisor_ip=active.hypervisor_ip,
-    )
-    if not access_switch_id or not active.hypervisor_ip:
-        return summary
+    if len(access_switch_ids) != 1:
+        return HardwarePathSummary(hypervisor_ip=active.hypervisor_ip)
 
-    uplinks = _switch_links(access_switch_id, devices, connections)
-    if len(uplinks) != 1:
-        return summary
+    access_switch_id = access_switch_ids[0]
+    access_switch = devices.get(access_switch_id)
+    if not access_switch or not active.hypervisor_ip:
+        return HardwarePathSummary(
+            hops=[SwitchHop(switch_id=access_switch_id, switch_name=access_switch.display_name if access_switch else access_switch_id, switch_ip=access_switch.ip_address if access_switch else None)] if access_switch else [],
+            hypervisor_ip=active.hypervisor_ip,
+        )
 
-    uplink = uplinks[0]
-    remote_endpoint = _other_endpoint(uplink, access_switch_id)
-    upstream_switch = devices.get(remote_endpoint.device_id)
-    if not upstream_switch or upstream_switch.type != "switch":
-        return summary
+    hops = _find_switch_path_to_hypervisor(access_switch_id, active.hypervisor_ip, devices, connections, visited={active.id})
+    if hops is None:
+        return HardwarePathSummary(
+            hops=[SwitchHop(switch_id=access_switch_id, switch_name=access_switch.display_name, switch_ip=access_switch.ip_address)],
+            hypervisor_ip=active.hypervisor_ip,
+        )
 
-    hypervisor_links = [
-        connection
-        for connection in connections
-        if _is_hypervisor_access_connection(connection, upstream_switch.id, devices, active.hypervisor_ip)
-    ]
-    if len(hypervisor_links) != 1:
-        return summary
+    hypervisor_link = _hypervisor_access_link(hops[-1].switch_id, active.hypervisor_ip, devices, connections)
+    if not hypervisor_link:
+        return HardwarePathSummary(hops=hops, hypervisor_ip=active.hypervisor_ip)
 
-    hypervisor_link = hypervisor_links[0]
-    upstream_endpoint = _edge_endpoint(hypervisor_link, upstream_switch.id)
-    hypervisor_endpoint = _other_endpoint(hypervisor_link, upstream_switch.id)
+    hypervisor_endpoint = _other_endpoint(hypervisor_link, hops[-1].switch_id)
     hypervisor_device = devices.get(hypervisor_endpoint.device_id)
-    summary.access_uplink_port = _edge_endpoint(uplink, access_switch_id).interface
-    summary.upstream_switch_id = upstream_switch.id
-    summary.upstream_switch_name = upstream_switch.display_name
-    summary.upstream_switch_model = upstream_switch.model
-    summary.upstream_switch_ip = upstream_switch.ip_address
-    summary.upstream_access_port = remote_endpoint.interface
-    summary.upstream_hypervisor_port = upstream_endpoint.interface
-    summary.hypervisor_id = hypervisor_device.id if hypervisor_device else None
-    summary.hypervisor_name = hypervisor_device.display_name if hypervisor_device else None
-    summary.complete = True
-    return summary
+    return HardwarePathSummary(
+        hops=hops,
+        hypervisor_id=hypervisor_device.id if hypervisor_device else None,
+        hypervisor_name=hypervisor_device.display_name if hypervisor_device else None,
+        hypervisor_ip=active.hypervisor_ip,
+        complete=True,
+    )
+
+
+def _find_switch_path_to_hypervisor(
+    start_switch_id: str,
+    hypervisor_ip: str,
+    devices: dict[str, InventoryDevice],
+    connections: list[InventoryConnection],
+    visited: set[str],
+) -> list[SwitchHop] | None:
+    """Find a unique path from start_switch to a switch that has a hypervisor-access link to hypervisor_ip.
+
+    Collects all terminal switches (those with a hypervisor-access connection to hypervisor_ip) and
+    finds the unique path from start_switch to each. Returns None if no path or multiple paths exist.
+    """
+    terminal_switch_ids = [
+        sw_id
+        for sw_id, device in devices.items()
+        if device.type == "switch"
+        and _hypervisor_access_link(sw_id, hypervisor_ip, devices, connections) is not None
+    ]
+
+    all_found_paths: list[list[SwitchHop]] = []
+    for terminal_id in terminal_switch_ids:
+        if terminal_id == start_switch_id:
+            start_device = devices.get(start_switch_id)
+            if not start_device:
+                continue
+            link = _hypervisor_access_link(start_switch_id, hypervisor_ip, devices, connections)
+            if not link:
+                continue
+            egress = _edge_endpoint(link, start_switch_id).interface
+            all_found_paths.append([SwitchHop(
+                switch_id=start_switch_id,
+                switch_name=start_device.display_name,
+                switch_ip=start_device.ip_address,
+                switch_model=start_device.model,
+                egress_port=egress,
+            )])
+        else:
+            path = _dfs_path(start_switch_id, terminal_id, devices, connections, visited | {start_switch_id})
+            if path is None:
+                continue
+            link = _hypervisor_access_link(terminal_id, hypervisor_ip, devices, connections)
+            if link:
+                egress = _edge_endpoint(link, terminal_id).interface
+                path[-1] = path[-1].model_copy(update={"egress_port": egress})
+            all_found_paths.append(path)
+
+    if len(all_found_paths) == 1:
+        return all_found_paths[0]
+    return None  # 0 = no path, 2+ = ambiguous
+
+
+def _dfs_path(
+    start_id: str,
+    target_id: str,
+    devices: dict[str, InventoryDevice],
+    connections: list[InventoryConnection],
+    visited: set[str],
+) -> list[SwitchHop] | None:
+    """BFS from start_id to target_id through switch-uplink edges.
+
+    Returns the shortest path as a list of SwitchHop objects (start first, target last), or None if not found.
+    When multiple equal-length paths exist, returns the first one found.
+    """
+    from collections import deque
+
+    start_device = devices.get(start_id)
+    if not start_device:
+        return None
+
+    # Each queue entry: (current_device_id, path_so_far_as_SwitchHop_list, visited_set)
+    start_hop = SwitchHop(
+        switch_id=start_id,
+        switch_name=start_device.display_name,
+        switch_ip=start_device.ip_address,
+        switch_model=start_device.model,
+    )
+    queue: deque[tuple[str, list[SwitchHop], set[str]]] = deque()
+    queue.append((start_id, [start_hop], visited | {start_id}))
+
+    while queue:
+        current_id, path, seen = queue.popleft()
+
+        if current_id == target_id:
+            return path
+
+        for uplink in _switch_links(current_id, devices, connections):
+            remote_endpoint = _other_endpoint(uplink, current_id)
+            if remote_endpoint.device_id in seen:
+                continue
+            egress_port = _edge_endpoint(uplink, current_id).interface
+            ingress_port = remote_endpoint.interface
+
+            # Annotate the last hop with its egress port, and create the next hop with ingress port
+            updated_last = path[-1].model_copy(update={"egress_port": egress_port})
+            remote_device = devices.get(remote_endpoint.device_id)
+            if not remote_device:
+                continue
+            next_hop = SwitchHop(
+                switch_id=remote_endpoint.device_id,
+                switch_name=remote_device.display_name,
+                switch_ip=remote_device.ip_address,
+                switch_model=remote_device.model,
+                ingress_port=ingress_port,
+            )
+            new_path = path[:-1] + [updated_last, next_hop]
+            queue.append((remote_endpoint.device_id, new_path, seen | {remote_endpoint.device_id}))
+
+    return None
+
+
+def _hypervisor_access_link(
+    switch_id: str,
+    hypervisor_ip: str,
+    devices: dict[str, InventoryDevice],
+    connections: list[InventoryConnection],
+) -> InventoryConnection | None:
+    """Return the first hypervisor-access link from switch_id to hypervisor_ip, or None if none exist."""
+    links = [c for c in connections if _is_hypervisor_access_connection(c, switch_id, devices, hypervisor_ip)]
+    return links[0] if links else None
 
 
 def _switch_links(
@@ -840,11 +947,9 @@ def _range_from_pool(pool: list[int]) -> VlanRange | None:
 
 
 def _path_has_credentials(path: HardwarePathSummary, devices: dict[str, InventoryDevice]) -> bool:
-    if not path.access_switch_id or not path.upstream_switch_id:
+    if not path.hops:
         return False
-    access = devices.get(path.access_switch_id)
-    upstream = devices.get(path.upstream_switch_id)
-    return _device_has_credentials(access) and _device_has_credentials(upstream)
+    return all(_device_has_credentials(devices.get(hop.switch_id)) for hop in path.hops)
 
 
 def _device_has_credentials(device: InventoryDevice | None) -> bool:

@@ -139,21 +139,62 @@ class HardwareAllocation(BaseModel):
     ports: list[HardwarePortAllocation] = Field(default_factory=list)
 
 
+class SwitchHop(BaseModel):
+    switch_id: str
+    switch_name: str
+    switch_ip: Optional[str] = None
+    switch_model: Optional[str] = None
+    ingress_port: Optional[str] = None
+    egress_port: Optional[str] = None
+
+
 class HardwarePathSummary(BaseModel):
-    access_switch_id: Optional[str] = None
-    access_switch_name: Optional[str] = None
-    access_switch_ip: Optional[str] = None
-    access_uplink_port: Optional[str] = None
-    upstream_switch_id: Optional[str] = None
-    upstream_switch_name: Optional[str] = None
-    upstream_switch_model: Optional[str] = None
-    upstream_switch_ip: Optional[str] = None
-    upstream_access_port: Optional[str] = None
-    upstream_hypervisor_port: Optional[str] = None
+    hops: list[SwitchHop] = Field(default_factory=list)
     hypervisor_id: Optional[str] = None
     hypervisor_name: Optional[str] = None
     hypervisor_ip: Optional[str] = None
     complete: bool = False
+
+    # Backward-compat properties derived from hops[0] (access switch) and hops[-1] (upstream switch)
+    @property
+    def access_switch_id(self) -> Optional[str]:
+        return self.hops[0].switch_id if self.hops else None
+
+    @property
+    def access_switch_name(self) -> Optional[str]:
+        return self.hops[0].switch_name if self.hops else None
+
+    @property
+    def access_switch_ip(self) -> Optional[str]:
+        return self.hops[0].switch_ip if self.hops else None
+
+    @property
+    def access_uplink_port(self) -> Optional[str]:
+        return self.hops[0].egress_port if self.hops else None
+
+    @property
+    def upstream_switch_id(self) -> Optional[str]:
+        return self.hops[-1].switch_id if self.hops else None
+
+    @property
+    def upstream_switch_name(self) -> Optional[str]:
+        return self.hops[-1].switch_name if self.hops else None
+
+    @property
+    def upstream_switch_model(self) -> Optional[str]:
+        return self.hops[-1].switch_model if self.hops else None
+
+    @property
+    def upstream_switch_ip(self) -> Optional[str]:
+        return self.hops[-1].switch_ip if self.hops else None
+
+    @property
+    def upstream_access_port(self) -> Optional[str]:
+        return self.hops[-1].ingress_port if self.hops else None
+
+    @property
+    def upstream_hypervisor_port(self) -> Optional[str]:
+        return self.hops[-1].egress_port if self.hops else None
 
 
 class HardwareEdge(BaseModel):

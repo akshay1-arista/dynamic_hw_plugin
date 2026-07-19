@@ -15,7 +15,13 @@ from app.generator import (
     generate_topology,
 )
 from app.config import INVENTORY_PATH
-from app.inventory import build_inventory, load_inventory, resolve_mapping_path
+from app.inventory import (
+    build_inventory,
+    load_inventory,
+    reserve_generated_hardware,
+    resolve_mapping_path,
+    update_hardware_availability,
+)
 from app.models import GenerateRequest, HardwareEdge, InterfaceOverride, InventoryFile
 
 DEFAULT_3800_HARDWARE_ID = "ln-ha-a01-327-dgd10q2-a01-328-16c10q2"
@@ -179,6 +185,54 @@ def test_generated_json_files_parse(tmp_path):
     for path in Path(result.topology_path).rglob("*.json"):
         with path.open() as fh:
             json.load(fh)
+
+
+def test_generate_allows_same_user_to_regenerate_with_reserved_hardware(tmp_path):
+    inventory_path = copy_inventory(tmp_path)
+    reserve_generated_hardware(
+        [DEFAULT_3800_HARDWARE_ID],
+        {"name": "Test User", "email": "test@example.com"},
+        "run123",
+        "topology-123",
+        inventory_path,
+    )
+
+    result = generate_topology(make_request(), inventory_path=inventory_path, outputs_root=tmp_path)
+
+    inventory = load_inventory(inventory_path)
+    hardware = next(item for item in inventory.hardware if item.id == DEFAULT_3800_HARDWARE_ID)
+    assert result.run_id != "run123"
+    assert hardware.available is False
+    assert hardware.reservation is not None
+    assert hardware.reservation.actor.email == "test@example.com"
+    assert hardware.reservation.run_id == result.run_id
+
+
+def test_generate_rejects_hardware_reserved_by_other_requester(tmp_path):
+    inventory_path = copy_inventory(tmp_path)
+    reserve_generated_hardware(
+        [DEFAULT_3800_HARDWARE_ID],
+        {"name": "Other User", "email": "other@example.com"},
+        "run123",
+        "topology-123",
+        inventory_path,
+    )
+
+    with pytest.raises(GenerationError, match=r"Reserved by Other User \(other@example\.com\)"):
+        generate_topology(make_request(), inventory_path=inventory_path, outputs_root=tmp_path)
+
+
+def test_generate_rejects_manual_unavailable_hardware_for_same_requester(tmp_path):
+    inventory_path = copy_inventory(tmp_path)
+    update_hardware_availability(
+        DEFAULT_3800_HARDWARE_ID,
+        False,
+        {"name": "Test User", "email": "test@example.com"},
+        inventory_path,
+    )
+
+    with pytest.raises(GenerationError, match="currently reserved"):
+        generate_topology(make_request(), inventory_path=inventory_path, outputs_root=tmp_path)
 
 
 def test_generate_uses_saved_hardware_snapshot_when_inventory_has_no_imported_switch_connections(tmp_path):
@@ -1362,7 +1416,7 @@ def test_generate_resolves_switch_config_path_from_generation_hypervisor_ip(tmp_
         "type": "hypervisor",
         "display_name": "esxi-01",
         "model": "Dell-R640",
-        "ip_address": "10.68.136.221",
+        "ip_address": "192.0.2.1",  # unique test IP, not in real inventory
     }
     inventory["connections"].extend(
         [
@@ -1384,7 +1438,7 @@ def test_generate_resolves_switch_config_path_from_generation_hypervisor_ip(tmp_
     inventory_path.write_text(json.dumps(inventory))
 
     result = generate_topology(
-        make_request(hypervisor_ip="10.68.136.221", hypervisor_interface="vmnic0"),
+        make_request(hypervisor_ip="192.0.2.1", hypervisor_interface="vmnic0"),
         inventory_path=inventory_path,
         outputs_root=tmp_path,
     )
@@ -1399,9 +1453,10 @@ def test_generate_resolves_switch_config_path_from_generation_hypervisor_ip(tmp_
     assert edge["l2_switches"][0]["interfaces"][-1]["link"] == "vmnic0"
     metadata_path = Path(result.topology_path).parent / "run_metadata.json"
     metadata = json.loads(metadata_path.read_text())
-    assert metadata["mappings"][0]["path"]["access_switch_id"] == "chn_rnd_sw_3048_j8f10q2"
-    assert metadata["mappings"][0]["path"]["hypervisor_ip"] == "10.68.136.221"
-    assert metadata["mappings"][0]["path"]["upstream_hypervisor_port"] == "Te1/10"
+    path = metadata["mappings"][0]["path"]
+    assert path["hops"][0]["switch_id"] == "chn_rnd_sw_3048_j8f10q2"
+    assert path["hypervisor_ip"] == "192.0.2.1"
+    assert path["hops"][-1]["egress_port"] == "Te1/10"
 
 
 def test_resolve_mapping_path_uses_hypervisor_interface_to_disambiguate_links():
@@ -1491,11 +1546,11 @@ def test_generate_resolves_path_when_mapping_spans_access_and_upstream_switches(
     metadata_path = Path(result.topology_path).parent / "run_metadata.json"
     metadata = json.loads(metadata_path.read_text())
     path = metadata["mappings"][0]["path"]
-    assert path["access_switch_name"] == "chn-rnd-sw-3048-J8Y00Q2"
-    assert path["access_uplink_port"] == "tengigabitethernet1/52"
-    assert path["upstream_switch_name"] == "chn-rnd-sw-4148-F19CV43"
-    assert path["upstream_access_port"] == "eth1/1/53"
-    assert path["upstream_hypervisor_port"] == "eth1/1/54"
+    assert path["hops"][0]["switch_name"] == "chn-rnd-sw-3048-J8Y00Q2"
+    assert path["hops"][0]["egress_port"] == "tengigabitethernet1/52"
+    assert path["hops"][-1]["switch_name"] == "chn-rnd-sw-4148-F19CV43"
+    assert path["hops"][-1]["ingress_port"] == "eth1/1/53"
+    assert path["hops"][-1]["egress_port"] == "eth1/1/54"
 
 
 def test_apply_hardware_to_edge_forces_dpdk_enabled_true():

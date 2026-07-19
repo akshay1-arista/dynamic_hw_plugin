@@ -1490,8 +1490,7 @@ export function App() {
                       key={`${status.hardware_id}-${index}`}
                     >
                       {status.branch_name}/{status.edge_name}: {status.path_resolved ? 'path resolved' : 'path unresolved'}
-                      {status.path?.access_switch_name ? ` via ${status.path.access_switch_name}` : ''}
-                      {status.path?.upstream_switch_name ? ` -> ${status.path.upstream_switch_name}` : ''}
+                      {status.path?.hops?.length > 0 ? ` via ${status.path.hops.map((h) => h.switch_name).join(' -> ')}` : ''}
                       {status.path?.hypervisor_name ? ` -> ${status.path.hypervisor_name}` : ''}
                       {status.auto_config_ready ? ' (switch auto-config ready)' : ''}
                       {status.reason ? ` - ${status.reason}` : ''}
@@ -2654,14 +2653,17 @@ function HardwareDetails({ hardware, refreshStatus, refreshing, onVlanRangeChang
       {hardware.path && (
         <div className="switchList">
           <small>Imported path links</small>
-          <small>
-            uplink: {hardware.path.access_switch_name || 'unknown'} {hardware.path.access_uplink_port || 'n/a'} {'->'}{' '}
-            {hardware.path.upstream_switch_name || 'unknown'} {hardware.path.upstream_access_port || 'n/a'}
-          </small>
-          <small>
-            hypervisor: {hardware.path.upstream_switch_name || 'unknown'} {hardware.path.upstream_hypervisor_port || 'n/a'} {'->'}{' '}
-            {hardware.path.hypervisor_name || hardware.path.hypervisor_ip || 'imported hypervisor'}
-          </small>
+          {(hardware.path.hops || []).map((hop, i) => {
+            const hops = hardware.path.hops;
+            const isLast = i === hops.length - 1;
+            return (
+              <small key={hop.switch_id}>
+                {i === 0 ? 'edge' : (hops[i - 1].switch_name || 'unknown')} {hop.ingress_port || 'n/a'} {'->'}
+                {' '}{hop.switch_name || 'unknown'} {hop.egress_port || 'n/a'}
+                {isLast ? ` -> ${hardware.path.hypervisor_name || hardware.path.hypervisor_ip || 'hypervisor'}` : ''}
+              </small>
+            );
+          })}
         </div>
       )}
 

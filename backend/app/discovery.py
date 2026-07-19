@@ -552,19 +552,26 @@ def _wiremap_remote_inventory_device(
 ) -> InventoryDevice | None:
     remote_type = _infer_inventory_type(current_device.type, remote_device)
     if remote_type == "switch":
-        switch_id = _safe_id(remote_device["name"])
         existing_devices = {**devices, **discovered_devices}
+        # Find any existing record for this LN device ID to reuse its inventory ID and metadata.
+        existing = _find_existing_by_lab_navigator_id(existing_devices, remote_device["id"])
+        if existing is None:
+            existing = _existing_inventory_device(existing_devices, _safe_id(remote_device["name"]))
         return InventoryDevice.model_validate(
             _inventory_switch_device(
                 remote_device["name"],
                 _device_model(remote_device),
                 remote_device.get("ip_address") or "",
                 remote_device["id"],
-                existing=_existing_inventory_device(existing_devices, switch_id),
+                existing=existing,
             )
         )
     if remote_type == "hypervisor":
-        return InventoryDevice.model_validate(_inventory_hypervisor_device(remote_device))
+        existing_devices = {**devices, **discovered_devices}
+        existing = _find_existing_by_lab_navigator_id(existing_devices, remote_device["id"])
+        if existing is None:
+            existing = _existing_inventory_device(existing_devices, _safe_id(remote_device["name"]))
+        return InventoryDevice.model_validate(_inventory_hypervisor_device(remote_device, existing_id=existing.id if existing else None))
     return None
 
 
@@ -687,7 +694,7 @@ def _inventory_switch_device(
     existing_metadata = existing.switch_metadata if existing else None
     switch_ip = ip_address or (existing_metadata.connections.ip if existing_metadata else "")
     return InventoryDevice(
-        id=_safe_id(name),
+        id=existing.id if existing else _safe_id(name),  # reuse existing ID to avoid duplicates
         type="switch",
         display_name=name,
         model=model,
@@ -707,9 +714,9 @@ def _inventory_switch_device(
     ).model_dump(mode="json")
 
 
-def _inventory_hypervisor_device(device: dict[str, Any]) -> dict[str, Any]:
+def _inventory_hypervisor_device(device: dict[str, Any], *, existing_id: str | None = None) -> dict[str, Any]:
     return InventoryDevice(
-        id=_safe_id(device["name"]),
+        id=existing_id or _safe_id(device["name"]),  # reuse existing ID to avoid duplicates
         type="hypervisor",
         display_name=device["name"],
         model=device.get("device_model") or device.get("display_model"),
@@ -800,6 +807,17 @@ def _existing_inventory_device(
     if not existing:
         return None
     return InventoryDevice.model_validate(existing)
+
+
+def _find_existing_by_lab_navigator_id(
+    devices: dict[str, dict[str, Any]],
+    lab_navigator_id: int,
+) -> InventoryDevice | None:
+    """Find an existing inventory device by its Lab Navigator ID, regardless of stored key."""
+    for raw in devices.values():
+        if raw.get("lab_navigator_id") == lab_navigator_id:
+            return InventoryDevice.model_validate(raw)
+    return None
 
 
 def _diff_inventory(current: InventoryFile, proposed: InventoryFile) -> list[InventoryRefreshChange]:

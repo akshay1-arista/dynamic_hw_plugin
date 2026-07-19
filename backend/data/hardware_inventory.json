@@ -2939,573 +2939,6 @@
       "hypervisor_ip": null,
       "notes": "Imported from Lab Navigator rack , device id 485. HA-paired in local inventory with chn-rnd-edge-7105-6208335."
     },
-    "chn_rnd_sw_4048_hfcqxc2": {
-      "id": "chn_rnd_sw_4048_hfcqxc2",
-      "type": "switch",
-      "display_name": "chn-rnd-sw-4048-HFCQXC2",
-      "short_name": null,
-      "model": "",
-      "model_suffix": null,
-      "serial_number": null,
-      "ip_address": "10.68.137.146",
-      "ha_group_id": null,
-      "ha_role": null,
-      "dpdk_enabled": null,
-      "free_vlans": [],
-      "vlan_range": null,
-      "switch_metadata": {
-        "name": "chn-rnd-sw-4048-HFCQXC2",
-        "device_type": "DELL",
-        "model": "Dell",
-        "os_family": null,
-        "connections": {
-          "ip": "10.68.137.146",
-          "port": null
-        },
-        "credentials": {
-          "username": "velo",
-          "password": "Velocloud@123"
-        }
-      },
-      "lab_navigator_id": 340,
-      "hypervisor_ip": null,
-      "notes": null
-    },
-    "chn_rnd_sw_3048_dtrb9z2": {
-      "id": "chn_rnd_sw_3048_dtrb9z2",
-      "type": "switch",
-      "display_name": "chn-rnd-sw-3048-DTRB9Z2",
-      "short_name": null,
-      "model": "",
-      "model_suffix": null,
-      "serial_number": null,
-      "ip_address": "10.68.136.38",
-      "ha_group_id": null,
-      "ha_role": null,
-      "dpdk_enabled": null,
-      "free_vlans": [],
-      "vlan_range": null,
-      "switch_metadata": {
-        "name": "chn-rnd-sw-3048-DTRB9Z2",
-        "device_type": "DELL",
-        "model": "Dell",
-        "os_family": null,
-        "connections": {
-          "ip": "10.68.136.38",
-          "port": null
-        },
-        "credentials": {
-          "username": "velo",
-          "password": "Velocloud@123"
-        }
-      },
-      "lab_navigator_id": 848,
-      "hypervisor_ip": null,
-      "notes": null
-    },
-    "chn_rnd_srv_640_298vf33": {
-      "id": "chn_rnd_srv_640_298vf33",
-      "type": "hypervisor",
-      "display_name": "chn-rnd-srv-640-298VF33",
-      "short_name": null,
-      "model": null,
-      "model_suffix": null,
-      "serial_number": null,
-      "ip_address": "10.68.137.7",
-      "ha_group_id": null,
-      "ha_role": null,
-      "dpdk_enabled": null,
-      "free_vlans": [],
-      "vlan_range": null,
-      "switch_metadata": null,
-      "lab_navigator_id": 355,
-      "hypervisor_ip": null,
-      "notes": null
-    },
-    "chn_rnd_srv_640_5s8vf33": {
-      "id": "chn_rnd_srv_640_5s8vf33",
-      "type": "hypervisor",
-      "display_name": "chn-rnd-srv-640-5S8VF33",
-      "short_name": null,
-      "model": null,
-      "model_suffix": null,
-      "serial_number": null,
-      "ip_address": "10.68.137.180",
-      "ha_group_id": null,
-      "ha_role": null,
-      "dpdk_enabled": null,
-      "free_vlans": [],
-      "vlan_range": null,
-      "switch_metadata": null,
-      "lab_navigator_id": 354,
-      "hypervisor_ip": null,
-      "notes": null
-    },
-    "chn_rnd_srv_640_8kcgjj3": {
-      "id": "chn_rnd_srv_640_8kcgjj3",
-      "type": "hypervisor",
-      "display_name": "chn-rnd-srv-640-8KCGJJ3",
-      "short_name": null,
-      "model": null,
-      "model_suffix": null,
-      "serial_number": null,
-      "ip_address": "10.68.137.28",
-      "ha_group_id": null,
-      "ha_role": null,
-      "dpdk_enabled": null,
-      "free_vlans": [],
-      "vlan_range": null,
-      "switch_metadata": null,
-      "lab_navigator_id": 351,
-      "hypervisor_ip": null,
-      "notes": null
-    },
-    "chn_rnd_srv_640_2p83s63": {
-      "id": "chn_rnd_srv_640_2p83s63",
-      "type": "hypervisor",
-      "display_name": "chn-rnd-srv-640-2P83S63",
-      "short_name": null,
-      "model": null,
-      "model_suffix": null,
-      "serial_number": null,
-      "ip_address": "10.68.137.102",
-      "ha_group_id": null,
-      "ha_role": null,
-      "dpdk_enabled": null,
-      "free_vlans": [],
-      "vlan_range": null,
-      "switch_metadata": null,
-      "lab_navigator_id": 348,
-      "hypervisor_ip": null,
-      "notes": null
-    },
-    "chn_rnd_srv_640_3p83s63": {
-      "id": "chn_rnd_srv_640_3p83s63",
-      "type": "hypervisor",
-      "display_name": "chn-rnd-srv-640-3P83S63",
-      "short_name": null,
-      "model": null,
-      "model_suffix": null,
-      "serial_number": null,
-      "ip_address": "10.68.136.221",
-      "ha_group_id": null,
-      "ha_role": null,
-      "dpdk_enabled": null,
-      "free_vlans": [],
-      "vlan_range": null,
-      "switch_metadata": null,
-      "lab_navigator_id": 347,
-      "hypervisor_ip": null,
-      "notes": null
-    },
-    "chn_rnd_srv_640_js8vf33": {
-      "id": "chn_rnd_srv_640_js8vf33",
-      "type": "hypervisor",
-      "display_name": "chn-rnd-srv-640-JS8VF33",
-      "short_name": null,
-      "model": null,
-      "model_suffix": null,
-      "serial_number": null,
-      "ip_address": "10.68.137.190",
-      "ha_group_id": null,
-      "ha_role": null,
-      "dpdk_enabled": null,
-      "free_vlans": [],
-      "vlan_range": null,
-      "switch_metadata": null,
-      "lab_navigator_id": 352,
-      "hypervisor_ip": null,
-      "notes": null
-    },
-    "chn_rnd_srv_640_588vf33": {
-      "id": "chn_rnd_srv_640_588vf33",
-      "type": "hypervisor",
-      "display_name": "chn-rnd-srv-640-588VF33",
-      "short_name": null,
-      "model": null,
-      "model_suffix": null,
-      "serial_number": null,
-      "ip_address": "10.68.137.151",
-      "ha_group_id": null,
-      "ha_role": null,
-      "dpdk_enabled": null,
-      "free_vlans": [],
-      "vlan_range": null,
-      "switch_metadata": null,
-      "lab_navigator_id": 353,
-      "hypervisor_ip": null,
-      "notes": null
-    },
-    "chn_rnd_srv_640_hlz02s2": {
-      "id": "chn_rnd_srv_640_hlz02s2",
-      "type": "hypervisor",
-      "display_name": "chn-rnd-srv-640-HLZ02S2",
-      "short_name": null,
-      "model": null,
-      "model_suffix": null,
-      "serial_number": null,
-      "ip_address": "10.68.141.176",
-      "ha_group_id": null,
-      "ha_role": null,
-      "dpdk_enabled": null,
-      "free_vlans": [],
-      "vlan_range": null,
-      "switch_metadata": null,
-      "lab_navigator_id": 349,
-      "hypervisor_ip": null,
-      "notes": null
-    },
-    "chn_rnd_sw_3048_73kzzp2": {
-      "id": "chn_rnd_sw_3048_73kzzp2",
-      "type": "switch",
-      "display_name": "chn-rnd-sw-3048-73KZZP2",
-      "short_name": null,
-      "model": "",
-      "model_suffix": null,
-      "serial_number": null,
-      "ip_address": "10.68.136.129",
-      "ha_group_id": null,
-      "ha_role": null,
-      "dpdk_enabled": null,
-      "free_vlans": [],
-      "vlan_range": null,
-      "switch_metadata": {
-        "name": "chn-rnd-sw-3048-73KZZP2",
-        "device_type": "DELL",
-        "model": "Dell",
-        "os_family": null,
-        "connections": {
-          "ip": "10.68.136.129",
-          "port": null
-        },
-        "credentials": {
-          "username": "velo",
-          "password": "Velocloud@123"
-        }
-      },
-      "lab_navigator_id": 847,
-      "hypervisor_ip": null,
-      "notes": null
-    },
-    "chn_rnd_sw_3048_j8y00q2": {
-      "id": "chn_rnd_sw_3048_j8y00q2",
-      "type": "switch",
-      "display_name": "chn-rnd-sw-3048-J8Y00Q2",
-      "short_name": null,
-      "model": "",
-      "model_suffix": null,
-      "serial_number": null,
-      "ip_address": "10.68.136.28",
-      "ha_group_id": null,
-      "ha_role": null,
-      "dpdk_enabled": null,
-      "free_vlans": [],
-      "vlan_range": null,
-      "switch_metadata": {
-        "name": "chn-rnd-sw-3048-J8Y00Q2",
-        "device_type": "DELL",
-        "model": "Dell",
-        "os_family": null,
-        "connections": {
-          "ip": "10.68.136.28",
-          "port": null
-        },
-        "credentials": {
-          "username": "velo",
-          "password": "Velocloud@123"
-        }
-      },
-      "lab_navigator_id": 777,
-      "hypervisor_ip": null,
-      "notes": null
-    },
-    "chn_rnd_sw_4148_f19cv43": {
-      "id": "chn_rnd_sw_4148_f19cv43",
-      "type": "switch",
-      "display_name": "chn-rnd-sw-4148-F19CV43",
-      "short_name": null,
-      "model": "",
-      "model_suffix": null,
-      "serial_number": null,
-      "ip_address": "10.68.137.247",
-      "ha_group_id": null,
-      "ha_role": null,
-      "dpdk_enabled": null,
-      "free_vlans": [],
-      "vlan_range": null,
-      "switch_metadata": {
-        "name": "chn-rnd-sw-4148-F19CV43",
-        "device_type": "DELL",
-        "model": "Dell",
-        "os_family": null,
-        "connections": {
-          "ip": "10.68.137.247",
-          "port": null
-        },
-        "credentials": {
-          "username": "velo",
-          "password": "Velocloud@123"
-        }
-      },
-      "lab_navigator_id": 798,
-      "hypervisor_ip": null,
-      "notes": null
-    },
-    "chn_rnd_sw_3048_cnzc9z2": {
-      "id": "chn_rnd_sw_3048_cnzc9z2",
-      "type": "switch",
-      "display_name": "chn-rnd-sw-3048-CNZC9Z2",
-      "short_name": null,
-      "model": "",
-      "model_suffix": null,
-      "serial_number": null,
-      "ip_address": "10.68.136.27",
-      "ha_group_id": null,
-      "ha_role": null,
-      "dpdk_enabled": null,
-      "free_vlans": [],
-      "vlan_range": null,
-      "switch_metadata": {
-        "name": "chn-rnd-sw-3048-CNZC9Z2",
-        "device_type": "DELL",
-        "model": "Dell",
-        "os_family": null,
-        "connections": {
-          "ip": "10.68.136.27",
-          "port": null
-        },
-        "credentials": {
-          "username": "velo",
-          "password": "Velocloud@123"
-        }
-      },
-      "lab_navigator_id": 232,
-      "hypervisor_ip": null,
-      "notes": null
-    },
-    "chn_rnd_srv_650_g1hvkj3": {
-      "id": "chn_rnd_srv_650_g1hvkj3",
-      "type": "hypervisor",
-      "display_name": "chn-rnd-srv-650-G1HVKJ3",
-      "short_name": null,
-      "model": null,
-      "model_suffix": null,
-      "serial_number": null,
-      "ip_address": "10.68.137.104",
-      "ha_group_id": null,
-      "ha_role": null,
-      "dpdk_enabled": null,
-      "free_vlans": [],
-      "vlan_range": null,
-      "switch_metadata": null,
-      "lab_navigator_id": 276,
-      "hypervisor_ip": null,
-      "notes": null
-    },
-    "chn_rnd_srv_640_8fys6t2": {
-      "id": "chn_rnd_srv_640_8fys6t2",
-      "type": "hypervisor",
-      "display_name": "chn-rnd-srv-640-8FYS6T2",
-      "short_name": null,
-      "model": null,
-      "model_suffix": null,
-      "serial_number": null,
-      "ip_address": "10.68.137.162",
-      "ha_group_id": null,
-      "ha_role": null,
-      "dpdk_enabled": null,
-      "free_vlans": [],
-      "vlan_range": null,
-      "switch_metadata": null,
-      "lab_navigator_id": 251,
-      "hypervisor_ip": null,
-      "notes": null
-    },
-    "chn_rnd_srv_640_4w8vf33": {
-      "id": "chn_rnd_srv_640_4w8vf33",
-      "type": "hypervisor",
-      "display_name": "chn-rnd-srv-640-4W8VF33",
-      "short_name": null,
-      "model": null,
-      "model_suffix": null,
-      "serial_number": null,
-      "ip_address": "10.68.136.247",
-      "ha_group_id": null,
-      "ha_role": null,
-      "dpdk_enabled": null,
-      "free_vlans": [],
-      "vlan_range": null,
-      "switch_metadata": null,
-      "lab_navigator_id": 249,
-      "hypervisor_ip": null,
-      "notes": null
-    },
-    "chn_rnd_srv_640_jv8vf33": {
-      "id": "chn_rnd_srv_640_jv8vf33",
-      "type": "hypervisor",
-      "display_name": "chn-rnd-srv-640-JV8VF33",
-      "short_name": null,
-      "model": null,
-      "model_suffix": null,
-      "serial_number": null,
-      "ip_address": "10.68.137.65",
-      "ha_group_id": null,
-      "ha_role": null,
-      "dpdk_enabled": null,
-      "free_vlans": [],
-      "vlan_range": null,
-      "switch_metadata": null,
-      "lab_navigator_id": 248,
-      "hypervisor_ip": null,
-      "notes": null
-    },
-    "chn_rnd_sw_3048_crrd9z2": {
-      "id": "chn_rnd_sw_3048_crrd9z2",
-      "type": "switch",
-      "display_name": "chn-rnd-sw-3048-CRRD9Z2",
-      "short_name": null,
-      "model": "",
-      "model_suffix": null,
-      "serial_number": null,
-      "ip_address": "10.68.137.213",
-      "ha_group_id": null,
-      "ha_role": null,
-      "dpdk_enabled": null,
-      "free_vlans": [],
-      "vlan_range": null,
-      "switch_metadata": {
-        "name": "chn-rnd-sw-3048-CRRD9Z2",
-        "device_type": "DELL",
-        "model": "Dell",
-        "os_family": null,
-        "connections": {
-          "ip": "10.68.137.213",
-          "port": null
-        },
-        "credentials": {
-          "username": "velo",
-          "password": "Velocloud@123"
-        }
-      },
-      "lab_navigator_id": 231,
-      "hypervisor_ip": null,
-      "notes": null
-    },
-    "chn_rnd_srv_640_f88vf33": {
-      "id": "chn_rnd_srv_640_f88vf33",
-      "type": "hypervisor",
-      "display_name": "chn-rnd-srv-640-F88VF33",
-      "short_name": null,
-      "model": null,
-      "model_suffix": null,
-      "serial_number": null,
-      "ip_address": "10.68.136.208",
-      "ha_group_id": null,
-      "ha_role": null,
-      "dpdk_enabled": null,
-      "free_vlans": [],
-      "vlan_range": null,
-      "switch_metadata": null,
-      "lab_navigator_id": 250,
-      "hypervisor_ip": null,
-      "notes": null
-    },
-    "chn_rnd_sw_4148_dq8cv43": {
-      "id": "chn_rnd_sw_4148_dq8cv43",
-      "type": "switch",
-      "display_name": "chn-rnd-sw-4148-DQ8CV43",
-      "short_name": null,
-      "model": "",
-      "model_suffix": null,
-      "serial_number": null,
-      "ip_address": "10.68.137.112",
-      "ha_group_id": null,
-      "ha_role": null,
-      "dpdk_enabled": null,
-      "free_vlans": [],
-      "vlan_range": null,
-      "switch_metadata": {
-        "name": "chn-rnd-sw-4148-DQ8CV43",
-        "device_type": "DELL",
-        "model": "Dell",
-        "os_family": null,
-        "connections": {
-          "ip": "10.68.137.112",
-          "port": null
-        },
-        "credentials": {
-          "username": "velo",
-          "password": "Velocloud@123"
-        }
-      },
-      "lab_navigator_id": 235,
-      "hypervisor_ip": null,
-      "notes": null
-    },
-    "chn_rnd_sw_4048_gbwsnk2": {
-      "id": "chn_rnd_sw_4048_gbwsnk2",
-      "type": "switch",
-      "display_name": "chn-rnd-sw-4048-GBWSNK2",
-      "short_name": null,
-      "model": "",
-      "model_suffix": null,
-      "serial_number": null,
-      "ip_address": "10.68.137.214",
-      "ha_group_id": null,
-      "ha_role": null,
-      "dpdk_enabled": null,
-      "free_vlans": [],
-      "vlan_range": null,
-      "switch_metadata": {
-        "name": "chn-rnd-sw-4048-GBWSNK2",
-        "device_type": "DELL",
-        "model": "Dell",
-        "os_family": null,
-        "connections": {
-          "ip": "10.68.137.214",
-          "port": null
-        },
-        "credentials": {
-          "username": "velo",
-          "password": "Velocloud@123"
-        }
-      },
-      "lab_navigator_id": 253,
-      "hypervisor_ip": null,
-      "notes": null
-    },
-    "chn_rnd_sw_3048_c5mb9z2": {
-      "id": "chn_rnd_sw_3048_c5mb9z2",
-      "type": "switch",
-      "display_name": "chn-rnd-sw-3048-C5MB9Z2",
-      "short_name": null,
-      "model": "",
-      "model_suffix": null,
-      "serial_number": null,
-      "ip_address": "10.68.136.96",
-      "ha_group_id": null,
-      "ha_role": null,
-      "dpdk_enabled": null,
-      "free_vlans": [],
-      "vlan_range": null,
-      "switch_metadata": {
-        "name": "chn-rnd-sw-3048-C5MB9Z2",
-        "device_type": "DELL",
-        "model": "Dell",
-        "os_family": null,
-        "connections": {
-          "ip": "10.68.136.96",
-          "port": null
-        },
-        "credentials": {
-          "username": "velo",
-          "password": "Velocloud@123"
-        }
-      },
-      "lab_navigator_id": 252,
-      "hypervisor_ip": null,
-      "notes": null
-    },
     "chn_rnd_sw_4048_lhwf4j4": {
       "id": "chn_rnd_sw_4048_lhwf4j4",
       "type": "switch",
@@ -6560,7 +5993,7 @@
         "interface": "GE1"
       },
       "b": {
-        "device_id": "chn_rnd_sw_3048_j8y00q2",
+        "device_id": "ln_a03_777_switch_j8y00q2",
         "interface": "gigabitethernet1/19"
       },
       "vlans": [],
@@ -6576,7 +6009,7 @@
         "interface": "SFP1"
       },
       "b": {
-        "device_id": "chn_rnd_sw_4148_f19cv43",
+        "device_id": "ln_a03_798_switch_f19cv43",
         "interface": "eth1/1/2"
       },
       "vlans": [],
@@ -6592,7 +6025,7 @@
         "interface": "GE2"
       },
       "b": {
-        "device_id": "chn_rnd_sw_3048_j8y00q2",
+        "device_id": "ln_a03_777_switch_j8y00q2",
         "interface": "gigabitethernet1/20"
       },
       "vlans": [],
@@ -6608,7 +6041,7 @@
         "interface": "SFP2"
       },
       "b": {
-        "device_id": "chn_rnd_sw_4148_f19cv43",
+        "device_id": "ln_a03_798_switch_f19cv43",
         "interface": "eth1/1/4"
       },
       "vlans": [],
@@ -6624,7 +6057,7 @@
         "interface": "GE3"
       },
       "b": {
-        "device_id": "chn_rnd_sw_3048_j8y00q2",
+        "device_id": "ln_a03_777_switch_j8y00q2",
         "interface": "gigabitethernet1/22"
       },
       "vlans": [],
@@ -6640,7 +6073,7 @@
         "interface": "GE4"
       },
       "b": {
-        "device_id": "chn_rnd_sw_3048_j8y00q2",
+        "device_id": "ln_a03_777_switch_j8y00q2",
         "interface": "gigabitethernet1/23"
       },
       "vlans": [],
@@ -6656,7 +6089,7 @@
         "interface": "GE5"
       },
       "b": {
-        "device_id": "chn_rnd_sw_3048_j8y00q2",
+        "device_id": "ln_a03_777_switch_j8y00q2",
         "interface": "gigabitethernet1/24"
       },
       "vlans": [],
@@ -6672,7 +6105,7 @@
         "interface": "GE6"
       },
       "b": {
-        "device_id": "chn_rnd_sw_3048_j8y00q2",
+        "device_id": "ln_a03_777_switch_j8y00q2",
         "interface": "gigabitethernet1/25"
       },
       "vlans": [],
@@ -6688,7 +6121,7 @@
         "interface": "GE1"
       },
       "b": {
-        "device_id": "chn_rnd_sw_3048_j8y00q2",
+        "device_id": "ln_a03_777_switch_j8y00q2",
         "interface": "gigabitethernet1/7"
       },
       "vlans": [],
@@ -6704,7 +6137,7 @@
         "interface": "SFP1"
       },
       "b": {
-        "device_id": "chn_rnd_sw_4148_f19cv43",
+        "device_id": "ln_a03_798_switch_f19cv43",
         "interface": "eth1/1/1"
       },
       "vlans": [],
@@ -6720,7 +6153,7 @@
         "interface": "GE2"
       },
       "b": {
-        "device_id": "chn_rnd_sw_3048_j8y00q2",
+        "device_id": "ln_a03_777_switch_j8y00q2",
         "interface": "gigabitethernet1/8"
       },
       "vlans": [],
@@ -6736,7 +6169,7 @@
         "interface": "SFP2"
       },
       "b": {
-        "device_id": "chn_rnd_sw_4148_f19cv43",
+        "device_id": "ln_a03_798_switch_f19cv43",
         "interface": "eth1/1/3"
       },
       "vlans": [],
@@ -6752,7 +6185,7 @@
         "interface": "GE3"
       },
       "b": {
-        "device_id": "chn_rnd_sw_3048_j8y00q2",
+        "device_id": "ln_a03_777_switch_j8y00q2",
         "interface": "gigabitethernet1/9"
       },
       "vlans": [],
@@ -6768,7 +6201,7 @@
         "interface": "GE4"
       },
       "b": {
-        "device_id": "chn_rnd_sw_3048_j8y00q2",
+        "device_id": "ln_a03_777_switch_j8y00q2",
         "interface": "gigabitethernet1/10"
       },
       "vlans": [],
@@ -6784,7 +6217,7 @@
         "interface": "GE5"
       },
       "b": {
-        "device_id": "chn_rnd_sw_3048_j8y00q2",
+        "device_id": "ln_a03_777_switch_j8y00q2",
         "interface": "gigabitethernet1/11"
       },
       "vlans": [],
@@ -6800,7 +6233,7 @@
         "interface": "GE6"
       },
       "b": {
-        "device_id": "chn_rnd_sw_3048_j8y00q2",
+        "device_id": "ln_a03_777_switch_j8y00q2",
         "interface": "gigabitethernet1/12"
       },
       "vlans": [],
@@ -6816,7 +6249,7 @@
         "interface": "GE1"
       },
       "b": {
-        "device_id": "chn_rnd_sw_3048_j8y00q2",
+        "device_id": "ln_a03_777_switch_j8y00q2",
         "interface": "gigabitethernet1/13"
       },
       "vlans": [],
@@ -6832,7 +6265,7 @@
         "interface": "SFP1"
       },
       "b": {
-        "device_id": "chn_rnd_sw_4148_f19cv43",
+        "device_id": "ln_a03_798_switch_f19cv43",
         "interface": "eth1/1/6"
       },
       "vlans": [],
@@ -6848,7 +6281,7 @@
         "interface": "GE2"
       },
       "b": {
-        "device_id": "chn_rnd_sw_3048_j8y00q2",
+        "device_id": "ln_a03_777_switch_j8y00q2",
         "interface": "gigabitethernet1/14"
       },
       "vlans": [],
@@ -6864,7 +6297,7 @@
         "interface": "SFP2"
       },
       "b": {
-        "device_id": "chn_rnd_sw_4148_f19cv43",
+        "device_id": "ln_a03_798_switch_f19cv43",
         "interface": "eth1/1/8"
       },
       "vlans": [],
@@ -6880,7 +6313,7 @@
         "interface": "GE3"
       },
       "b": {
-        "device_id": "chn_rnd_sw_3048_j8y00q2",
+        "device_id": "ln_a03_777_switch_j8y00q2",
         "interface": "gigabitethernet1/15"
       },
       "vlans": [],
@@ -6896,7 +6329,7 @@
         "interface": "GE4"
       },
       "b": {
-        "device_id": "chn_rnd_sw_3048_j8y00q2",
+        "device_id": "ln_a03_777_switch_j8y00q2",
         "interface": "gigabitethernet1/16"
       },
       "vlans": [],
@@ -6912,7 +6345,7 @@
         "interface": "GE5"
       },
       "b": {
-        "device_id": "chn_rnd_sw_3048_j8y00q2",
+        "device_id": "ln_a03_777_switch_j8y00q2",
         "interface": "gigabitethernet1/17"
       },
       "vlans": [],
@@ -6928,7 +6361,7 @@
         "interface": "GE6"
       },
       "b": {
-        "device_id": "chn_rnd_sw_3048_j8y00q2",
+        "device_id": "ln_a03_777_switch_j8y00q2",
         "interface": "gigabitethernet1/18"
       },
       "vlans": [],
@@ -6944,7 +6377,7 @@
         "interface": "GE1"
       },
       "b": {
-        "device_id": "chn_rnd_sw_3048_j8y00q2",
+        "device_id": "ln_a03_777_switch_j8y00q2",
         "interface": "gigabitethernet1/1"
       },
       "vlans": [],
@@ -6960,7 +6393,7 @@
         "interface": "SFP1"
       },
       "b": {
-        "device_id": "chn_rnd_sw_4148_f19cv43",
+        "device_id": "ln_a03_798_switch_f19cv43",
         "interface": "eth1/1/5"
       },
       "vlans": [],
@@ -6976,7 +6409,7 @@
         "interface": "GE2"
       },
       "b": {
-        "device_id": "chn_rnd_sw_3048_j8y00q2",
+        "device_id": "ln_a03_777_switch_j8y00q2",
         "interface": "gigabitethernet1/2"
       },
       "vlans": [],
@@ -6992,7 +6425,7 @@
         "interface": "SFP2"
       },
       "b": {
-        "device_id": "chn_rnd_sw_4148_f19cv43",
+        "device_id": "ln_a03_798_switch_f19cv43",
         "interface": "eth1/1/7"
       },
       "vlans": [],
@@ -7008,7 +6441,7 @@
         "interface": "GE3"
       },
       "b": {
-        "device_id": "chn_rnd_sw_3048_j8y00q2",
+        "device_id": "ln_a03_777_switch_j8y00q2",
         "interface": "gigabitethernet1/3"
       },
       "vlans": [],
@@ -7024,7 +6457,7 @@
         "interface": "GE4"
       },
       "b": {
-        "device_id": "chn_rnd_sw_3048_j8y00q2",
+        "device_id": "ln_a03_777_switch_j8y00q2",
         "interface": "gigabitethernet1/4"
       },
       "vlans": [],
@@ -7040,7 +6473,7 @@
         "interface": "GE5"
       },
       "b": {
-        "device_id": "chn_rnd_sw_3048_j8y00q2",
+        "device_id": "ln_a03_777_switch_j8y00q2",
         "interface": "gigabitethernet1/5"
       },
       "vlans": [],
@@ -7056,7 +6489,7 @@
         "interface": "GE6"
       },
       "b": {
-        "device_id": "chn_rnd_sw_3048_j8y00q2",
+        "device_id": "ln_a03_777_switch_j8y00q2",
         "interface": "gigabitethernet1/6"
       },
       "vlans": [],
@@ -7068,11 +6501,11 @@
     {
       "id": "ln_chn_rnd_sw_3048_j8y00q2_gigabitethernet1_43_chn_rnd_sw_4148_f19cv43_eth1_1_41",
       "a": {
-        "device_id": "chn_rnd_sw_3048_j8y00q2",
+        "device_id": "ln_a03_777_switch_j8y00q2",
         "interface": "gigabitethernet1/43"
       },
       "b": {
-        "device_id": "chn_rnd_sw_4148_f19cv43",
+        "device_id": "ln_a03_798_switch_f19cv43",
         "interface": "eth1/1/41"
       },
       "vlans": [],
@@ -7082,227 +6515,19 @@
       "notes": "Imported from Lab Navigator wiremap."
     },
     {
-      "id": "ln_chn_rnd_sw_3048_j8y00q2_tengigabitethernet1_52_chn_rnd_sw_4148_f19cv43_eth1_1_53",
-      "a": {
-        "device_id": "chn_rnd_sw_3048_j8y00q2",
-        "interface": "tengigabitethernet1/52"
-      },
-      "b": {
-        "device_id": "chn_rnd_sw_4148_f19cv43",
-        "interface": "eth1/1/53"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": "switch-uplink",
-      "notes": "Imported from Lab Navigator wiremap."
-    },
-    {
-      "id": "ln_chn_rnd_sw_3048_cnzc9z2_gigabitethernet1_45_chn_rnd_sw_3048_j8y00q2_managementethernet1_1",
-      "a": {
-        "device_id": "chn_rnd_sw_3048_cnzc9z2",
-        "interface": "gigabitethernet1/45"
-      },
-      "b": {
-        "device_id": "chn_rnd_sw_3048_j8y00q2",
-        "interface": "managementethernet1/1"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": "switch-uplink",
-      "notes": "Imported from Lab Navigator wiremap."
-    },
-    {
-      "id": "ln_chn_rnd_sw_4148_f19cv43_eth1_1_52_chn_rnd_srv_650_g1hvkj3_vmnic3",
-      "a": {
-        "device_id": "chn_rnd_sw_4148_f19cv43",
-        "interface": "eth1/1/52"
-      },
-      "b": {
-        "device_id": "chn_rnd_srv_650_g1hvkj3",
-        "interface": "vmnic3"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": "hypervisor-access",
-      "notes": "Imported from Lab Navigator wiremap."
-    },
-    {
-      "id": "ln_chn_rnd_sw_4148_f19cv43_eth1_1_54_chn_rnd_srv_650_g1hvkj3_vmnic2",
-      "a": {
-        "device_id": "chn_rnd_sw_4148_f19cv43",
-        "interface": "eth1/1/54"
-      },
-      "b": {
-        "device_id": "chn_rnd_srv_650_g1hvkj3",
-        "interface": "vmnic2"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": "hypervisor-access",
-      "notes": "Imported from Lab Navigator wiremap."
-    },
-    {
-      "id": "ln_chn_rnd_sw_3048_cnzc9z2_gigabitethernet1_46_chn_rnd_sw_4148_f19cv43_mgmt1_1_1",
-      "a": {
-        "device_id": "chn_rnd_sw_3048_cnzc9z2",
-        "interface": "gigabitethernet1/46"
-      },
-      "b": {
-        "device_id": "chn_rnd_sw_4148_f19cv43",
-        "interface": "mgmt1/1/1"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": "switch-uplink",
-      "notes": "Imported from Lab Navigator wiremap."
-    },
-    {
-      "id": "ln_chn_rnd_sw_3048_cnzc9z2_gigabitethernet1_1_chn_rnd_srv_640_8fys6t2_idrac",
-      "a": {
-        "device_id": "chn_rnd_sw_3048_cnzc9z2",
-        "interface": "gigabitethernet1/1"
-      },
-      "b": {
-        "device_id": "chn_rnd_srv_640_8fys6t2",
-        "interface": "iDRAC"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": "hypervisor-access",
-      "notes": "Imported from Lab Navigator wiremap."
-    },
-    {
-      "id": "ln_chn_rnd_sw_3048_cnzc9z2_gigabitethernet1_3_chn_rnd_srv_640_4w8vf33_idrac",
-      "a": {
-        "device_id": "chn_rnd_sw_3048_cnzc9z2",
-        "interface": "gigabitethernet1/3"
-      },
-      "b": {
-        "device_id": "chn_rnd_srv_640_4w8vf33",
-        "interface": "iDRAC"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": "hypervisor-access",
-      "notes": "Imported from Lab Navigator wiremap."
-    },
-    {
-      "id": "ln_chn_rnd_sw_3048_cnzc9z2_gigabitethernet1_4_chn_rnd_srv_640_jv8vf33_idrac",
-      "a": {
-        "device_id": "chn_rnd_sw_3048_cnzc9z2",
-        "interface": "gigabitethernet1/4"
-      },
-      "b": {
-        "device_id": "chn_rnd_srv_640_jv8vf33",
-        "interface": "iDRAC"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": "hypervisor-access",
-      "notes": "Imported from Lab Navigator wiremap."
-    },
-    {
-      "id": "ln_chn_rnd_sw_3048_cnzc9z2_gigabitethernet1_43_chn_rnd_srv_650_g1hvkj3_vmnic0",
-      "a": {
-        "device_id": "chn_rnd_sw_3048_cnzc9z2",
-        "interface": "gigabitethernet1/43"
-      },
-      "b": {
-        "device_id": "chn_rnd_srv_650_g1hvkj3",
-        "interface": "vmnic0"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": "hypervisor-access",
-      "notes": "Imported from Lab Navigator wiremap."
-    },
-    {
       "id": "ln_chn_rnd_sw_3048_cnzc9z2_managementethernet1_1_chn_rnd_sw_3048_crrd9z2_gigabitethernet1_46",
       "a": {
-        "device_id": "chn_rnd_sw_3048_cnzc9z2",
+        "device_id": "ln_a02_232_switch_cnzc9z2",
         "interface": "managementethernet1/1"
       },
       "b": {
-        "device_id": "chn_rnd_sw_3048_crrd9z2",
+        "device_id": "ln_a02_231_switch_crrd9z2",
         "interface": "gigabitethernet1/46"
       },
       "vlans": [],
       "tagged_vlans": [],
       "untagged_vlan": null,
       "role": "switch-uplink",
-      "notes": "Imported from Lab Navigator wiremap."
-    },
-    {
-      "id": "ln_chn_rnd_sw_3048_crrd9z2_gigabitethernet1_1_chn_rnd_srv_640_8fys6t2_eno3",
-      "a": {
-        "device_id": "chn_rnd_sw_3048_crrd9z2",
-        "interface": "gigabitethernet1/1"
-      },
-      "b": {
-        "device_id": "chn_rnd_srv_640_8fys6t2",
-        "interface": "eno3"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": "hypervisor-access",
-      "notes": "Imported from Lab Navigator wiremap."
-    },
-    {
-      "id": "ln_chn_rnd_sw_3048_crrd9z2_gigabitethernet1_2_chn_rnd_srv_640_f88vf33_eno3",
-      "a": {
-        "device_id": "chn_rnd_sw_3048_crrd9z2",
-        "interface": "gigabitethernet1/2"
-      },
-      "b": {
-        "device_id": "chn_rnd_srv_640_f88vf33",
-        "interface": "eno3"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": "hypervisor-access",
-      "notes": "Imported from Lab Navigator wiremap."
-    },
-    {
-      "id": "ln_chn_rnd_sw_3048_crrd9z2_gigabitethernet1_3_chn_rnd_srv_640_4w8vf33_vmnic2",
-      "a": {
-        "device_id": "chn_rnd_sw_3048_crrd9z2",
-        "interface": "gigabitethernet1/3"
-      },
-      "b": {
-        "device_id": "chn_rnd_srv_640_4w8vf33",
-        "interface": "vmnic2"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": "hypervisor-access",
-      "notes": "Imported from Lab Navigator wiremap."
-    },
-    {
-      "id": "ln_chn_rnd_sw_3048_crrd9z2_gigabitethernet1_4_chn_rnd_srv_640_jv8vf33_vmnic2",
-      "a": {
-        "device_id": "chn_rnd_sw_3048_crrd9z2",
-        "interface": "gigabitethernet1/4"
-      },
-      "b": {
-        "device_id": "chn_rnd_srv_640_jv8vf33",
-        "interface": "vmnic2"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": "hypervisor-access",
       "notes": "Imported from Lab Navigator wiremap."
     },
     {
@@ -7312,7 +6537,7 @@
         "interface": "managementethernet1/1"
       },
       "b": {
-        "device_id": "chn_rnd_sw_3048_crrd9z2",
+        "device_id": "ln_a02_231_switch_crrd9z2",
         "interface": "gigabitethernet1/5"
       },
       "vlans": [],
@@ -7324,11 +6549,11 @@
     {
       "id": "ln_chn_rnd_sw_3048_crrd9z2_gigabitethernet1_42_chn_rnd_sw_4148_dq8cv43_mgmt1_1_1",
       "a": {
-        "device_id": "chn_rnd_sw_3048_crrd9z2",
+        "device_id": "ln_a02_231_switch_crrd9z2",
         "interface": "gigabitethernet1/42"
       },
       "b": {
-        "device_id": "chn_rnd_sw_4148_dq8cv43",
+        "device_id": "chn_rnd_sw_4148_ujx270b",
         "interface": "mgmt1/1/1"
       },
       "vlans": [],
@@ -7340,7 +6565,7 @@
     {
       "id": "ln_chn_rnd_sw_3048_crrd9z2_gigabitethernet1_44_chn_rnd_sw_3248_qg9immu_mgmt1_1_1",
       "a": {
-        "device_id": "chn_rnd_sw_3048_crrd9z2",
+        "device_id": "ln_a02_231_switch_crrd9z2",
         "interface": "gigabitethernet1/44"
       },
       "b": {
@@ -7356,43 +6581,11 @@
     {
       "id": "ln_chn_rnd_sw_3048_crrd9z2_gigabitethernet1_45_chn_rnd_sw_4048_gbwsnk2_managementethernet1_1",
       "a": {
-        "device_id": "chn_rnd_sw_3048_crrd9z2",
+        "device_id": "ln_a02_231_switch_crrd9z2",
         "interface": "gigabitethernet1/45"
       },
       "b": {
-        "device_id": "chn_rnd_sw_4048_gbwsnk2",
-        "interface": "managementethernet1/1"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": "switch-uplink",
-      "notes": "Imported from Lab Navigator wiremap."
-    },
-    {
-      "id": "ln_chn_rnd_sw_3048_c5mb9z2_managementethernet1_1_chn_rnd_sw_3048_crrd9z2_gigabitethernet1_47",
-      "a": {
-        "device_id": "chn_rnd_sw_3048_c5mb9z2",
-        "interface": "managementethernet1/1"
-      },
-      "b": {
-        "device_id": "chn_rnd_sw_3048_crrd9z2",
-        "interface": "gigabitethernet1/47"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": "switch-uplink",
-      "notes": "Imported from Lab Navigator wiremap."
-    },
-    {
-      "id": "ln_chn_rnd_sw_3048_crrd9z2_gigabitethernet1_48_chn_rnd_sw_3048_crrd9z2_managementethernet1_1",
-      "a": {
-        "device_id": "chn_rnd_sw_3048_crrd9z2",
-        "interface": "gigabitethernet1/48"
-      },
-      "b": {
-        "device_id": "chn_rnd_sw_3048_crrd9z2",
+        "device_id": "chn_rnd_sw_4048_igcf7dd",
         "interface": "managementethernet1/1"
       },
       "vlans": [],
@@ -7408,7 +6601,7 @@
         "interface": "po13"
       },
       "b": {
-        "device_id": "chn_rnd_sw_4148_dq8cv43",
+        "device_id": "chn_rnd_sw_4148_ujx270b",
         "interface": "eth1/1/46"
       },
       "vlans": [],
@@ -7418,45 +6611,13 @@
       "notes": "Imported from Lab Navigator wiremap."
     },
     {
-      "id": "ln_chn_rnd_sw_4148_dq8cv43_eth1_1_1_chn_rnd_srv_640_jv8vf33_vmnic0",
-      "a": {
-        "device_id": "chn_rnd_sw_4148_dq8cv43",
-        "interface": "eth1/1/1"
-      },
-      "b": {
-        "device_id": "chn_rnd_srv_640_jv8vf33",
-        "interface": "vmnic0"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": "hypervisor-access",
-      "notes": "Imported from Lab Navigator wiremap."
-    },
-    {
-      "id": "ln_chn_rnd_sw_4148_dq8cv43_eth1_1_2_chn_rnd_srv_640_jv8vf33_vmnic1",
-      "a": {
-        "device_id": "chn_rnd_sw_4148_dq8cv43",
-        "interface": "eth1/1/2"
-      },
-      "b": {
-        "device_id": "chn_rnd_srv_640_jv8vf33",
-        "interface": "vmnic1"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": "hypervisor-access",
-      "notes": "Imported from Lab Navigator wiremap."
-    },
-    {
       "id": "ln_chn_rnd_sw_4048_lhwf4j4_fortygigabitethernet1_53_chn_rnd_sw_4148_dq8cv43_eth1_1_25",
       "a": {
         "device_id": "chn_rnd_sw_4048_lhwf4j4",
         "interface": "fortygigabitethernet1/53"
       },
       "b": {
-        "device_id": "chn_rnd_sw_4148_dq8cv43",
+        "device_id": "chn_rnd_sw_4148_ujx270b",
         "interface": "eth1/1/25"
       },
       "vlans": [],
@@ -7472,7 +6633,7 @@
         "interface": "fortygigabitethernet1/54"
       },
       "b": {
-        "device_id": "chn_rnd_sw_4148_dq8cv43",
+        "device_id": "chn_rnd_sw_4148_ujx270b",
         "interface": "eth1/1/26"
       },
       "vlans": [],
@@ -7482,141 +6643,13 @@
       "notes": "Imported from Lab Navigator wiremap."
     },
     {
-      "id": "ln_chn_rnd_sw_4048_gbwsnk2_fortygigabitethernet1_53_chn_rnd_sw_4148_dq8cv43_eth1_1_29",
-      "a": {
-        "device_id": "chn_rnd_sw_4048_gbwsnk2",
-        "interface": "fortygigabitethernet1/53"
-      },
-      "b": {
-        "device_id": "chn_rnd_sw_4148_dq8cv43",
-        "interface": "eth1/1/29"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": "switch-uplink",
-      "notes": "Imported from Lab Navigator wiremap."
-    },
-    {
-      "id": "ln_chn_rnd_sw_4148_dq8cv43_eth1_1_3_chn_rnd_srv_640_4w8vf33_vmnic0",
-      "a": {
-        "device_id": "chn_rnd_sw_4148_dq8cv43",
-        "interface": "eth1/1/3"
-      },
-      "b": {
-        "device_id": "chn_rnd_srv_640_4w8vf33",
-        "interface": "vmnic0"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": "hypervisor-access",
-      "notes": "Imported from Lab Navigator wiremap."
-    },
-    {
-      "id": "ln_chn_rnd_sw_4048_gbwsnk2_fortygigabitethernet1_54_chn_rnd_sw_4148_dq8cv43_eth1_1_30",
-      "a": {
-        "device_id": "chn_rnd_sw_4048_gbwsnk2",
-        "interface": "fortygigabitethernet1/54"
-      },
-      "b": {
-        "device_id": "chn_rnd_sw_4148_dq8cv43",
-        "interface": "eth1/1/30"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": "switch-uplink",
-      "notes": "Imported from Lab Navigator wiremap."
-    },
-    {
-      "id": "ln_chn_rnd_sw_3048_c5mb9z2_tengigabitethernet1_49_chn_rnd_sw_4148_dq8cv43_eth1_1_31",
-      "a": {
-        "device_id": "chn_rnd_sw_3048_c5mb9z2",
-        "interface": "tengigabitethernet1/49"
-      },
-      "b": {
-        "device_id": "chn_rnd_sw_4148_dq8cv43",
-        "interface": "eth1/1/31"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": "switch-uplink",
-      "notes": "Imported from Lab Navigator wiremap."
-    },
-    {
-      "id": "ln_chn_rnd_sw_3048_c5mb9z2_tengigabitethernet1_50_chn_rnd_sw_4148_dq8cv43_eth1_1_32",
-      "a": {
-        "device_id": "chn_rnd_sw_3048_c5mb9z2",
-        "interface": "tengigabitethernet1/50"
-      },
-      "b": {
-        "device_id": "chn_rnd_sw_4148_dq8cv43",
-        "interface": "eth1/1/32"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": "switch-uplink",
-      "notes": "Imported from Lab Navigator wiremap."
-    },
-    {
-      "id": "ln_chn_rnd_sw_3048_c5mb9z2_tengigabitethernet1_51_chn_rnd_sw_4148_dq8cv43_eth1_1_33",
-      "a": {
-        "device_id": "chn_rnd_sw_3048_c5mb9z2",
-        "interface": "tengigabitethernet1/51"
-      },
-      "b": {
-        "device_id": "chn_rnd_sw_4148_dq8cv43",
-        "interface": "eth1/1/33"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": "switch-uplink",
-      "notes": "Imported from Lab Navigator wiremap."
-    },
-    {
-      "id": "ln_chn_rnd_sw_3048_c5mb9z2_tengigabitethernet1_52_chn_rnd_sw_4148_dq8cv43_eth1_1_34",
-      "a": {
-        "device_id": "chn_rnd_sw_3048_c5mb9z2",
-        "interface": "tengigabitethernet1/52"
-      },
-      "b": {
-        "device_id": "chn_rnd_sw_4148_dq8cv43",
-        "interface": "eth1/1/34"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": "switch-uplink",
-      "notes": "Imported from Lab Navigator wiremap."
-    },
-    {
-      "id": "ln_chn_rnd_sw_4148_dq8cv43_eth1_1_4_chn_rnd_srv_640_4w8vf33_vmnic1",
-      "a": {
-        "device_id": "chn_rnd_sw_4148_dq8cv43",
-        "interface": "eth1/1/4"
-      },
-      "b": {
-        "device_id": "chn_rnd_srv_640_4w8vf33",
-        "interface": "vmnic1"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": "hypervisor-access",
-      "notes": "Imported from Lab Navigator wiremap."
-    },
-    {
       "id": "ln_chn_rnd_sw_3248_qg9immu_eth1_1_49_chn_rnd_sw_4148_dq8cv43_eth1_1_43",
       "a": {
         "device_id": "chn_rnd_sw_3248_qg9immu",
         "interface": "eth1/1/49"
       },
       "b": {
-        "device_id": "chn_rnd_sw_4148_dq8cv43",
+        "device_id": "chn_rnd_sw_4148_ujx270b",
         "interface": "eth1/1/43"
       },
       "vlans": [],
@@ -7632,7 +6665,7 @@
         "interface": "eth1/1/50"
       },
       "b": {
-        "device_id": "chn_rnd_sw_4148_dq8cv43",
+        "device_id": "chn_rnd_sw_4148_ujx270b",
         "interface": "eth1/1/44"
       },
       "vlans": [],
@@ -7642,73 +6675,9 @@
       "notes": "Imported from Lab Navigator wiremap."
     },
     {
-      "id": "ln_chn_rnd_sw_4148_dq8cv43_eth1_1_5_chn_rnd_srv_640_f88vf33_eno1np0",
-      "a": {
-        "device_id": "chn_rnd_sw_4148_dq8cv43",
-        "interface": "eth1/1/5"
-      },
-      "b": {
-        "device_id": "chn_rnd_srv_640_f88vf33",
-        "interface": "eno1np0"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": "hypervisor-access",
-      "notes": "Imported from Lab Navigator wiremap."
-    },
-    {
-      "id": "ln_chn_rnd_sw_4148_dq8cv43_eth1_1_6_chn_rnd_srv_640_f88vf33_eno2np1",
-      "a": {
-        "device_id": "chn_rnd_sw_4148_dq8cv43",
-        "interface": "eth1/1/6"
-      },
-      "b": {
-        "device_id": "chn_rnd_srv_640_f88vf33",
-        "interface": "eno2np1"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": "hypervisor-access",
-      "notes": "Imported from Lab Navigator wiremap."
-    },
-    {
-      "id": "ln_chn_rnd_sw_4148_dq8cv43_eth1_1_7_chn_rnd_srv_640_8fys6t2_eno1np0",
-      "a": {
-        "device_id": "chn_rnd_sw_4148_dq8cv43",
-        "interface": "eth1/1/7"
-      },
-      "b": {
-        "device_id": "chn_rnd_srv_640_8fys6t2",
-        "interface": "eno1np0"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": "hypervisor-access",
-      "notes": "Imported from Lab Navigator wiremap."
-    },
-    {
-      "id": "ln_chn_rnd_sw_4148_dq8cv43_eth1_1_8_chn_rnd_srv_640_8fys6t2_eno2np1",
-      "a": {
-        "device_id": "chn_rnd_sw_4148_dq8cv43",
-        "interface": "eth1/1/8"
-      },
-      "b": {
-        "device_id": "chn_rnd_srv_640_8fys6t2",
-        "interface": "eno2np1"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": "hypervisor-access",
-      "notes": "Imported from Lab Navigator wiremap."
-    },
-    {
       "id": "ln_chn_rnd_sw_3048_c5mb9z2_gigabitethernet1_27_chn_rnd_srv_640_198vf33_eno1np0",
       "a": {
-        "device_id": "chn_rnd_sw_3048_c5mb9z2",
+        "device_id": "chn_rnd_sw_3048_m0ap7qi",
         "interface": "gigabitethernet1/27"
       },
       "b": {
@@ -9968,7 +8937,7 @@
         "interface": "tengigabitethernet1/51"
       },
       "b": {
-        "device_id": "chn_rnd_sw_4048_hfcqxc2",
+        "device_id": "ln_a01_340_switch_hfcqxc2",
         "interface": "tengigabitethernet1/45"
       },
       "vlans": [],
@@ -9980,7 +8949,7 @@
     {
       "id": "ln_chn_rnd_sw_3048_dtrb9z2_gigabitethernet1_43_chn_rnd_sw_3048_fctd9z2_managementethernet1_1",
       "a": {
-        "device_id": "chn_rnd_sw_3048_dtrb9z2",
+        "device_id": "ln_a01_848_switch_dtrb9z2",
         "interface": "gigabitethernet1/43"
       },
       "b": {
@@ -9994,93 +8963,13 @@
       "notes": "Imported from Lab Navigator wiremap."
     },
     {
-      "id": "ln_chn_rnd_sw_4048_hfcqxc2_tengigabitethernet1_1_chn_rnd_srv_640_298vf33_vmnic0",
-      "a": {
-        "device_id": "chn_rnd_sw_4048_hfcqxc2",
-        "interface": "tengigabitethernet1/1"
-      },
-      "b": {
-        "device_id": "chn_rnd_srv_640_298vf33",
-        "interface": "vmnic0"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": "hypervisor-access",
-      "notes": "Imported from Lab Navigator wiremap."
-    },
-    {
-      "id": "ln_chn_rnd_sw_4048_hfcqxc2_tengigabitethernet1_2_chn_rnd_srv_640_5s8vf33_vmnic0",
-      "a": {
-        "device_id": "chn_rnd_sw_4048_hfcqxc2",
-        "interface": "tengigabitethernet1/2"
-      },
-      "b": {
-        "device_id": "chn_rnd_srv_640_5s8vf33",
-        "interface": "vmnic0"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": "hypervisor-access",
-      "notes": "Imported from Lab Navigator wiremap."
-    },
-    {
-      "id": "ln_chn_rnd_sw_4048_hfcqxc2_tengigabitethernet1_3_chn_rnd_srv_640_8kcgjj3_vmnic2",
-      "a": {
-        "device_id": "chn_rnd_sw_4048_hfcqxc2",
-        "interface": "tengigabitethernet1/3"
-      },
-      "b": {
-        "device_id": "chn_rnd_srv_640_8kcgjj3",
-        "interface": "vmnic2"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": "hypervisor-access",
-      "notes": "Imported from Lab Navigator wiremap."
-    },
-    {
-      "id": "ln_chn_rnd_sw_4048_hfcqxc2_tengigabitethernet1_9_chn_rnd_srv_640_2p83s63_vmnic0",
-      "a": {
-        "device_id": "chn_rnd_sw_4048_hfcqxc2",
-        "interface": "tengigabitethernet1/9"
-      },
-      "b": {
-        "device_id": "chn_rnd_srv_640_2p83s63",
-        "interface": "vmnic0"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": "hypervisor-access",
-      "notes": "Imported from Lab Navigator wiremap."
-    },
-    {
-      "id": "ln_chn_rnd_sw_4048_hfcqxc2_tengigabitethernet1_10_chn_rnd_srv_640_3p83s63_vmnic0",
-      "a": {
-        "device_id": "chn_rnd_sw_4048_hfcqxc2",
-        "interface": "tengigabitethernet1/10"
-      },
-      "b": {
-        "device_id": "chn_rnd_srv_640_3p83s63",
-        "interface": "vmnic0"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": "hypervisor-access",
-      "notes": "Imported from Lab Navigator wiremap."
-    },
-    {
       "id": "ln_chn_rnd_sw_4048_hfcqxc2_tengigabitethernet1_11_chn_rnd_srv_640_js8vf33_vmnic0",
       "a": {
-        "device_id": "chn_rnd_sw_4048_hfcqxc2",
+        "device_id": "ln_a01_340_switch_hfcqxc2",
         "interface": "tengigabitethernet1/11"
       },
       "b": {
-        "device_id": "chn_rnd_srv_640_js8vf33",
+        "device_id": "ln_a01_352_hypervisor_js8vf33",
         "interface": "vmnic0"
       },
       "vlans": [],
@@ -10092,11 +8981,11 @@
     {
       "id": "ln_chn_rnd_sw_4048_hfcqxc2_tengigabitethernet1_12_chn_rnd_srv_640_588vf33_vmnic0",
       "a": {
-        "device_id": "chn_rnd_sw_4048_hfcqxc2",
+        "device_id": "ln_a01_340_switch_hfcqxc2",
         "interface": "tengigabitethernet1/12"
       },
       "b": {
-        "device_id": "chn_rnd_srv_640_588vf33",
+        "device_id": "ln_a01_353_hypervisor_588vf33",
         "interface": "vmnic0"
       },
       "vlans": [],
@@ -10108,11 +8997,11 @@
     {
       "id": "ln_chn_rnd_sw_4048_hfcqxc2_tengigabitethernet1_13_chn_rnd_srv_640_hlz02s2_eno1",
       "a": {
-        "device_id": "chn_rnd_sw_4048_hfcqxc2",
+        "device_id": "ln_a01_340_switch_hfcqxc2",
         "interface": "tengigabitethernet1/13"
       },
       "b": {
-        "device_id": "chn_rnd_srv_640_hlz02s2",
+        "device_id": "ln_a02_349_hypervisor_hlz02s2",
         "interface": "eno1"
       },
       "vlans": [],
@@ -10128,7 +9017,7 @@
         "interface": "tengigabitethernet1/51"
       },
       "b": {
-        "device_id": "chn_rnd_sw_4048_hfcqxc2",
+        "device_id": "ln_a01_340_switch_hfcqxc2",
         "interface": "tengigabitethernet1/42"
       },
       "vlans": [],
@@ -10144,7 +9033,7 @@
         "interface": "tengigabitethernet1/51"
       },
       "b": {
-        "device_id": "chn_rnd_sw_4048_hfcqxc2",
+        "device_id": "ln_a01_340_switch_hfcqxc2",
         "interface": "tengigabitethernet1/43"
       },
       "vlans": [],
@@ -10160,7 +9049,7 @@
         "interface": "tengigabitethernet1/51"
       },
       "b": {
-        "device_id": "chn_rnd_sw_4048_hfcqxc2",
+        "device_id": "ln_a01_340_switch_hfcqxc2",
         "interface": "tengigabitethernet1/44"
       },
       "vlans": [],
@@ -10176,7 +9065,7 @@
         "interface": "tengigabitethernet1/51"
       },
       "b": {
-        "device_id": "chn_rnd_sw_4048_hfcqxc2",
+        "device_id": "ln_a01_340_switch_hfcqxc2",
         "interface": "tengigabitethernet1/46"
       },
       "vlans": [],
@@ -10188,11 +9077,11 @@
     {
       "id": "ln_chn_rnd_sw_3048_dtrb9z2_gigabitethernet1_46_chn_rnd_sw_4048_hfcqxc2_managementethernet1_1",
       "a": {
-        "device_id": "chn_rnd_sw_3048_dtrb9z2",
+        "device_id": "ln_a01_848_switch_dtrb9z2",
         "interface": "gigabitethernet1/46"
       },
       "b": {
-        "device_id": "chn_rnd_sw_4048_hfcqxc2",
+        "device_id": "ln_a01_340_switch_hfcqxc2",
         "interface": "managementethernet1/1"
       },
       "vlans": [],
@@ -10202,141 +9091,13 @@
       "notes": "Imported from Lab Navigator wiremap."
     },
     {
-      "id": "ln_chn_rnd_sw_3048_dtrb9z2_gigabitethernet1_31_chn_rnd_srv_640_5s8vf33_vmnic2",
-      "a": {
-        "device_id": "chn_rnd_sw_3048_dtrb9z2",
-        "interface": "gigabitethernet1/31"
-      },
-      "b": {
-        "device_id": "chn_rnd_srv_640_5s8vf33",
-        "interface": "vmnic2"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": "hypervisor-access",
-      "notes": "Imported from Lab Navigator wiremap."
-    },
-    {
-      "id": "ln_chn_rnd_sw_3048_dtrb9z2_gigabitethernet1_33_chn_rnd_srv_640_298vf33_vmnic2",
-      "a": {
-        "device_id": "chn_rnd_sw_3048_dtrb9z2",
-        "interface": "gigabitethernet1/33"
-      },
-      "b": {
-        "device_id": "chn_rnd_srv_640_298vf33",
-        "interface": "vmnic2"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": "hypervisor-access",
-      "notes": "Imported from Lab Navigator wiremap."
-    },
-    {
-      "id": "ln_chn_rnd_sw_3048_dtrb9z2_gigabitethernet1_34_chn_rnd_srv_640_8kcgjj3_vmnic1",
-      "a": {
-        "device_id": "chn_rnd_sw_3048_dtrb9z2",
-        "interface": "gigabitethernet1/34"
-      },
-      "b": {
-        "device_id": "chn_rnd_srv_640_8kcgjj3",
-        "interface": "vmnic1"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": "hypervisor-access",
-      "notes": "Imported from Lab Navigator wiremap."
-    },
-    {
-      "id": "ln_chn_rnd_sw_3048_dtrb9z2_gigabitethernet1_35_chn_rnd_srv_640_js8vf33_vmnic2",
-      "a": {
-        "device_id": "chn_rnd_sw_3048_dtrb9z2",
-        "interface": "gigabitethernet1/35"
-      },
-      "b": {
-        "device_id": "chn_rnd_srv_640_js8vf33",
-        "interface": "vmnic2"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": "hypervisor-access",
-      "notes": "Imported from Lab Navigator wiremap."
-    },
-    {
-      "id": "ln_chn_rnd_sw_3048_dtrb9z2_gigabitethernet1_36_chn_rnd_srv_640_588vf33_vmnic2",
-      "a": {
-        "device_id": "chn_rnd_sw_3048_dtrb9z2",
-        "interface": "gigabitethernet1/36"
-      },
-      "b": {
-        "device_id": "chn_rnd_srv_640_588vf33",
-        "interface": "vmnic2"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": "hypervisor-access",
-      "notes": "Imported from Lab Navigator wiremap."
-    },
-    {
-      "id": "ln_chn_rnd_sw_3048_dtrb9z2_gigabitethernet1_38_chn_rnd_srv_640_2p83s63_vmnic3",
-      "a": {
-        "device_id": "chn_rnd_sw_3048_dtrb9z2",
-        "interface": "gigabitethernet1/38"
-      },
-      "b": {
-        "device_id": "chn_rnd_srv_640_2p83s63",
-        "interface": "vmnic3"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": "hypervisor-access",
-      "notes": "Imported from Lab Navigator wiremap."
-    },
-    {
-      "id": "ln_chn_rnd_sw_3048_dtrb9z2_gigabitethernet1_39_chn_rnd_srv_640_hlz02s2_eno3",
-      "a": {
-        "device_id": "chn_rnd_sw_3048_dtrb9z2",
-        "interface": "gigabitethernet1/39"
-      },
-      "b": {
-        "device_id": "chn_rnd_srv_640_hlz02s2",
-        "interface": "eno3"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": "hypervisor-access",
-      "notes": "Imported from Lab Navigator wiremap."
-    },
-    {
-      "id": "ln_chn_rnd_sw_3048_dtrb9z2_gigabitethernet1_40_chn_rnd_srv_640_3p83s63_vmnic3",
-      "a": {
-        "device_id": "chn_rnd_sw_3048_dtrb9z2",
-        "interface": "gigabitethernet1/40"
-      },
-      "b": {
-        "device_id": "chn_rnd_srv_640_3p83s63",
-        "interface": "vmnic3"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": "hypervisor-access",
-      "notes": "Imported from Lab Navigator wiremap."
-    },
-    {
       "id": "ln_chn_rnd_sw_3048_73v00q2_managementethernet1_1_chn_rnd_sw_3048_dtrb9z2_gigabitethernet1_41",
       "a": {
         "device_id": "chn_rnd_sw_3048_73v00q2",
         "interface": "managementethernet1/1"
       },
       "b": {
-        "device_id": "chn_rnd_sw_3048_dtrb9z2",
+        "device_id": "ln_a01_848_switch_dtrb9z2",
         "interface": "gigabitethernet1/41"
       },
       "vlans": [],
@@ -10348,7 +9109,7 @@
     {
       "id": "ln_chn_rnd_sw_3048_dtrb9z2_gigabitethernet1_42_chn_rnd_sw_3048_fd1f9z2_managementethernet1_1",
       "a": {
-        "device_id": "chn_rnd_sw_3048_dtrb9z2",
+        "device_id": "ln_a01_848_switch_dtrb9z2",
         "interface": "gigabitethernet1/42"
       },
       "b": {
@@ -10364,7 +9125,7 @@
     {
       "id": "ln_chn_rnd_sw_3048_dtrb9z2_gigabitethernet1_44_chn_rnd_sw_3048_j8vsg02_managementethernet1_1",
       "a": {
-        "device_id": "chn_rnd_sw_3048_dtrb9z2",
+        "device_id": "ln_a01_848_switch_dtrb9z2",
         "interface": "gigabitethernet1/44"
       },
       "b": {
@@ -10378,25 +9139,9 @@
       "notes": "Imported from Lab Navigator wiremap."
     },
     {
-      "id": "ln_chn_rnd_sw_3048_73kzzp2_managementethernet1_1_chn_rnd_sw_3048_dtrb9z2_gigabitethernet1_45",
-      "a": {
-        "device_id": "chn_rnd_sw_3048_73kzzp2",
-        "interface": "managementethernet1/1"
-      },
-      "b": {
-        "device_id": "chn_rnd_sw_3048_dtrb9z2",
-        "interface": "gigabitethernet1/45"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": "switch-uplink",
-      "notes": "Imported from Lab Navigator wiremap."
-    },
-    {
       "id": "ln_chn_rnd_sw_3048_dtrb9z2_gigabitethernet1_47_chn_rnd_sw_3048_j8f10q2_managementethernet1_1",
       "a": {
-        "device_id": "chn_rnd_sw_3048_dtrb9z2",
+        "device_id": "ln_a01_848_switch_dtrb9z2",
         "interface": "gigabitethernet1/47"
       },
       "b": {
@@ -10407,134 +9152,6 @@
       "tagged_vlans": [],
       "untagged_vlan": null,
       "role": "switch-uplink",
-      "notes": "Imported from Lab Navigator wiremap."
-    },
-    {
-      "id": "ln_chn_rnd_sw_3048_dtrb9z2_gigabitethernet1_48_chn_rnd_sw_3048_dtrb9z2_managementethernet1_1",
-      "a": {
-        "device_id": "chn_rnd_sw_3048_dtrb9z2",
-        "interface": "gigabitethernet1/48"
-      },
-      "b": {
-        "device_id": "chn_rnd_sw_3048_dtrb9z2",
-        "interface": "managementethernet1/1"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": "switch-uplink",
-      "notes": "Imported from Lab Navigator wiremap."
-    },
-    {
-      "id": "ln_chn_rnd_sw_3048_73kzzp2_gigabitethernet1_1_chn_rnd_srv_640_8kcgjj3_idrac",
-      "a": {
-        "device_id": "chn_rnd_sw_3048_73kzzp2",
-        "interface": "gigabitethernet1/1"
-      },
-      "b": {
-        "device_id": "chn_rnd_srv_640_8kcgjj3",
-        "interface": "iDRAC"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": "hypervisor-access",
-      "notes": "Imported from Lab Navigator wiremap."
-    },
-    {
-      "id": "ln_chn_rnd_sw_3048_73kzzp2_gigabitethernet1_2_chn_rnd_srv_640_298vf33_idrac",
-      "a": {
-        "device_id": "chn_rnd_sw_3048_73kzzp2",
-        "interface": "gigabitethernet1/2"
-      },
-      "b": {
-        "device_id": "chn_rnd_srv_640_298vf33",
-        "interface": "iDRAC"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": "hypervisor-access",
-      "notes": "Imported from Lab Navigator wiremap."
-    },
-    {
-      "id": "ln_chn_rnd_sw_3048_73kzzp2_gigabitethernet1_4_chn_rnd_srv_640_588vf33_idrac",
-      "a": {
-        "device_id": "chn_rnd_sw_3048_73kzzp2",
-        "interface": "gigabitethernet1/4"
-      },
-      "b": {
-        "device_id": "chn_rnd_srv_640_588vf33",
-        "interface": "iDRAC"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": "hypervisor-access",
-      "notes": "Imported from Lab Navigator wiremap."
-    },
-    {
-      "id": "ln_chn_rnd_sw_3048_73kzzp2_gigabitethernet1_5_chn_rnd_srv_640_5s8vf33_idrac",
-      "a": {
-        "device_id": "chn_rnd_sw_3048_73kzzp2",
-        "interface": "gigabitethernet1/5"
-      },
-      "b": {
-        "device_id": "chn_rnd_srv_640_5s8vf33",
-        "interface": "iDRAC"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": "hypervisor-access",
-      "notes": "Imported from Lab Navigator wiremap."
-    },
-    {
-      "id": "ln_chn_rnd_sw_3048_73kzzp2_gigabitethernet1_6_chn_rnd_srv_640_js8vf33_idrac",
-      "a": {
-        "device_id": "chn_rnd_sw_3048_73kzzp2",
-        "interface": "gigabitethernet1/6"
-      },
-      "b": {
-        "device_id": "chn_rnd_srv_640_js8vf33",
-        "interface": "iDRAC"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": "hypervisor-access",
-      "notes": "Imported from Lab Navigator wiremap."
-    },
-    {
-      "id": "ln_chn_rnd_sw_3048_73kzzp2_gigabitethernet1_47_chn_rnd_srv_640_2p83s63_idrac",
-      "a": {
-        "device_id": "chn_rnd_sw_3048_73kzzp2",
-        "interface": "gigabitethernet1/47"
-      },
-      "b": {
-        "device_id": "chn_rnd_srv_640_2p83s63",
-        "interface": "iDRAC"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": "hypervisor-access",
-      "notes": "Imported from Lab Navigator wiremap."
-    },
-    {
-      "id": "ln_chn_rnd_sw_3048_73kzzp2_gigabitethernet1_48_chn_rnd_srv_640_3p83s63_idrac",
-      "a": {
-        "device_id": "chn_rnd_sw_3048_73kzzp2",
-        "interface": "gigabitethernet1/48"
-      },
-      "b": {
-        "device_id": "chn_rnd_srv_640_3p83s63",
-        "interface": "iDRAC"
-      },
-      "vlans": [],
-      "tagged_vlans": [],
-      "untagged_vlan": null,
-      "role": "hypervisor-access",
       "notes": "Imported from Lab Navigator wiremap."
     }
   ],

@@ -331,6 +331,9 @@ def resolve_mapping_path(
     # Each pair is one specific switch-port → hypervisor-port connection.
     # When hypervisor_interface is given, restrict to links where the hypervisor side
     # matches — this is the primary disambiguator when a switch has multiple NIC links.
+    # Inventory may contain duplicate device IDs for the same physical switch (e.g. an
+    # LN-prefixed and a chn-prefixed entry); we keep all variants so the candidate loop
+    # can try each one via BFS and pick whichever is reachable.
     terminal_links: list[tuple[str, InventoryConnection]] = []
     for connection in inventory.connections:
         for sw_id, device in inventory.devices.items():
@@ -856,23 +859,13 @@ def _dfs_path(
     queue: deque[tuple[str, list[SwitchHop], set[str]]] = deque()
     queue.append((start_id, [start_hop], visited | {start_id}))
 
-    found: list[SwitchHop] | None = None
-    found_depth: int | None = None
-
     while queue:
         current_id, path, seen = queue.popleft()
-        depth = len(path)
-
-        # Once we've found a path, stop processing nodes deeper than that depth.
-        if found_depth is not None and depth > found_depth:
-            break
 
         if current_id == target_id:
-            if found is not None:
-                return None  # second path of the same length — ambiguous
-            found = path
-            found_depth = depth
-            continue  # keep draining the queue at this depth to detect siblings
+            # Multiple paths reaching the same target (e.g. parallel physical cables) are
+            # unambiguous — the destination is clear. Return the first shortest path found.
+            return path
 
         for uplink in _switch_links(current_id, devices, connections):
             remote_endpoint = _other_endpoint(uplink, current_id)

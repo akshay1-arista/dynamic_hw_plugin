@@ -155,6 +155,41 @@ class HardwarePathSummary(BaseModel):
     hypervisor_ip: Optional[str] = None
     complete: bool = False
 
+    @model_validator(mode="before")
+    @classmethod
+    def _migrate_legacy_flat_fields(cls, data: Any) -> Any:
+        """Convert old run_metadata.json payloads (flat access_*/upstream_* keys) to hops list."""
+        if not isinstance(data, dict) or "hops" in data:
+            return data
+        access_id = data.get("access_switch_id")
+        upstream_id = data.get("upstream_switch_id")
+        if not access_id and not upstream_id:
+            return data
+        hops = []
+        if access_id:
+            hops.append({
+                "switch_id": access_id,
+                "switch_name": data.get("access_switch_name") or access_id,
+                "switch_ip": data.get("access_switch_ip"),
+                "egress_port": data.get("access_uplink_port"),
+            })
+        if upstream_id and upstream_id != access_id:
+            hops.append({
+                "switch_id": upstream_id,
+                "switch_name": data.get("upstream_switch_name") or upstream_id,
+                "switch_ip": data.get("upstream_switch_ip"),
+                "switch_model": data.get("upstream_switch_model"),
+                "ingress_port": data.get("upstream_access_port"),
+                "egress_port": data.get("upstream_hypervisor_port"),
+            })
+        return {
+            "hops": hops,
+            "hypervisor_id": data.get("hypervisor_id"),
+            "hypervisor_name": data.get("hypervisor_name"),
+            "hypervisor_ip": data.get("hypervisor_ip"),
+            "complete": data.get("complete", False),
+        }
+
     # Backward-compat properties derived from hops[0] (access switch) and hops[-1] (upstream switch)
     @property
     def access_switch_id(self) -> Optional[str]:

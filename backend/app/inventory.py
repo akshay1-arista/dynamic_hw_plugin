@@ -760,11 +760,13 @@ def _derive_path_summary(
             hypervisor_ip=active.hypervisor_ip,
         )
 
-    hypervisor_link = _hypervisor_access_link(hops[-1].switch_id, active.hypervisor_ip, devices, connections)
-    if not hypervisor_link:
+    # Require exactly one hypervisor-access link on the terminal switch — multiple links means
+    # the vmnic is ambiguous and we cannot safely pick one without user input.
+    terminal_links = _hypervisor_access_links(hops[-1].switch_id, active.hypervisor_ip, devices, connections)
+    if len(terminal_links) != 1:
         return HardwarePathSummary(hops=hops, hypervisor_ip=active.hypervisor_ip)
 
-    hypervisor_endpoint = _other_endpoint(hypervisor_link, hops[-1].switch_id)
+    hypervisor_endpoint = _other_endpoint(terminal_links[0], hops[-1].switch_id)
     hypervisor_device = devices.get(hypervisor_endpoint.device_id)
     return HardwarePathSummary(
         hops=hops,
@@ -835,8 +837,8 @@ def _dfs_path(
 ) -> list[SwitchHop] | None:
     """BFS from start_id to target_id through switch-uplink edges.
 
-    Returns the shortest path as a list of SwitchHop objects (start first, target last), or None if not found.
-    When multiple equal-length paths exist, returns the first one found.
+    Returns the unique shortest path as a list of SwitchHop objects (start first, target last).
+    Returns None if no path exists or if multiple paths of the same minimum length exist (ambiguous).
     """
     from collections import deque
 
@@ -844,21 +846,33 @@ def _dfs_path(
     if not start_device:
         return None
 
-    # Each queue entry: (current_device_id, path_so_far_as_SwitchHop_list, visited_set)
     start_hop = SwitchHop(
         switch_id=start_id,
         switch_name=start_device.display_name,
         switch_ip=start_device.ip_address,
         switch_model=start_device.model,
     )
+    # Each queue entry: (current_device_id, path_so_far_as_SwitchHop_list, visited_set)
     queue: deque[tuple[str, list[SwitchHop], set[str]]] = deque()
     queue.append((start_id, [start_hop], visited | {start_id}))
 
+    found: list[SwitchHop] | None = None
+    found_depth: int | None = None
+
     while queue:
         current_id, path, seen = queue.popleft()
+        depth = len(path)
+
+        # Once we've found a path, stop processing nodes deeper than that depth.
+        if found_depth is not None and depth > found_depth:
+            break
 
         if current_id == target_id:
-            return path
+            if found is not None:
+                return None  # second path of the same length — ambiguous
+            found = path
+            found_depth = depth
+            continue  # keep draining the queue at this depth to detect siblings
 
         for uplink in _switch_links(current_id, devices, connections):
             remote_endpoint = _other_endpoint(uplink, current_id)
@@ -867,7 +881,6 @@ def _dfs_path(
             egress_port = _edge_endpoint(uplink, current_id).interface
             ingress_port = remote_endpoint.interface
 
-            # Annotate the last hop with its egress port, and create the next hop with ingress port
             updated_last = path[-1].model_copy(update={"egress_port": egress_port})
             remote_device = devices.get(remote_endpoint.device_id)
             if not remote_device:
@@ -882,7 +895,17 @@ def _dfs_path(
             new_path = path[:-1] + [updated_last, next_hop]
             queue.append((remote_endpoint.device_id, new_path, seen | {remote_endpoint.device_id}))
 
-    return None
+    return found
+
+
+def _hypervisor_access_links(
+    switch_id: str,
+    hypervisor_ip: str,
+    devices: dict[str, InventoryDevice],
+    connections: list[InventoryConnection],
+) -> list[InventoryConnection]:
+    """Return all hypervisor-access links from switch_id to hypervisor_ip."""
+    return [c for c in connections if _is_hypervisor_access_connection(c, switch_id, devices, hypervisor_ip)]
 
 
 def _hypervisor_access_link(
@@ -892,7 +915,7 @@ def _hypervisor_access_link(
     connections: list[InventoryConnection],
 ) -> InventoryConnection | None:
     """Return the first hypervisor-access link from switch_id to hypervisor_ip, or None if none exist."""
-    links = [c for c in connections if _is_hypervisor_access_connection(c, switch_id, devices, hypervisor_ip)]
+    links = _hypervisor_access_links(switch_id, hypervisor_ip, devices, connections)
     return links[0] if links else None
 
 

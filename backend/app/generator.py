@@ -273,7 +273,7 @@ def _validate_request(request: GenerateRequest, hardware_by_id: dict[str, Hardwa
         raise GenerationError(f"Unknown hardware inventory id: {', '.join(missing)}")
     for mapping in request.mappings:
         hardware = hardware_by_id[mapping.hardware_id]
-        if not hardware.available:
+        if not _hardware_is_available_for_request(hardware, request):
             reservation_actor = hardware.reservation.actor if hardware.reservation else None
             reserved_by = (
                 f"{reservation_actor.name} ({reservation_actor.email})"
@@ -285,6 +285,15 @@ def _validate_request(request: GenerateRequest, hardware_by_id: dict[str, Hardwa
             )
         if not _topology_ports(hardware):
             raise GenerationError(f"No connected switch ports found for {hardware.id}")
+
+
+def _hardware_is_available_for_request(hardware: HardwareEdge, request: GenerateRequest) -> bool:
+    if hardware.available:
+        return True
+    reservation = hardware.reservation
+    if reservation is None or reservation.reason != "topology-generation":
+        return False
+    return reservation.actor.email == request.requested_by.email
 
 
 def _merge_saved_hardware_snapshots(

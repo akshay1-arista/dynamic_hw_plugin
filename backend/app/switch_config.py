@@ -112,19 +112,26 @@ def _build_plans(
         path = mapping.path or (hardware.path if hardware else None)
         if not hardware or not path or not path.complete:
             raise SwitchConfigError(f"Run {metadata.run_id} is missing complete path data for {mapping.hardware_id}")
-        access_switch = inventory.devices.get(path.access_switch_id or "")
-        upstream_switch = inventory.devices.get(path.upstream_switch_id or "")
-        if not access_switch or not upstream_switch:
-            raise SwitchConfigError(f"Run {metadata.run_id} is missing switch inventory data for {mapping.hardware_id}")
-        _assert_supported_switch(access_switch)
-        _assert_supported_switch(upstream_switch)
+        if not path.hops:
+            raise SwitchConfigError(f"Run {metadata.run_id} has empty switch hops for {mapping.hardware_id}")
+
+        hop_devices: list[InventoryDevice] = []
+        for hop in path.hops:
+            device = inventory.devices.get(hop.switch_id)
+            if not device:
+                raise SwitchConfigError(f"Run {metadata.run_id} is missing switch inventory data for {hop.switch_id}")
+            _assert_supported_switch(device)
+            hop_devices.append(device)
+
+        access_switch = hop_devices[0]
+        upstream_switch = hop_devices[-1]
 
         access_state = _ensure_device_state(device_states, access_switch)
         upstream_state = _ensure_device_state(device_states, upstream_switch)
         access_ports: list[HardwarePortAllocation] = []
         upstream_ports: list[HardwarePortAllocation] = []
         for port in mapping.allocations:
-            port_switch = _resolve_mapping_switch(port.switch_name, access_switch, upstream_switch)
+            port_switch = _resolve_mapping_switch(port.switch_name, hop_devices)
             if not port_switch:
                 raise SwitchConfigError(
                     f"Run {metadata.run_id} contains an unsupported switch allocation for {port.switch_name}"
@@ -166,51 +173,69 @@ def _build_plans(
                 for vlan in _transport_vlans_for_port(port, generated_switch_links)
             }
         )
-        if path.access_uplink_port:
-            _add_shared_port(
-                access_state,
-                path.access_uplink_port,
-                description=_switch_link_description(upstream_switch, path.upstream_access_port),
-            )
-            _add_shared_transport(access_state, path.access_uplink_port, access_transport_vlans)
-            _add_shared_cleanup_vlans(access_state, path.access_uplink_port, access_transport_vlans)
-            _add_access_uplink_vlan_state(access_state, path.access_uplink_port, access_transport_vlans)
 
-        if path.upstream_access_port:
-            uplink_native = _connection_native_vlan(
-                inventory.connections,
-                path.access_switch_id,
-                path.access_uplink_port,
-                path.upstream_switch_id,
-                path.upstream_access_port,
-            )
-            _add_shared_port(
-                upstream_state,
-                path.upstream_access_port,
-                description=_switch_link_description(access_switch, path.access_uplink_port),
-                native_vlan=uplink_native,
-            )
-            _add_shared_transport(upstream_state, path.upstream_access_port, access_transport_vlans)
-            _add_shared_cleanup_vlans(upstream_state, path.upstream_access_port, access_transport_vlans)
+        # Configure each consecutive inter-switch link along the hop chain
+        for i, (hop, hop_device) in enumerate(zip(path.hops, hop_devices)):
+            hop_state = _ensure_device_state(device_states, hop_device)
+            is_access = i == 0
+            is_upstream = i == len(path.hops) - 1
 
-        if path.upstream_hypervisor_port:
-            hypervisor_native = _connection_native_vlan(
-                inventory.connections,
-                path.upstream_switch_id,
-                path.upstream_hypervisor_port,
-                path.hypervisor_id,
-                None,
-            )
-            _add_shared_port(
-                upstream_state,
-                path.upstream_hypervisor_port,
-                description=_hypervisor_link_description(path),
-                native_vlan=hypervisor_native,
-            )
-            _add_shared_transport(upstream_state, path.upstream_hypervisor_port, hypervisor_transport_vlans)
-            _add_shared_cleanup_vlans(upstream_state, path.upstream_hypervisor_port, hypervisor_transport_vlans)
-            _add_upstream_vlan_state(upstream_state, path, access_transport_vlans)
-            _add_hypervisor_vlan_state(upstream_state, path.upstream_hypervisor_port, hypervisor_transport_vlans)
+            # Egress port: this hop's outbound link (toward next switch or hypervisor)
+            if hop.egress_port:
+                if is_upstream:
+                    # Upstream switch → hypervisor
+                    hypervisor_native = _connection_native_vlan(
+                        inventory.connections,
+                        hop.switch_id,
+                        hop.egress_port,
+                        path.hypervisor_id,
+                        None,
+                    )
+                    _add_shared_port(
+                        hop_state,
+                        hop.egress_port,
+                        description=_hypervisor_link_description(path),
+                        native_vlan=hypervisor_native,
+                    )
+                    _add_shared_transport(hop_state, hop.egress_port, hypervisor_transport_vlans)
+                    _add_shared_cleanup_vlans(hop_state, hop.egress_port, hypervisor_transport_vlans)
+                    _add_upstream_vlan_state(hop_state, path, access_transport_vlans)
+                    _add_hypervisor_vlan_state(hop_state, hop.egress_port, hypervisor_transport_vlans)
+                else:
+                    # Any switch → next switch in chain
+                    next_hop = path.hops[i + 1]
+                    next_device = hop_devices[i + 1]
+                    vlans = hypervisor_transport_vlans if not is_access else access_transport_vlans
+                    _add_shared_port(
+                        hop_state,
+                        hop.egress_port,
+                        description=_switch_link_description(next_device, next_hop.ingress_port),
+                    )
+                    _add_shared_transport(hop_state, hop.egress_port, vlans)
+                    _add_shared_cleanup_vlans(hop_state, hop.egress_port, vlans)
+                    if is_access:
+                        _add_access_uplink_vlan_state(hop_state, hop.egress_port, vlans)
+
+            # Ingress port: this hop's inbound link (toward previous switch)
+            if hop.ingress_port and not is_access:
+                prev_hop = path.hops[i - 1]
+                prev_device = hop_devices[i - 1]
+                vlans = access_transport_vlans
+                uplink_native = _connection_native_vlan(
+                    inventory.connections,
+                    prev_hop.switch_id,
+                    prev_hop.egress_port,
+                    hop.switch_id,
+                    hop.ingress_port,
+                )
+                _add_shared_port(
+                    hop_state,
+                    hop.ingress_port,
+                    description=_switch_link_description(prev_device, prev_hop.egress_port),
+                    native_vlan=uplink_native,
+                )
+                _add_shared_transport(hop_state, hop.ingress_port, vlans)
+                _add_shared_cleanup_vlans(hop_state, hop.ingress_port, vlans)
 
     plans: list[tuple[SwitchCommandPlan, InventoryDevice]] = []
     for device_id in sorted(device_states):
@@ -731,11 +756,10 @@ def _os9_member_commands(command: str, interfaces: set[str]) -> list[str]:
 
 def _resolve_mapping_switch(
     switch_name: str,
-    access_switch: InventoryDevice,
-    upstream_switch: InventoryDevice,
+    hop_devices: list[InventoryDevice],
 ) -> InventoryDevice | None:
     normalized = _normalize_switch_name(switch_name)
-    for candidate in (access_switch, upstream_switch):
+    for candidate in hop_devices:
         if normalized in _switch_name_candidates(candidate):
             return candidate
     return None

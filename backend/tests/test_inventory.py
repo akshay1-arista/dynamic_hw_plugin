@@ -8,7 +8,7 @@ from app.inventory import (
     save_inventory_hardware_edits,
     update_hardware_availability,
 )
-from app.models import VlanRange
+from app.models import HardwarePathSummary, VlanRange
 
 
 def test_build_inventory_sanitizes_conflicting_remote_interface_connections():
@@ -569,3 +569,56 @@ def test_save_inventory_hardware_edits_preserves_existing_graph(tmp_path):
     assert len(persisted["connections"]) == 2
     assert persisted["devices"]["edge-1"]["vlan_range"] == {"start": 111, "end": 113}
     assert persisted["devices"]["edge-2"]["vlan_range"] == {"start": 201, "end": 203}
+
+
+def test_hardware_path_summary_migrates_legacy_flat_fields():
+    """Old run_metadata.json payloads with access_*/upstream_* flat fields deserialize correctly."""
+    legacy_payload = {
+        "access_switch_id": "access_sw",
+        "access_switch_name": "A01-S3048",
+        "access_switch_ip": "10.0.0.10",
+        "access_uplink_port": "tengigabitethernet1/51",
+        "upstream_switch_id": "upstream_sw",
+        "upstream_switch_name": "A01-S4148",
+        "upstream_switch_ip": "10.0.0.11",
+        "upstream_switch_model": "4148",
+        "upstream_access_port": "tengigabitethernet1/43",
+        "upstream_hypervisor_port": "tengigabitethernet1/9",
+        "hypervisor_id": "esxi_01",
+        "hypervisor_ip": "10.0.1.1",
+        "complete": True,
+    }
+
+    path = HardwarePathSummary.model_validate(legacy_payload)
+
+    assert len(path.hops) == 2
+    assert path.access_switch_id == "access_sw"
+    assert path.access_switch_name == "A01-S3048"
+    assert path.access_switch_ip == "10.0.0.10"
+    assert path.access_uplink_port == "tengigabitethernet1/51"
+    assert path.upstream_switch_id == "upstream_sw"
+    assert path.upstream_switch_name == "A01-S4148"
+    assert path.upstream_switch_ip == "10.0.0.11"
+    assert path.upstream_switch_model == "4148"
+    assert path.upstream_access_port == "tengigabitethernet1/43"
+    assert path.upstream_hypervisor_port == "tengigabitethernet1/9"
+    assert path.hypervisor_id == "esxi_01"
+    assert path.hypervisor_ip == "10.0.1.1"
+    assert path.complete is True
+
+
+def test_hardware_path_summary_single_switch_legacy():
+    """Legacy payload with only an access switch (no upstream) round-trips correctly."""
+    legacy_payload = {
+        "access_switch_id": "only_sw",
+        "access_switch_name": "A01-S3048",
+        "hypervisor_ip": "10.0.1.1",
+        "complete": False,
+    }
+
+    path = HardwarePathSummary.model_validate(legacy_payload)
+
+    assert len(path.hops) == 1
+    assert path.access_switch_id == "only_sw"
+    assert path.upstream_switch_id == "only_sw"  # hops[-1] == hops[0] for single hop
+    assert path.complete is False

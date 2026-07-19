@@ -108,6 +108,7 @@ export function App() {
   const [inventorySearch, setInventorySearch] = useState('');
   const [inventoryAvailabilityFilter, setInventoryAvailabilityFilter] = useState('all');
   const [inventoryLabelFilters, setInventoryLabelFilters] = useState([]);
+  const [generatedRunRequestedByFilter, setGeneratedRunRequestedByFilter] = useState('all');
   const [auditSearch, setAuditSearch] = useState('');
   const [expandedHardwareId, setExpandedHardwareId] = useState('');
   const [collapsedDataCards, setCollapsedDataCards] = useState({
@@ -196,6 +197,35 @@ export function App() {
     }
     return auditTrail.filter((event) => auditSearchText(event).includes(query));
   }, [auditTrail, auditSearch]);
+  const generatedRunRequesterOptions = useMemo(() => {
+    const requesters = new Map();
+    let hasUnknownRequester = false;
+    generatedRuns.forEach((run) => {
+      const actor = run.requested_by || null;
+      if (!actor?.email) {
+        hasUnknownRequester = true;
+        return;
+      }
+      requesters.set(actor.email, {
+        value: actor.email,
+        label: actorFilterLabel(actor)
+      });
+    });
+    return [
+      { value: 'all', label: 'All requesters' },
+      ...[...requesters.values()].sort((left, right) => left.label.localeCompare(right.label)),
+      ...(hasUnknownRequester ? [{ value: 'unknown', label: 'Unknown requester' }] : [])
+    ];
+  }, [generatedRuns]);
+  const filteredGeneratedRuns = useMemo(() => {
+    if (generatedRunRequestedByFilter === 'all') {
+      return generatedRuns;
+    }
+    if (generatedRunRequestedByFilter === 'unknown') {
+      return generatedRuns.filter((run) => !run.requested_by?.email);
+    }
+    return generatedRuns.filter((run) => run.requested_by?.email === generatedRunRequestedByFilter);
+  }, [generatedRuns, generatedRunRequestedByFilter]);
   const inventoryRefreshStatusByHardwareId = useMemo(
     () => buildInventoryRefreshStatusMap(inventoryRefreshFeedback?.summary),
     [inventoryRefreshFeedback]
@@ -224,6 +254,11 @@ export function App() {
     const validFilters = new Set(inventoryLabelFilterOptions.map((option) => option.key));
     setInventoryLabelFilters((current) => current.filter((filterKey) => validFilters.has(filterKey)));
   }, [inventoryLabelFilterOptions]);
+
+  useEffect(() => {
+    const validRequesters = new Set(generatedRunRequesterOptions.map((option) => option.value));
+    setGeneratedRunRequestedByFilter((current) => (validRequesters.has(current) ? current : 'all'));
+  }, [generatedRunRequesterOptions]);
 
   const filteredHardware = useMemo(() => {
     const query = inventorySearch.trim().toLowerCase();
@@ -449,6 +484,7 @@ export function App() {
     setSelectedPrivateBranchNames([]);
     setDeletingPrivateBranchNames([]);
     setPrivateBranchFeedback(null);
+    setGeneratedRunRequestedByFilter('all');
     setLoading(false);
   }
 
@@ -1087,43 +1123,62 @@ export function App() {
                   <p>No generated runs recorded yet.</p>
                 </div>
               ) : (
-                <div className="branchRegistryList">
-                  {generatedRuns.map((run) => (
-                    <div className="branchRegistryItem" key={run.run_id}>
-                      <div className="branchRegistrySelect">
-                        <span>
-                          <strong>{run.topology_name}</strong>
-                          <small>
-                            {run.reference_topology_id} / run {run.run_id}
-                          </small>
-                          <small>
-                            Requested as {run.requested_topology_name}
-                            {run.requested_by?.name ? ` by ${run.requested_by.name}` : ''}
-                          </small>
-                          {run.private_branch_name ? (
+                <>
+                  <label className="panelFilterField">
+                    Requested by
+                    <select
+                      aria-label="Filter generated runs by requested by"
+                      value={generatedRunRequestedByFilter}
+                      onChange={(event) => setGeneratedRunRequestedByFilter(event.target.value)}
+                    >
+                      {generatedRunRequesterOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <div className="branchRegistryList">
+                    {filteredGeneratedRuns.map((run) => (
+                      <div className="branchRegistryItem" key={run.run_id}>
+                        <div className="branchRegistrySelect">
+                          <span>
+                            <strong>{run.topology_name}</strong>
                             <small>
-                              {run.private_branch_pushed ? 'Pushed' : 'Committed only'} / {run.private_branch_name}
+                              {run.reference_topology_id} / run {run.run_id}
                             </small>
-                          ) : (
-                            <small>Not published to Gerrit yet</small>
-                          )}
-                        </span>
+                            <small>
+                              Requested as {run.requested_topology_name}
+                              {run.requested_by ? ` by ${actorNameLabel(run.requested_by)}` : ''}
+                            </small>
+                            {run.private_branch_name ? (
+                              <small>
+                                {run.private_branch_pushed ? 'Pushed' : 'Committed only'} / {run.private_branch_name}
+                              </small>
+                            ) : (
+                              <small>Not published to Gerrit yet</small>
+                            )}
+                          </span>
+                        </div>
+                        <button
+                          className="secondary savedRunLoadButton"
+                          onClick={() => loadSavedRun(run.run_id)}
+                          disabled={loadingSavedRunId !== '' || generating || publishingAction !== ''}
+                          aria-label={
+                            loadingSavedRunId === run.run_id ? `Loading run ${run.run_id}` : `Load run ${run.run_id}`
+                          }
+                          type="button"
+                        >
+                          {loadingSavedRunId === run.run_id ? <Loader2 className="spin" size={16} /> : <Archive size={16} />}
+                          {loadingSavedRunId === run.run_id ? 'Loading...' : 'Load'}
+                        </button>
                       </div>
-                      <button
-                        className="secondary savedRunLoadButton"
-                        onClick={() => loadSavedRun(run.run_id)}
-                        disabled={loadingSavedRunId !== '' || generating || publishingAction !== ''}
-                        aria-label={
-                          loadingSavedRunId === run.run_id ? `Loading run ${run.run_id}` : `Load run ${run.run_id}`
-                        }
-                        type="button"
-                      >
-                        {loadingSavedRunId === run.run_id ? <Loader2 className="spin" size={16} /> : <Archive size={16} />}
-                        {loadingSavedRunId === run.run_id ? 'Loading...' : 'Load'}
-                      </button>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                    {filteredGeneratedRuns.length === 0 && (
+                      <p className="muted">No generated runs match the selected requester.</p>
+                    )}
+                  </div>
+                </>
               )}
             </CollapsiblePanel>
 
@@ -1183,6 +1238,8 @@ export function App() {
                             {branch.private_branch_pushed ? 'pushed' : 'committed only'} / {branch.base_branch} / run{' '}
                             {branch.run_id}
                           </small>
+                          {branch.created_by && <small>Created by {actorSummaryLabel(branch.created_by)}</small>}
+                          {branch.pushed_by && <small>Pushed by {actorSummaryLabel(branch.pushed_by)}</small>}
                           <small>
                             {branch.topology_name} from {branch.reference_topology_id}
                           </small>
@@ -1841,6 +1898,27 @@ function auditSearchText(event) {
     .filter(Boolean)
     .join(' ')
     .toLowerCase();
+}
+
+function actorNameLabel(actor) {
+  if (!actor) {
+    return '';
+  }
+  return actor.name || actor.email || '';
+}
+
+function actorSummaryLabel(actor) {
+  if (!actor) {
+    return '';
+  }
+  if (actor.name && actor.email) {
+    return `${actor.name} (${actor.email})`;
+  }
+  return actor.name || actor.email || '';
+}
+
+function actorFilterLabel(actor) {
+  return actorSummaryLabel(actor) || 'Unknown requester';
 }
 
 function hardwareSearchText(hardware) {

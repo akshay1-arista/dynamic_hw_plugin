@@ -345,6 +345,20 @@ beforeEach(() => {
       updated_at: '2026-07-11T00:01:00+00:00',
       private_branch_name: null,
       private_branch_pushed: false
+    },
+    {
+      run_id: 'saved999',
+      topology_name: 'other-topology-z9y8x7',
+      requested_topology_name: 'other-topology',
+      reference_topology_id: '3-site',
+      requested_by: {
+        name: 'Other User',
+        email: 'other@example.com'
+      },
+      created_at: '2026-07-10T00:00:00+00:00',
+      updated_at: '2026-07-10T00:01:00+00:00',
+      private_branch_name: 'hw_topo_gen_private_saved999',
+      private_branch_pushed: true
     }
   ];
   let privateBranches = [];
@@ -686,6 +700,8 @@ beforeEach(() => {
         remote_branch_ref: `refs/heads/hw_topo_gen_private_${runId}`,
         fetch_command:
           `git fetch origin refs/heads/hw_topo_gen_private_${runId} && git checkout -b hw_topo_gen_private_${runId} FETCH_HEAD`,
+        created_by: payload.requested_by,
+        pushed_by: payload.requested_by,
         created_at: '2026-07-11T00:00:00+00:00',
         updated_at: '2026-07-11T00:01:00+00:00',
         messages: [{ level: 'info', message: 'Committed and pushed private branch to origin.' }]
@@ -706,6 +722,8 @@ beforeEach(() => {
           remote_name: response.remote_name,
           remote_branch_ref: response.remote_branch_ref,
           fetch_command: response.fetch_command,
+          created_by: response.created_by,
+          pushed_by: response.pushed_by,
           created_at: response.created_at,
           updated_at: response.updated_at
         }
@@ -1069,6 +1087,20 @@ describe('App', () => {
     });
   });
 
+  test('filters generated runs by requested by', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await screen.findAllByText('CHN 3800 HA Pair 8');
+    expect(screen.getByText('saved-topology-a1b2c3')).toBeInTheDocument();
+    expect(screen.getByText('other-topology-z9y8x7')).toBeInTheDocument();
+
+    await user.selectOptions(screen.getByLabelText('Filter generated runs by requested by'), 'test@example.com');
+
+    expect(screen.getByText('saved-topology-a1b2c3')).toBeInTheDocument();
+    expect(screen.queryByText('other-topology-z9y8x7')).not.toBeInTheDocument();
+  });
+
   test('adds mapping preview and generates download result', async () => {
     const user = userEvent.setup();
     render(<App />);
@@ -1201,6 +1233,8 @@ describe('App', () => {
     });
     expect(screen.getByText(/Remote ref: refs\/heads\/hw_topo_gen_private_abc123/)).toBeInTheDocument();
     expect(screen.getByText(/pushed \/ release_6.4 \/ run abc123/i)).toBeInTheDocument();
+    expect(screen.getByText('Created by Test User (test@example.com)')).toBeInTheDocument();
+    expect(screen.getByText('Pushed by Test User (test@example.com)')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /copy branch name/i }));
     expect(writeText).toHaveBeenCalledWith('hw_topo_gen_private_abc123');
     expect(await screen.findByText('Copied')).toBeInTheDocument();

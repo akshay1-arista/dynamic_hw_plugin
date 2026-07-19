@@ -1190,6 +1190,12 @@ button:disabled {
   margin-bottom: 14px;
 }
 
+.panelFilterField {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
 .bulkSelectToggle {
   min-height: 34px;
   padding: 0 2px;

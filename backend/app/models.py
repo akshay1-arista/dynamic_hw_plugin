@@ -465,6 +465,8 @@ class HapyPublishMetadata(BaseModel):
     remote_branch_ref: Optional[str] = None
     fetch_command: Optional[str] = None
     workspace_path: Optional[str] = None
+    created_by: Optional[ActorIdentity] = None
+    pushed_by: Optional[ActorIdentity] = None
     created_at: str
     updated_at: str
 
@@ -484,6 +486,8 @@ class HapyCommitResult(BaseModel):
     remote_name: str = "origin"
     remote_branch_ref: Optional[str] = None
     fetch_command: Optional[str] = None
+    created_by: Optional[ActorIdentity] = None
+    pushed_by: Optional[ActorIdentity] = None
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
     messages: list[ValidationMessage] = Field(default_factory=list)
@@ -505,6 +509,8 @@ class HapyPrivateBranchRecord(BaseModel):
     remote_branch_ref: Optional[str] = None
     fetch_command: Optional[str] = None
     workspace_path: Optional[str] = None
+    created_by: Optional[ActorIdentity] = None
+    pushed_by: Optional[ActorIdentity] = None
     created_at: str
     updated_at: str
 

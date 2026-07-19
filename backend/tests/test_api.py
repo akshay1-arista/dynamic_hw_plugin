@@ -315,6 +315,8 @@ def test_commit_hapy_route(monkeypatch):
             "remote_name": "origin",
             "remote_branch_ref": "refs/heads/hw_topo_gen_private_run123",
             "fetch_command": "git fetch origin refs/heads/hw_topo_gen_private_run123 && git checkout -b hw_topo_gen_private_run123 FETCH_HEAD",
+            "created_by": {"name": "Test User", "email": "test@example.com"},
+            "pushed_by": {"name": "Test User", "email": "test@example.com"},
             "created_at": "2026-07-11T00:00:00+00:00",
             "updated_at": "2026-07-11T00:01:00+00:00",
             "messages": [{"level": "info", "message": "Committed and pushed private branch."}],
@@ -327,6 +329,8 @@ def test_commit_hapy_route(monkeypatch):
     body = response.json()
     assert body["base_branch"] == "release_6.4"
     assert body["private_branch_name"] == "hw_topo_gen_private_run123"
+    assert body["created_by"]["email"] == "test@example.com"
+    assert body["pushed_by"]["email"] == "test@example.com"
 
 
 def test_list_private_branches_route(monkeypatch):
@@ -350,6 +354,8 @@ def test_list_private_branches_route(monkeypatch):
                     "remote_name": "origin",
                     "remote_branch_ref": None,
                     "fetch_command": None,
+                    "created_by": {"name": "Test User", "email": "test@example.com"},
+                    "pushed_by": None,
                     "created_at": "2026-07-11T00:00:00+00:00",
                     "updated_at": "2026-07-11T00:00:00+00:00",
                 }
@@ -361,6 +367,7 @@ def test_list_private_branches_route(monkeypatch):
 
     assert response.status_code == 200
     assert response.json()["branches"][0]["private_branch_name"] == "hw_topo_gen_private_run123"
+    assert response.json()["branches"][0]["created_by"]["email"] == "test@example.com"
 
 
 def test_list_saved_runs_route(monkeypatch):

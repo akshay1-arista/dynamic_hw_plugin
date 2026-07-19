@@ -128,6 +128,7 @@ def commit_run_to_hapy_repo(
         commit_message=commit_message,
         remote_name=remote_name,
         workspace_path=str(workspace_path),
+        created_by=request.requested_by,
         created_at=now,
         updated_at=now,
     )
@@ -208,6 +209,7 @@ def publish_run_private_branch(
     publish_metadata.remote_name = remote_name
     publish_metadata.remote_branch_ref = remote_branch_ref
     publish_metadata.private_branch_pushed = True
+    publish_metadata.pushed_by = request.requested_by
     publish_metadata.fetch_command = (
         f"git fetch {remote_name} {remote_branch_ref} && "
         f"git checkout -b {publish_metadata.private_branch_name} FETCH_HEAD"
@@ -507,6 +509,8 @@ def _upsert_registry_record(path: Path, publish_metadata: HapyPublishMetadata) -
         remote_branch_ref=publish_metadata.remote_branch_ref,
         fetch_command=publish_metadata.fetch_command,
         workspace_path=publish_metadata.workspace_path,
+        created_by=publish_metadata.created_by,
+        pushed_by=publish_metadata.pushed_by,
         created_at=publish_metadata.created_at,
         updated_at=publish_metadata.updated_at,
     )
@@ -549,6 +553,8 @@ def _build_commit_result(
         remote_name=publish_metadata.remote_name,
         remote_branch_ref=publish_metadata.remote_branch_ref,
         fetch_command=publish_metadata.fetch_command,
+        created_by=publish_metadata.created_by,
+        pushed_by=publish_metadata.pushed_by,
         created_at=publish_metadata.created_at,
         updated_at=publish_metadata.updated_at,
         messages=messages,

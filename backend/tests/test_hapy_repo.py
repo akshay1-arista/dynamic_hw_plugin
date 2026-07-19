@@ -115,7 +115,10 @@ def test_commit_run_to_hapy_repo_places_nested_reference_under_parent_folder(tmp
     assert Path(result.destination_path, "config.json").exists()
     assert result.base_branch == "release_6.4"
     assert result.private_branch_name == "hw_topo_gen_private_run123"
-    assert list_private_branches(registry_path).branches[0].private_branch_name == result.private_branch_name
+    branch_record = list_private_branches(registry_path).branches[0]
+    assert branch_record.private_branch_name == result.private_branch_name
+    assert branch_record.created_by is None
+    assert branch_record.pushed_by is None
 
 
 def test_commit_run_to_hapy_repo_uses_fixed_service_git_identity(tmp_path, monkeypatch):
@@ -191,7 +194,32 @@ def test_publish_run_private_branch_pushes_only_private_branch_ref(tmp_path):
     assert pushed.private_branch_pushed is True
     assert pushed.remote_branch_ref == expected_ref
     assert expected_ref in pushed.fetch_command
+    assert pushed.created_by is None
+    assert pushed.pushed_by is None
     assert _git_dir(remote_root, "rev-parse", expected_ref) == pushed.commit_sha
+
+
+def test_publish_run_private_branch_records_creator_and_pusher(tmp_path):
+    repo_root, _remote_root, configs_root = _init_repo(tmp_path)
+    outputs_root, run_id = _build_run_outputs(tmp_path, reference_topology_id="3-site")
+    registry_path = tmp_path / "hapy_private_branches.json"
+    actor = ActorIdentity(name="Prod User", email="prod.user@example.com")
+
+    pushed = publish_run_private_branch(
+        run_id,
+        HapyCommitRequest(base_branch="release_6.4", requested_by=actor),
+        outputs_root=outputs_root,
+        repo_root=repo_root,
+        configs_root=configs_root,
+        remote_name="origin",
+        registry_path=registry_path,
+    )
+
+    assert pushed.created_by == actor
+    assert pushed.pushed_by == actor
+    branch_record = list_private_branches(registry_path).branches[0]
+    assert branch_record.created_by == actor
+    assert branch_record.pushed_by == actor
 
 
 def test_delete_private_branches_removes_local_remote_and_registry_entries(tmp_path):

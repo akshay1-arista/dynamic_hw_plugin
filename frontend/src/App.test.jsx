@@ -1101,6 +1101,18 @@ describe('App', () => {
     expect(screen.queryByText('other-topology-z9y8x7')).not.toBeInTheDocument();
   });
 
+  test('shows generated timestamp for each saved run', async () => {
+    render(<App />);
+
+    await screen.findAllByText('CHN 3800 HA Pair 8');
+    expect(
+      screen.getByText(`Generated ${new Date('2026-07-11T00:00:00+00:00').toLocaleString()}`)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(`Generated ${new Date('2026-07-10T00:00:00+00:00').toLocaleString()}`)
+    ).toBeInTheDocument();
+  });
+
   test('adds mapping preview and generates download result', async () => {
     const user = userEvent.setup();
     render(<App />);

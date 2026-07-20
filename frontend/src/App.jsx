@@ -1139,41 +1139,45 @@ export function App() {
                     </select>
                   </label>
                   <div className="branchRegistryList">
-                    {filteredGeneratedRuns.map((run) => (
-                      <div className="branchRegistryItem" key={run.run_id}>
-                        <div className="branchRegistrySelect">
-                          <span>
-                            <strong>{run.topology_name}</strong>
-                            <small>
-                              {run.reference_topology_id} / run {run.run_id}
-                            </small>
-                            <small>
-                              Requested as {run.requested_topology_name}
-                              {run.requested_by ? ` by ${actorNameLabel(run.requested_by)}` : ''}
-                            </small>
-                            {run.private_branch_name ? (
+                    {filteredGeneratedRuns.map((run) => {
+                      const generatedAt = run.created_at || run.updated_at;
+                      return (
+                        <div className="branchRegistryItem" key={run.run_id}>
+                          <div className="branchRegistrySelect">
+                            <span>
+                              <strong>{run.topology_name}</strong>
                               <small>
-                                {run.private_branch_pushed ? 'Pushed' : 'Committed only'} / {run.private_branch_name}
+                                {run.reference_topology_id} / run {run.run_id}
                               </small>
-                            ) : (
-                              <small>Not published to Gerrit yet</small>
-                            )}
-                          </span>
+                              {generatedAt && <small>Generated {formatAuditTimestamp(generatedAt)}</small>}
+                              <small>
+                                Requested as {run.requested_topology_name}
+                                {run.requested_by ? ` by ${actorNameLabel(run.requested_by)}` : ''}
+                              </small>
+                              {run.private_branch_name ? (
+                                <small>
+                                  {run.private_branch_pushed ? 'Pushed' : 'Committed only'} / {run.private_branch_name}
+                                </small>
+                              ) : (
+                                <small>Not published to Gerrit yet</small>
+                              )}
+                            </span>
+                          </div>
+                          <button
+                            className="secondary savedRunLoadButton"
+                            onClick={() => loadSavedRun(run.run_id)}
+                            disabled={loadingSavedRunId !== '' || generating || publishingAction !== ''}
+                            aria-label={
+                              loadingSavedRunId === run.run_id ? `Loading run ${run.run_id}` : `Load run ${run.run_id}`
+                            }
+                            type="button"
+                          >
+                            {loadingSavedRunId === run.run_id ? <Loader2 className="spin" size={16} /> : <Archive size={16} />}
+                            {loadingSavedRunId === run.run_id ? 'Loading...' : 'Load'}
+                          </button>
                         </div>
-                        <button
-                          className="secondary savedRunLoadButton"
-                          onClick={() => loadSavedRun(run.run_id)}
-                          disabled={loadingSavedRunId !== '' || generating || publishingAction !== ''}
-                          aria-label={
-                            loadingSavedRunId === run.run_id ? `Loading run ${run.run_id}` : `Load run ${run.run_id}`
-                          }
-                          type="button"
-                        >
-                          {loadingSavedRunId === run.run_id ? <Loader2 className="spin" size={16} /> : <Archive size={16} />}
-                          {loadingSavedRunId === run.run_id ? 'Loading...' : 'Load'}
-                        </button>
-                      </div>
-                    ))}
+                      );
+                    })}
                     {filteredGeneratedRuns.length === 0 && (
                       <p className="muted">No generated runs match the selected requester.</p>
                     )}

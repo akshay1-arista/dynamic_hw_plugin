@@ -9,9 +9,11 @@ from app.generator import (
     GenerationError,
     _apply_hardware_to_edge,
     _apply_inventory_free_vlans_to_edge,
+    _apply_companion_file_updates,
     _apply_port_mappings,
     _apply_remote_updates_to_config,
     _build_l2_switches,
+    _drop_linked_interfaces,
     generate_topology,
 )
 from app.config import INVENTORY_PATH
@@ -1392,6 +1394,110 @@ def test_switch_only_interface_tags_remote_peer_with_same_link():
     remote_interface = config["routers"][0]["interfaces"][0]
     assert remote_interface["name"] == "eth9.200"
     assert remote_interface["link"] == "internet1-link"
+
+
+def test_drop_linked_interfaces_compacts_peer_side_eth_numbers():
+    edge = {
+        "interfaces": [
+            {"name": "ge1", "logical_interface": "GE1", "link": "kept-link"},
+        ],
+        "l2_switches": [],
+    }
+    config = {
+        "routers": [
+            {
+                "name": "peer-router",
+                "interfaces": [
+                    {"name": "eth0", "link": "mgmt-link"},
+                    {"name": "eth1", "link": "dropped-link"},
+                    {"name": "eth2.200", "logical_interface": "eth2", "link": "kept-link"},
+                    {"name": "lo", "link": "loopback-link"},
+                ],
+            },
+            {
+                "name": "untouched-router",
+                "interfaces": [
+                    {"name": "eth9", "link": "other-link"},
+                ],
+            },
+        ],
+    }
+
+    _drop_linked_interfaces(config, edge, {"dropped-link"})
+
+    assert [interface["name"] for interface in config["routers"][0]["interfaces"]] == [
+        "eth0",
+        "eth1.200",
+        "lo",
+    ]
+    assert config["routers"][0]["interfaces"][1]["logical_interface"] == "eth1"
+    assert config["routers"][0]["interfaces"][1]["link"] == "kept-link"
+    assert config["routers"][1]["interfaces"][0]["name"] == "eth9"
+
+
+def test_apply_companion_file_updates_matches_kept_interfaces_by_link_after_drop(tmp_path):
+    reference_branch = {
+        "name": "branch1",
+        "edges": [],
+        "CEs": [
+            {
+                "name": "peer-ce",
+                "interfaces": [
+                    {"name": "eth0", "link": "mgmt-link"},
+                    {"name": "eth1", "link": "dropped-link"},
+                    {"name": "eth2.110", "logical_interface": "eth2", "link": "kept-link"},
+                ],
+            }
+        ],
+        "l3switches": [],
+    }
+    generated_branch = {
+        "name": "branch1",
+        "edges": [],
+        "CEs": [
+            {
+                "name": "peer-ce",
+                "interfaces": [
+                    {"name": "eth0", "link": "mgmt-link"},
+                    {"name": "eth1.110", "logical_interface": "eth1", "link": "kept-link"},
+                ],
+            }
+        ],
+        "l3switches": [],
+    }
+    companion_path = tmp_path / "characteristics.json"
+    companion_path.write_text(
+        json.dumps(
+            {
+                "topology": {
+                    "branches": [
+                        {
+                            "name": "branch1",
+                            "CEs": [
+                                {
+                                    "name": "peer-ce",
+                                    "interfaces": [
+                                        {
+                                            "name": "eth2.110",
+                                            "logical_interface": "eth2",
+                                            "link": "kept-link",
+                                        }
+                                    ],
+                                }
+                            ],
+                        }
+                    ]
+                }
+            }
+        )
+    )
+
+    _apply_companion_file_updates(tmp_path, reference_branch, generated_branch)
+
+    updated = json.loads(companion_path.read_text())
+    interface = updated["topology"]["branches"][0]["CEs"][0]["interfaces"][0]
+    assert interface["name"] == "eth1.110"
+    assert interface["logical_interface"] == "eth1"
 
 
 def test_generate_resolves_switch_config_path_from_generation_hypervisor_ip(tmp_path):

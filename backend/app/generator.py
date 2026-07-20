@@ -1201,6 +1201,7 @@ def _drop_linked_interfaces(config: JsonObject, edge: JsonObject, dropped_links:
                 walk(child)
         elif isinstance(value, list):
             kept = []
+            removed_interface = False
             for item in value:
                 if (
                     isinstance(item, dict)
@@ -1208,12 +1209,49 @@ def _drop_linked_interfaces(config: JsonObject, edge: JsonObject, dropped_links:
                     and item.get("link") in dropped_links
                     and _is_interface_dict(item)
                 ):
+                    removed_interface = True
                     continue
                 walk(item)
                 kept.append(item)
+            if removed_interface:
+                _compact_peer_interface_names(kept)
             value[:] = kept
 
     walk(config)
+
+
+def _compact_peer_interface_names(items: list[Any]) -> None:
+    next_eth_index = 0
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        original_name = item.get("name")
+        parsed_name = _parse_peer_interface_name(original_name)
+        if not parsed_name:
+            continue
+
+        prefix, old_index, suffix = parsed_name
+        new_base = f"{prefix}{next_eth_index}"
+        new_name = f"{new_base}{suffix}"
+        if new_name != original_name:
+            item["name"] = new_name
+
+        logical_interface = item.get("logical_interface")
+        if isinstance(logical_interface, str):
+            parsed_logical = _parse_peer_interface_name(logical_interface)
+            if parsed_logical and parsed_logical[:2] == (prefix, old_index):
+                item["logical_interface"] = f"{new_base}{parsed_logical[2]}"
+
+        next_eth_index += 1
+
+
+def _parse_peer_interface_name(value: Any) -> tuple[str, int, str] | None:
+    if not isinstance(value, str):
+        return None
+    match = re.fullmatch(r"(eth)(\d+)([.:].+)?", value.strip(), flags=re.IGNORECASE)
+    if not match:
+        return None
+    return match.group(1), int(match.group(2)), match.group(3) or ""
 
 
 def _is_interface_dict(value: JsonObject) -> bool:
@@ -1310,7 +1348,10 @@ def _build_companion_device_updates(
         logical_interface_map: dict[str, str] = {}
         reference_interfaces = reference_device.get("interfaces", [])
         generated_interfaces = generated_device.get("interfaces", [])
-        for reference_interface, generated_interface in zip(reference_interfaces, generated_interfaces):
+        for reference_interface, generated_interface in _match_device_interfaces(
+            reference_interfaces,
+            generated_interfaces,
+        ):
             if not isinstance(reference_interface, dict) or not isinstance(generated_interface, dict):
                 continue
 
@@ -1347,6 +1388,40 @@ def _build_companion_device_updates(
                 register_device_pair(reference_client, generated_client)
 
     return device_updates
+
+
+def _match_device_interfaces(
+    reference_interfaces: list[Any],
+    generated_interfaces: list[Any],
+) -> list[tuple[JsonObject, JsonObject]]:
+    reference_items = [item for item in reference_interfaces if isinstance(item, dict)]
+    generated_items = [item for item in generated_interfaces if isinstance(item, dict)]
+    matched_reference_ids: set[int] = set()
+    matched_generated_ids: set[int] = set()
+    pairs: list[tuple[JsonObject, JsonObject]] = []
+
+    generated_by_link: dict[str, list[JsonObject]] = {}
+    for item in generated_items:
+        link = item.get("link")
+        if isinstance(link, str) and link:
+            generated_by_link.setdefault(link, []).append(item)
+
+    for reference_item in reference_items:
+        link = reference_item.get("link")
+        if not isinstance(link, str) or not link:
+            continue
+        candidates = generated_by_link.get(link, [])
+        match = next((item for item in candidates if id(item) not in matched_generated_ids), None)
+        if match is None:
+            continue
+        pairs.append((reference_item, match))
+        matched_reference_ids.add(id(reference_item))
+        matched_generated_ids.add(id(match))
+
+    remaining_reference_items = [item for item in reference_items if id(item) not in matched_reference_ids]
+    remaining_generated_items = [item for item in generated_items if id(item) not in matched_generated_ids]
+    pairs.extend(zip(remaining_reference_items, remaining_generated_items))
+    return pairs
 
 
 def _update_companion_interfaces(

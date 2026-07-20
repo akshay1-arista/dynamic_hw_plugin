@@ -97,6 +97,7 @@ def generate_topology(
     mapping_statuses: list[GenerateMappingStatus] = []
 
     for mapping in request.mappings:
+        reference_config = _clone_json(config)
         hardware = hardware_by_id[mapping.hardware_id]
         if mapping.hardware_id in recovered_hardware_ids:
             messages.append(
@@ -212,7 +213,13 @@ def generate_topology(
 
         _apply_remote_updates_to_config(config, edge, remote_updates)
         _drop_linked_interfaces(config, edge, dropped_links)
-        _apply_companion_file_updates(topology_path, reference_branch, branch)
+        _apply_companion_file_updates(
+            topology_path,
+            reference_branch,
+            branch,
+            reference_config=reference_config,
+            generated_config=config,
+        )
 
         global_replacements.extend(
             [
@@ -1316,13 +1323,21 @@ def _apply_companion_file_updates(
     topology_path: Path,
     reference_branch: JsonObject,
     generated_branch: JsonObject,
+    *,
+    reference_config: JsonObject | None = None,
+    generated_config: JsonObject | None = None,
 ) -> None:
     branch_names = {
         name
         for name in (reference_branch.get("name"), generated_branch.get("name"))
         if isinstance(name, str) and name
     }
-    device_updates = _build_companion_device_updates(reference_branch, generated_branch)
+    device_updates = _build_companion_device_updates(
+        reference_branch,
+        generated_branch,
+        reference_config=reference_config,
+        generated_config=generated_config,
+    )
     for path in _json_paths(topology_path):
         if path.name == "config.json":
             continue
@@ -1334,6 +1349,9 @@ def _apply_companion_file_updates(
 def _build_companion_device_updates(
     reference_branch: JsonObject,
     generated_branch: JsonObject,
+    *,
+    reference_config: JsonObject | None = None,
+    generated_config: JsonObject | None = None,
 ) -> dict[str, dict[str, dict[str, str]]]:
     device_updates: dict[str, dict[str, dict[str, str]]] = {}
 
@@ -1375,7 +1393,7 @@ def _build_companion_device_updates(
                 "logical_interface_map": logical_interface_map,
             }
 
-    for key in ("edges", "CEs", "l3switches"):
+    for key in ("edges", "CEs", "l3switches", "hopaway_clients"):
         reference_devices = reference_branch.get(key, [])
         generated_devices = generated_branch.get(key, [])
         for reference_device, generated_device in zip(reference_devices, generated_devices):
@@ -1387,7 +1405,58 @@ def _build_companion_device_updates(
             for reference_client, generated_client in zip(reference_clients, generated_clients):
                 register_device_pair(reference_client, generated_client)
 
+    if isinstance(reference_config, dict) and isinstance(generated_config, dict):
+        _register_global_companion_device_pairs(reference_config, generated_config, register_device_pair)
+
     return device_updates
+
+
+def _register_global_companion_device_pairs(
+    reference_config: JsonObject,
+    generated_config: JsonObject,
+    register_device_pair,
+) -> None:
+    reference_topology = reference_config.get("topology")
+    generated_topology = generated_config.get("topology")
+    if not isinstance(reference_topology, dict) or not isinstance(generated_topology, dict):
+        return
+
+    for collection_name in ("corerouters", "wansims"):
+        reference_devices = reference_topology.get(collection_name, [])
+        generated_devices = generated_topology.get(collection_name, [])
+        if not isinstance(reference_devices, list) or not isinstance(generated_devices, list):
+            continue
+        generated_by_name = {
+            item.get("name"): item
+            for item in generated_devices
+            if isinstance(item, dict) and isinstance(item.get("name"), str)
+        }
+        for reference_device in reference_devices:
+            if not isinstance(reference_device, dict):
+                continue
+            generated_device = generated_by_name.get(reference_device.get("name"))
+            if generated_device is not None:
+                register_device_pair(reference_device, generated_device)
+
+    reference_gateways = reference_topology.get("gateways", [])
+    generated_gateways = generated_topology.get("gateways", [])
+    if isinstance(reference_gateways, list) and isinstance(generated_gateways, list):
+        generated_gateways_by_name = {
+            item.get("name"): item
+            for item in generated_gateways
+            if isinstance(item, dict) and isinstance(item.get("name"), str)
+        }
+        for reference_gateway in reference_gateways:
+            if not isinstance(reference_gateway, dict):
+                continue
+            generated_gateway = generated_gateways_by_name.get(reference_gateway.get("name"))
+            if generated_gateway is None:
+                continue
+            register_device_pair(reference_gateway, generated_gateway)
+            reference_provider_edge = reference_gateway.get("provider_edge")
+            generated_provider_edge = generated_gateway.get("provider_edge")
+            if isinstance(reference_provider_edge, dict) and isinstance(generated_provider_edge, dict):
+                register_device_pair(reference_provider_edge, generated_provider_edge)
 
 
 def _match_device_interfaces(
@@ -1438,7 +1507,7 @@ def _update_companion_interfaces(
             current_device_update = active_device_update
             name = value.get("name")
             branch_context = active_branch or (isinstance(name, str) and name in branch_names)
-            if branch_context and isinstance(name, str) and name in device_updates:
+            if isinstance(name, str) and name in device_updates:
                 current_device_update = device_updates[name]
 
             if current_device_update:

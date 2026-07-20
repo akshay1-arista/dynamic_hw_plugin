@@ -1500,6 +1500,138 @@ def test_apply_companion_file_updates_matches_kept_interfaces_by_link_after_drop
     assert interface["logical_interface"] == "eth1"
 
 
+def test_apply_companion_file_updates_updates_hopaway_client_interface_names(tmp_path):
+    reference_branch = {
+        "name": "branch1",
+        "edges": [],
+        "CEs": [],
+        "l3switches": [],
+        "hopaway_clients": [
+            {
+                "name": "branch1-hopaway",
+                "interfaces": [
+                    {"name": "eth1", "link": "hop-link"},
+                ],
+            }
+        ],
+    }
+    generated_branch = {
+        "name": "branch1",
+        "edges": [],
+        "CEs": [],
+        "l3switches": [],
+        "hopaway_clients": [
+            {
+                "name": "branch1-hopaway",
+                "interfaces": [
+                    {"name": "eth1.205", "link": "hop-link"},
+                ],
+            }
+        ],
+    }
+    companion_path = tmp_path / "characteristics.json"
+    companion_path.write_text(
+        json.dumps(
+            {
+                "topology": {
+                    "branches": [
+                        {
+                            "name": "branch1",
+                            "hopaway_clients": [
+                                {
+                                    "name": "branch1-hopaway",
+                                    "interfaces": [
+                                        {"name": "eth1"},
+                                    ],
+                                }
+                            ],
+                        }
+                    ]
+                }
+            }
+        )
+    )
+
+    _apply_companion_file_updates(tmp_path, reference_branch, generated_branch)
+
+    updated = json.loads(companion_path.read_text())
+    interface = updated["topology"]["branches"][0]["hopaway_clients"][0]["interfaces"][0]
+    assert interface["name"] == "eth1.205"
+
+
+def test_apply_companion_file_updates_updates_global_corerouter_interface_names(tmp_path):
+    reference_branch = {
+        "name": "branch1",
+        "edges": [],
+        "CEs": [],
+        "l3switches": [],
+        "hopaway_clients": [],
+    }
+    generated_branch = {
+        "name": "branch1",
+        "edges": [],
+        "CEs": [],
+        "l3switches": [],
+        "hopaway_clients": [],
+    }
+    reference_config = {
+        "topology": {
+            "branches": [reference_branch],
+            "corerouters": [
+                {
+                    "name": "cr-internet1",
+                    "interfaces": [
+                        {"name": "eth2", "link": "cr1b12"},
+                    ],
+                }
+            ],
+        }
+    }
+    generated_config = {
+        "topology": {
+            "branches": [generated_branch],
+            "corerouters": [
+                {
+                    "name": "cr-internet1",
+                    "interfaces": [
+                        {"name": "eth2.185", "link": "cr1b12"},
+                    ],
+                }
+            ],
+        }
+    }
+    companion_path = tmp_path / "characteristics.json"
+    companion_path.write_text(
+        json.dumps(
+            {
+                "topology": {
+                    "branches": [{"name": "branch1", "edges": []}],
+                    "corerouters": [
+                        {
+                            "name": "cr-internet1",
+                            "interfaces": [
+                                {"name": "eth2", "protocols": [{"name": "bgp"}]},
+                            ],
+                        }
+                    ],
+                }
+            }
+        )
+    )
+
+    _apply_companion_file_updates(
+        tmp_path,
+        reference_branch,
+        generated_branch,
+        reference_config=reference_config,
+        generated_config=generated_config,
+    )
+
+    updated = json.loads(companion_path.read_text())
+    interface = updated["topology"]["corerouters"][0]["interfaces"][0]
+    assert interface["name"] == "eth2.185"
+
+
 def test_generate_resolves_switch_config_path_from_generation_hypervisor_ip(tmp_path):
     with INVENTORY_PATH.open() as fh:
         inventory = json.load(fh)

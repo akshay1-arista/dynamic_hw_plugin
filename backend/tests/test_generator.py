@@ -13,6 +13,7 @@ from app.generator import (
     _apply_port_mappings,
     _apply_remote_updates_to_config,
     _build_l2_switches,
+    _ensure_unique_l2_switch_names,
     _drop_linked_interfaces,
     generate_topology,
 )
@@ -24,7 +25,7 @@ from app.inventory import (
     resolve_mapping_path,
     update_hardware_availability,
 )
-from app.models import GenerateRequest, HardwareEdge, InterfaceOverride, InventoryFile
+from app.models import GenerateRequest, HardwareEdge, InterfaceOverride, InventoryFile, RunMappingMetadata
 
 DEFAULT_3800_HARDWARE_ID = "ln-ha-a01-327-dgd10q2-a01-328-16c10q2"
 SECONDARY_HARDWARE_ID = "ln-ha-a02-312-246218457-a02-313-246218453"
@@ -1036,6 +1037,73 @@ def test_build_l2_switches_uses_resolved_switch_uplink_for_hypervisor_interface_
 
     assert l2_switches[0]["interfaces"][-1]["name"] == "Te1/51"
     assert l2_switches[0]["interfaces"][-1]["link"] == "vmnic0"
+
+
+def test_ensure_unique_l2_switch_names_suffixes_duplicates_across_edges():
+    config = {
+        "topology": {
+            "branches": [
+                {
+                    "name": "branch1",
+                    "edges": [
+                        {
+                            "name": "edge1",
+                            "l2_switches": [
+                                {"name": "shared-switch", "interfaces": []},
+                                {"name": "unique-switch", "interfaces": []},
+                            ],
+                        }
+                    ],
+                },
+                {
+                    "name": "branch2",
+                    "edges": [
+                        {
+                            "name": "edge2",
+                            "l2_switches": [
+                                {"name": "shared-switch", "interfaces": []},
+                                {"name": "shared-switch-1", "interfaces": []},
+                            ],
+                        }
+                    ],
+                },
+            ]
+        }
+    }
+    mappings = [
+        RunMappingMetadata(
+            hardware_id="hw-1",
+            branch_name="branch1",
+            edge_name="edge1",
+            generated_branch_name="branch1",
+            generated_edge_name="edge1",
+        ),
+        RunMappingMetadata(
+            hardware_id="hw-2",
+            branch_name="branch2",
+            edge_name="edge2",
+            generated_branch_name="branch2",
+            generated_edge_name="edge2",
+        ),
+    ]
+
+    _ensure_unique_l2_switch_names(config, mappings)
+
+    branch1_switches = config["topology"]["branches"][0]["edges"][0]["l2_switches"]
+    branch2_switches = config["topology"]["branches"][1]["edges"][0]["l2_switches"]
+
+    assert branch1_switches[0]["name"] == "shared-switch-2"
+    assert branch2_switches[0]["name"] == "shared-switch-3"
+    assert branch1_switches[1]["name"] == "unique-switch"
+    assert branch2_switches[1]["name"] == "shared-switch-1"
+    assert mappings[0].generated_l2_switch_names == {
+        "shared-switch": "shared-switch-2",
+        "unique-switch": "unique-switch",
+    }
+    assert mappings[1].generated_l2_switch_names == {
+        "shared-switch": "shared-switch-3",
+        "shared-switch-1": "shared-switch-1",
+    }
 
 
 def test_build_l2_switches_excludes_unallocated_hardware_ports():

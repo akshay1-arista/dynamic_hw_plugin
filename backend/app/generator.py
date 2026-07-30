@@ -194,6 +194,8 @@ def generate_topology(
                 hardware_id=hardware.id,
                 branch_name=mapping.branch_name,
                 edge_name=mapping.edge_name,
+                generated_branch_name=new_branch_name,
+                generated_edge_name=new_edge_name,
                 path=mapping_path,
                 allocations=allocation.ports,
             )
@@ -234,6 +236,7 @@ def generate_topology(
             )
         )
 
+    _ensure_unique_l2_switch_names(config, run_metadata.mappings)
     _write_json(config_path, config)
     _apply_global_replacements(topology_path, global_replacements, skip_paths={config_path})
     validation_messages = _validate_generated_json(topology_path)
@@ -1162,6 +1165,41 @@ def _build_l2_switches(
         ]
         l2_switches.append(switch)
     return l2_switches
+
+
+def _ensure_unique_l2_switch_names(config: JsonObject, mappings: list[RunMappingMetadata]) -> None:
+    switch_entries: list[tuple[RunMappingMetadata, str, JsonObject]] = []
+    switches_by_name: dict[str, list[JsonObject]] = {}
+
+    for mapping in mappings:
+        branch_name = mapping.generated_branch_name or mapping.branch_name
+        edge_name = mapping.generated_edge_name or mapping.edge_name
+        branch = _find_branch(config, branch_name)
+        edge = _find_edge(branch, edge_name)
+        for switch in edge.get("l2_switches", []):
+            switch_name = switch.get("name")
+            if not isinstance(switch_name, str) or not switch_name.strip():
+                continue
+            switch_entries.append((mapping, switch_name, switch))
+            switches_by_name.setdefault(switch_name, []).append(switch)
+
+    used_names = {switch_name for switch_name, switches in switches_by_name.items() if len(switches) == 1}
+
+    for switch_name, switches in switches_by_name.items():
+        if len(switches) == 1:
+            continue
+        next_suffix = 1
+        for switch in switches:
+            candidate = f"{switch_name}-{next_suffix}"
+            while candidate in used_names:
+                next_suffix += 1
+                candidate = f"{switch_name}-{next_suffix}"
+            switch["name"] = candidate
+            used_names.add(candidate)
+            next_suffix += 1
+
+    for mapping, original_name, switch in switch_entries:
+        mapping.generated_l2_switch_names[original_name] = switch["name"]
 
 
 def _switches_by_name(hardware: HardwareEdge) -> dict[str, Any]:

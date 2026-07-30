@@ -83,21 +83,62 @@ def _load_generated_switch_links(
         config = json.load(fh)
 
     links: dict[tuple[str, str], str] = {}
+    for mapping in metadata.mappings:
+        branch_name = mapping.generated_branch_name or mapping.branch_name
+        edge_name = mapping.generated_edge_name or mapping.edge_name
+        edge = _find_generated_edge(config, branch_name, edge_name)
+        if edge is None:
+            continue
+        switches_by_name = {
+            switch.get("name"): switch for switch in edge.get("l2_switches", []) if isinstance(switch, dict)
+        }
+        for original_name, generated_name in mapping.generated_l2_switch_names.items():
+            switch = switches_by_name.get(generated_name)
+            if not isinstance(switch, dict):
+                continue
+            _register_switch_links(links, original_name, switch)
+
     for branch in config.get("topology", {}).get("branches", []):
         for edge in branch.get("edges", []):
             for switch in edge.get("l2_switches", []):
+                if not isinstance(switch, dict):
+                    continue
                 switch_name = switch.get("name")
                 if not isinstance(switch_name, str) or not switch_name.strip():
                     continue
-                for interface in switch.get("interfaces", []):
-                    interface_name = interface.get("name")
-                    link = interface.get("link")
-                    if not isinstance(interface_name, str) or not interface_name.strip():
-                        continue
-                    if not isinstance(link, str) or not link.strip():
-                        continue
-                    links[(switch_name, interface_name)] = link
+                _register_switch_links(links, switch_name, switch)
     return links
+
+
+def _find_generated_edge(config: dict[str, object], branch_name: str, edge_name: str) -> dict[str, object] | None:
+    topology = config.get("topology")
+    if not isinstance(topology, dict):
+        return None
+    for branch in topology.get("branches", []):
+        if not isinstance(branch, dict) or branch.get("name") != branch_name:
+            continue
+        for edge in branch.get("edges", []):
+            if isinstance(edge, dict) and edge.get("name") == edge_name:
+                return edge
+        return None
+    return None
+
+
+def _register_switch_links(
+    links: dict[tuple[str, str], str],
+    switch_name: str,
+    switch: dict[str, object],
+) -> None:
+    for interface in switch.get("interfaces", []):
+        if not isinstance(interface, dict):
+            continue
+        interface_name = interface.get("name")
+        link = interface.get("link")
+        if not isinstance(interface_name, str) or not interface_name.strip():
+            continue
+        if not isinstance(link, str) or not link.strip():
+            continue
+        links[(switch_name, interface_name)] = link
 
 
 def _build_plans(

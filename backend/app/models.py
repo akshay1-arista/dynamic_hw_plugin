@@ -680,6 +680,9 @@ class RunMappingMetadata(BaseModel):
     hardware_id: str
     branch_name: str
     edge_name: str
+    generated_branch_name: Optional[str] = None
+    generated_edge_name: Optional[str] = None
+    generated_l2_switch_names: dict[str, str] = Field(default_factory=dict)
     path: Optional[HardwarePathSummary] = None
     allocations: list[HardwarePortAllocation] = Field(default_factory=list)
 

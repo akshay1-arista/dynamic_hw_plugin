@@ -15,7 +15,8 @@ import {
   Search,
   Server,
   TriangleAlert,
-  Trash2
+  Trash2,
+  X
 } from 'lucide-react';
 import {
   applyInventoryImport,
@@ -115,6 +116,7 @@ export function App() {
   const [selectedImportDeviceIds, setSelectedImportDeviceIds] = useState([]);
   const [importMode, setImportMode] = useState('single');
   const [labNavigatorImporting, setLabNavigatorImporting] = useState(false);
+  const [labNavigatorImportOpen, setLabNavigatorImportOpen] = useState(false);
   const [inventoryAvailabilityFilter, setInventoryAvailabilityFilter] = useState('all');
   const [inventoryLabelFilters, setInventoryLabelFilters] = useState([]);
   const [generatedRunRequestedByFilter, setGeneratedRunRequestedByFilter] = useState('all');
@@ -626,6 +628,7 @@ export function App() {
       setLabNavigatorSearchResults([]);
       setSelectedImportDeviceIds([]);
       setLabNavigatorImportQuery('');
+      setLabNavigatorImportOpen(false);
     } catch (importError) {
       setError(importError.message);
     } finally {
@@ -784,6 +787,18 @@ export function App() {
       ...current,
       [cardName]: !current[cardName]
     }));
+  }
+
+  function openLabNavigatorImport() {
+    setLabNavigatorImportOpen(true);
+    setError('');
+  }
+
+  function closeLabNavigatorImport() {
+    if (labNavigatorImporting) {
+      return;
+    }
+    setLabNavigatorImportOpen(false);
   }
 
   async function submitDeletePrivateBranches({ deleteAll = false, branchNames = [] } = {}) {
@@ -1040,44 +1055,48 @@ export function App() {
 
       {error && <div className="alert">{error}</div>}
 
-      <section className="workspace appWorkspace">
-        <div className="workspaceColumn sideColumn">
-          <CollapsiblePanel
-            className="inventoryPanel"
-            collapsed={collapsedDataCards.inventory}
-            description="Search, inspect, and mark physical hardware availability."
-            icon={<Server size={18} />}
-            onToggle={() => toggleDataCard('inventory')}
-            title="Inventory"
+      {labNavigatorImportOpen && (
+        <div className="modalBackdrop" role="presentation" onMouseDown={closeLabNavigatorImport}>
+          <div
+            aria-modal="true"
+            className="modalDialog labNavigatorImportDialog"
+            onMouseDown={(event) => event.stopPropagation()}
+            role="dialog"
           >
-            <label className="searchField">
-              Search hardware
+            <div className="modalHeader">
               <span>
-                <Search size={16} aria-hidden="true" />
-                <input
-                  value={inventorySearch}
-                  onChange={(event) => setInventorySearch(event.target.value)}
-                  placeholder="device name, short name, serial, model"
-                />
+                <h2>Add from Lab Navigator</h2>
+                <p>Search by name, IP, hostname, or serial, then import a single device or HA pair.</p>
               </span>
-            </label>
+              <button
+                aria-label="Close Lab Navigator import"
+                className="iconButton"
+                disabled={labNavigatorImporting}
+                onClick={closeLabNavigatorImport}
+                type="button"
+              >
+                <X size={18} />
+              </button>
+            </div>
             <div className="labNavigatorImport">
               <form className="inlineImportSearch" onSubmit={searchLabNavigatorForImport}>
-                <label className="searchField">
-                  Add from Lab Navigator
-                  <span>
+                <label htmlFor="lab-navigator-import-search">Search Lab Navigator</label>
+                <div className="modalSearchRow">
+                  <span className="modalSearchField">
                     <Search size={16} aria-hidden="true" />
                     <input
+                      autoFocus
+                      id="lab-navigator-import-search"
                       value={labNavigatorImportQuery}
                       onChange={(event) => setLabNavigatorImportQuery(event.target.value)}
                       placeholder="name, IP, hostname, serial"
                     />
                   </span>
-                </label>
-                <button className="secondary compactButton" disabled={labNavigatorImporting} type="submit">
-                  {labNavigatorImporting ? <Loader2 className="spin" size={16} /> : <Search size={16} />}
-                  Search
-                </button>
+                  <button className="secondary compactButton" disabled={labNavigatorImporting} type="submit">
+                    {labNavigatorImporting ? <Loader2 className="spin" size={16} /> : <Search size={16} />}
+                    Search
+                  </button>
+                </div>
               </form>
               {labNavigatorSearchResults.length > 0 && (
                 <div className="importResults">
@@ -1140,6 +1159,48 @@ export function App() {
                   </button>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <section className="workspace appWorkspace">
+        <div className="workspaceColumn sideColumn">
+          <CollapsiblePanel
+            className="inventoryPanel"
+            collapsed={collapsedDataCards.inventory}
+            description="Search, inspect, and mark physical hardware availability."
+            icon={<Server size={18} />}
+            onToggle={() => toggleDataCard('inventory')}
+            title="Inventory"
+          >
+            <label className="searchField">
+              Search hardware
+              <span>
+                <Search size={16} aria-hidden="true" />
+                <input
+                  value={inventorySearch}
+                  onChange={(event) => setInventorySearch(event.target.value)}
+                  placeholder="device name, short name, serial, model"
+                />
+              </span>
+            </label>
+            <div className="inventoryActionRow">
+              <button className="secondary compactButton" onClick={openLabNavigatorImport} type="button">
+                <Plus size={16} />
+                Add from Lab Navigator
+              </button>
+              <button
+                className="secondary compactButton"
+                onClick={() => refreshHardwareFromLabNavigator(refreshTargets)}
+                disabled={refreshingInventory || refreshTargets.length === 0}
+                type="button"
+              >
+                {refreshingInventory ? <Loader2 className="spin" size={16} /> : <RefreshCw size={16} />}
+                {refreshingInventory
+                  ? `Refreshing ${refreshingHardwareIds.length} device${refreshingHardwareIds.length === 1 ? '' : 's'}`
+                  : `Refresh ${filteredHardware.length === inventory.hardware.length ? 'all' : 'visible'}`}
+              </button>
             </div>
             <div className="inventoryFilterGroup">
               <small className="inventoryFilterLabel">Availability</small>
@@ -1204,17 +1265,6 @@ export function App() {
                 </div>
               </div>
             )}
-            <button
-              className="secondary compactButton"
-              onClick={() => refreshHardwareFromLabNavigator(refreshTargets)}
-              disabled={refreshingInventory || refreshTargets.length === 0}
-              type="button"
-            >
-              {refreshingInventory ? <Loader2 className="spin" size={16} /> : <RefreshCw size={16} />}
-              {refreshingInventory
-                ? `Refreshing ${refreshingHardwareIds.length} device${refreshingHardwareIds.length === 1 ? '' : 's'}`
-                : `Refresh ${filteredHardware.length === inventory.hardware.length ? 'all' : 'visible'} from Lab Navigator`}
-            </button>
             {inventoryRefreshFeedback?.messages?.some((m) => m.level === 'warning') && (
               <div className="messageList branchFeedback" role="status" aria-live="polite">
                 {inventoryRefreshFeedback.messages
@@ -3408,113 +3458,117 @@ function MappingRow({ index, mapping, mappings, reference, inventory, onChange, 
 
   return (
     <div className="mappingRow">
-      <label>
-        <RequiredLabel>Hardware</RequiredLabel>
-        <HardwareCombobox
-          index={index}
-          hardwareOptions={inventory.hardware}
-          selectedHardwareId={mapping.hardware_id}
-          selectedHardwareFallback={selectedHardware}
-          onSelect={(hardwareId) => onChange(index, 'hardware_id', hardwareId)}
-        />
-      </label>
+      <div className="mappingMainFields">
+        <label>
+          <RequiredLabel>Hardware</RequiredLabel>
+          <HardwareCombobox
+            index={index}
+            hardwareOptions={inventory.hardware}
+            selectedHardwareId={mapping.hardware_id}
+            selectedHardwareFallback={selectedHardware}
+            onSelect={(hardwareId) => onChange(index, 'hardware_id', hardwareId)}
+          />
+        </label>
 
-      <label>
-        <RequiredLabel>Branch</RequiredLabel>
-        <select
-          aria-label="Branch"
-          required
-          value={mapping.branch_name}
-          onChange={(event) => onChange(index, 'branch_name', event.target.value)}
+        <label>
+          <RequiredLabel>Branch</RequiredLabel>
+          <select
+            aria-label="Branch"
+            required
+            value={mapping.branch_name}
+            onChange={(event) => onChange(index, 'branch_name', event.target.value)}
+          >
+            <option value="">Select branch</option>
+            {reference?.branches.map((item) => (
+              <option key={item.name} value={item.name}>
+                {item.name}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label>
+          <RequiredLabel>Edge</RequiredLabel>
+          <select
+            aria-label="Edge"
+            required
+            value={mapping.edge_name}
+            onChange={(event) => onChange(index, 'edge_name', event.target.value)}
+          >
+            <option value="">Select edge</option>
+            {branch?.edges.map((edge) => (
+              <option key={edge.name} value={edge.name} disabled={usedEdgeNames.has(edge.name)}>
+                {edge.name}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label>
+          New branch
+          <input
+            placeholder={selectedHardware && mapping.branch_name ? `${mapping.branch_name}-${selectedHardware.model_suffix}` : ''}
+            value={mapping.target_branch_name}
+            onChange={(event) => onChange(index, 'target_branch_name', event.target.value)}
+          />
+        </label>
+
+        <label>
+          New edge
+          <input
+            placeholder={selectedHardware && mapping.edge_name ? `${mapping.edge_name}-${selectedHardware.model_suffix}` : ''}
+            value={mapping.target_edge_name}
+            onChange={(event) => onChange(index, 'target_edge_name', event.target.value)}
+          />
+        </label>
+
+        <button
+          type="button"
+          className="iconButton danger"
+          onClick={() => onRemove(index)}
+          disabled={!canRemove}
+          aria-label="Remove mapping"
+          title="Remove mapping"
         >
-          <option value="">Select branch</option>
-          {reference?.branches.map((item) => (
-            <option key={item.name} value={item.name}>
-              {item.name}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <label>
-        <RequiredLabel>Edge</RequiredLabel>
-        <select
-          aria-label="Edge"
-          required
-          value={mapping.edge_name}
-          onChange={(event) => onChange(index, 'edge_name', event.target.value)}
-        >
-          <option value="">Select edge</option>
-          {branch?.edges.map((edge) => (
-            <option key={edge.name} value={edge.name} disabled={usedEdgeNames.has(edge.name)}>
-              {edge.name}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <label>
-        New branch
-        <input
-          placeholder={selectedHardware && mapping.branch_name ? `${mapping.branch_name}-${selectedHardware.model_suffix}` : ''}
-          value={mapping.target_branch_name}
-          onChange={(event) => onChange(index, 'target_branch_name', event.target.value)}
-        />
-      </label>
-
-      <label>
-        New edge
-        <input
-          placeholder={selectedHardware && mapping.edge_name ? `${mapping.edge_name}-${selectedHardware.model_suffix}` : ''}
-          value={mapping.target_edge_name}
-          onChange={(event) => onChange(index, 'target_edge_name', event.target.value)}
-        />
-      </label>
+          <Trash2 size={16} />
+        </button>
+      </div>
 
       {selectedHardware && selectedEdge && (
-        <div className="haModeControl">
-          <small className="fieldCaption">Edge HA mode</small>
-          <div className="quickFilterRow" role="group" aria-label={`HA mode for mapping ${index + 1}`}>
-            {mappingHaOptions.map((option) => (
-              <button
-                key={option.value}
-                aria-pressed={(mapping.edge_ha_mode || 'topology_default') === option.value}
-                className={`quickFilterButton ${
-                  (mapping.edge_ha_mode || 'topology_default') === option.value ? 'active' : ''
-                }`}
-                disabled={option.disabled}
-                onClick={() => onChange(index, 'edge_ha_mode', option.value)}
-                title={option.reason || option.label}
-                type="button"
-              >
-                {option.label}
-              </button>
-            ))}
+        <div className="mappingOptionsBar">
+          <div className="haModeControl">
+            <span>
+              <small className="fieldCaption">HA mode</small>
+              <small>{selectedEdge.ha_enabled ? 'Base edge is HA' : 'Base edge is single'}</small>
+            </span>
+            <div className="segmentedControl" role="group" aria-label={`HA mode for mapping ${index + 1}`}>
+              {mappingHaOptions.map((option) => (
+                <button
+                  key={option.value}
+                  aria-pressed={(mapping.edge_ha_mode || 'topology_default') === option.value}
+                  disabled={option.disabled}
+                  onClick={() => onChange(index, 'edge_ha_mode', option.value)}
+                  title={option.reason || option.label}
+                  type="button"
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+            {mappingHaOptions.some(
+              (option) => option.value === (mapping.edge_ha_mode || 'topology_default') && option.disabled
+            ) && (
+              <small className="message warning">
+                {
+                  mappingHaOptions.find(
+                    (option) => option.value === (mapping.edge_ha_mode || 'topology_default')
+                  )?.reason
+                }
+              </small>
+            )}
           </div>
-          {mappingHaOptions.some(
-            (option) => option.value === (mapping.edge_ha_mode || 'topology_default') && option.disabled
-          ) && (
-            <small className="message warning">
-              {
-                mappingHaOptions.find(
-                  (option) => option.value === (mapping.edge_ha_mode || 'topology_default')
-                )?.reason
-              }
-            </small>
-          )}
         </div>
       )}
-
-      <button
-        type="button"
-        className="iconButton danger"
-        onClick={() => onRemove(index)}
-        disabled={!canRemove}
-        aria-label="Remove mapping"
-        title="Remove mapping"
-      >
-        <Trash2 size={16} />
-      </button>
       {selectedHardware && selectedEdge && referenceInterfaces.length > 0 && hardwarePorts.length > 0 && (
         <div className="interfaceOverrideCard">
           <button

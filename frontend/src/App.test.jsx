@@ -1138,7 +1138,7 @@ describe('App', () => {
     const user = userEvent.setup();
     render(<App />);
 
-    const refreshButton = await screen.findByRole('button', { name: 'Refresh all from Lab Navigator' });
+    const refreshButton = await screen.findByRole('button', { name: 'Refresh all' });
     await user.click(refreshButton);
 
     await waitFor(() => {
@@ -1304,7 +1304,9 @@ describe('App', () => {
     render(<App />);
 
     await screen.findAllByText('CHN 3800 HA Pair 8');
-    await user.type(screen.getByLabelText('Add from Lab Navigator'), 'edge-import');
+    await user.click(screen.getByRole('button', { name: 'Add from Lab Navigator' }));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    await user.type(screen.getByLabelText('Search Lab Navigator'), 'edge-import');
     await user.click(screen.getByRole('button', { name: /^Search$/ }));
 
     expect(await screen.findByText('edge-import-active')).toBeInTheDocument();

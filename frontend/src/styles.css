@@ -454,6 +454,19 @@ button:disabled {
   padding: 7px 11px;
 }
 
+.inventoryActionRow {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 18px 0 22px;
+}
+
+.inventoryActionRow .compactButton {
+  min-height: 38px;
+  white-space: nowrap;
+}
+
 .iconButton {
   aspect-ratio: 1;
   background: #ffffff;
@@ -706,8 +719,8 @@ button:disabled {
 
 .inventoryFilterGroup {
   display: grid;
-  gap: 7px;
-  margin: -2px 0 12px;
+  gap: 10px;
+  margin: 0 0 20px;
 }
 
 .inventoryFilterLabel {
@@ -756,14 +769,98 @@ button:disabled {
 .labNavigatorImport,
 .importResults {
   display: grid;
-  gap: 10px;
+  gap: 14px;
+}
+
+.modalBackdrop {
+  align-items: center;
+  background: rgba(15, 23, 42, 0.42);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 24px;
+  position: fixed;
+  z-index: 80;
+}
+
+.modalDialog {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  max-height: min(720px, calc(100vh - 48px));
+  overflow: auto;
+  padding: 18px;
+  width: min(680px, 100%);
+}
+
+.modalHeader {
+  align-items: start;
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.modalHeader h2 {
+  font-size: 20px;
+  margin: 0 0 3px;
+}
+
+.modalHeader p {
+  color: var(--muted);
+  margin: 0;
+}
+
+.labNavigatorImportDialog .importResultList {
+  max-height: 360px;
 }
 
 .inlineImportSearch {
-  align-items: end;
   display: grid;
-  gap: 9px;
+  gap: 8px;
+}
+
+.inlineImportSearch > label {
+  color: var(--text);
+  font-weight: 760;
+}
+
+.modalSearchRow {
+  align-items: center;
+  display: grid;
+  gap: 12px;
   grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.modalSearchField {
+  align-items: center;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 18px minmax(0, 1fr);
+  min-height: 42px;
+  padding: 0 10px;
+}
+
+.modalSearchField svg {
+  color: var(--muted);
+}
+
+.modalSearchField input {
+  border: 0;
+  box-shadow: none;
+  min-height: 40px;
+  padding: 0;
+}
+
+.modalSearchRow .compactButton {
+  align-self: stretch;
+  min-height: 42px;
+  padding-inline: 16px;
+  white-space: nowrap;
 }
 
 .importResultList {
@@ -965,24 +1062,89 @@ button:disabled {
 }
 
 .mappingRow {
-  align-items: end;
   background: var(--surface-subtle);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   display: grid;
   gap: 12px;
-  grid-template-columns: repeat(5, minmax(120px, 1fr)) 40px;
   margin-bottom: 12px;
   padding: 12px;
 }
 
-.mappingRow > label {
+.mappingMainFields {
+  align-items: end;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(220px, 1.15fr) repeat(4, minmax(140px, 1fr)) 40px;
+}
+
+.mappingMainFields > label {
   margin-bottom: 0;
 }
 
+.mappingMainFields > .iconButton {
+  align-self: end;
+}
+
+.mappingOptionsBar {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+  padding: 9px 10px;
+}
+
 .haModeControl {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.haModeControl > span {
   display: grid;
-  gap: 6px;
+  gap: 2px;
+}
+
+.haModeControl > span small:last-child {
+  color: var(--muted);
+}
+
+.segmentedControl {
+  background: var(--surface-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  display: inline-flex;
+  overflow: hidden;
+}
+
+.segmentedControl button {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 760;
+  min-height: 32px;
+  padding: 6px 11px;
+}
+
+.segmentedControl button + button {
+  border-left: 1px solid var(--border);
+}
+
+.segmentedControl button[aria-pressed="true"] {
+  background: var(--primary-soft);
+  color: var(--primary-strong);
+}
+
+.segmentedControl button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 .mappingCaveat {
@@ -1454,13 +1616,22 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 
-  .mappingRow {
+  .mappingMainFields {
     grid-template-columns: repeat(2, minmax(0, 1fr)) 40px;
   }
 
-  .mappingRow .interfaceOverrideCard,
-  .mappingRow .mappingCaveat {
-    grid-column: 1 / -1;
+  .mappingMainFields > label:first-child {
+    grid-column: span 2;
+  }
+
+  .mappingOptionsBar {
+    align-items: stretch;
+    display: grid;
+  }
+
+  .modalSearchRow {
+    align-items: stretch;
+    grid-template-columns: 1fr;
   }
 }
 

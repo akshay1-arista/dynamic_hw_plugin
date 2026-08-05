@@ -256,11 +256,12 @@ def test_generate_uses_saved_hardware_snapshot_when_inventory_has_no_imported_sw
                 "email": "test@example.com",
             },
             "mappings": [
-                {
-                    "hardware_id": STANDALONE_SOURCE_HARDWARE_ID,
-                    "branch_name": "branch2",
-                    "edge_name": "b2-edge1",
-                    "saved_hardware": {
+                    {
+                        "hardware_id": STANDALONE_SOURCE_HARDWARE_ID,
+                        "branch_name": "branch2",
+                        "edge_name": "b2-edge1",
+                        "edge_ha_mode": "ha",
+                        "saved_hardware": {
                         "id": STANDALONE_SOURCE_HARDWARE_ID,
                         "short_name": "a02-710-ha-236254370-236254372",
                         "display_name": "HA Pair chn-rnd-edge-710-6254370 + chn-rnd-edge-710-6254372",
@@ -1924,6 +1925,88 @@ def test_standalone_hardware_on_ha_reference_warns_and_drops_extra_interfaces(tm
     assert any("converts it to standalone" in message for message in messages)
     assert any("reference edge has 8 physical interface(s)" in message for message in messages)
     assert any("Dropped 1 unassigned reference interface" in message for message in messages)
+
+
+def test_ha_pair_can_generate_as_active_only_and_reserves_active_member(tmp_path):
+    inventory_path = copy_inventory(tmp_path)
+    request = make_request(
+        topology_name="active-only",
+        mappings=[
+            {
+                "hardware_id": DEFAULT_3800_HARDWARE_ID,
+                "branch_name": "branch2",
+                "edge_name": "b2-edge1",
+                "edge_ha_mode": "single_active",
+            }
+        ],
+    )
+
+    result = generate_topology(request, inventory_path=inventory_path, outputs_root=tmp_path)
+    config = load_config(result)
+    edge = next(item for item in config["topology"]["branches"] if item["name"] == "branch2")["edges"][0]
+    saved_inventory = load_inventory(inventory_path)
+    hardware = next(item for item in saved_inventory.hardware if item.id == DEFAULT_3800_HARDWARE_ID)
+    members = {member.role: member for member in hardware.members}
+
+    assert edge["ha_enabled"] is False
+    assert edge["slno"] == "DGD10Q2"
+    assert "standby_slno" not in edge
+    assert all(not interface["link"].startswith("standby_") for switch in edge["l2_switches"] for interface in switch["interfaces"])
+    assert members["active"].available is False
+    assert members["standby"].available is True
+
+
+def test_ha_pair_can_generate_as_standby_only_and_reserves_standby_member(tmp_path):
+    inventory_path = copy_inventory(tmp_path)
+    request = make_request(
+        topology_name="standby-only",
+        mappings=[
+            {
+                "hardware_id": DEFAULT_3800_HARDWARE_ID,
+                "branch_name": "branch2",
+                "edge_name": "b2-edge1",
+                "edge_ha_mode": "single_standby",
+            }
+        ],
+    )
+
+    result = generate_topology(request, inventory_path=inventory_path, outputs_root=tmp_path)
+    config = load_config(result)
+    edge = next(item for item in config["topology"]["branches"] if item["name"] == "branch2")["edges"][0]
+    saved_inventory = load_inventory(inventory_path)
+    hardware = next(item for item in saved_inventory.hardware if item.id == DEFAULT_3800_HARDWARE_ID)
+    members = {member.role: member for member in hardware.members}
+
+    assert edge["ha_enabled"] is False
+    assert edge["slno"] == "16C10Q2"
+    assert "standby_slno" not in edge
+    switch_port_names = {
+        interface["name"]
+        for switch in edge["l2_switches"]
+        for interface in switch["interfaces"]
+    }
+    assert "gigabitethernet1/25" in switch_port_names
+    assert members["active"].available is True
+    assert members["standby"].available is False
+
+
+def test_explicit_ha_mode_rejects_standalone_hardware(tmp_path):
+    inventory_path, standalone_id = build_standalone_inventory(tmp_path)
+    request = make_request(
+        topology_name="invalid-ha",
+        mappings=[
+            {
+                "hardware_id": standalone_id,
+                "branch_name": "branch2",
+                "edge_name": "b2-edge1",
+                "edge_ha_mode": "ha",
+            }
+        ],
+        hypervisor_interface="vmnic0",
+    )
+
+    with pytest.raises(GenerationError, match="cannot be mapped as HA"):
+        generate_topology(request, inventory_path=inventory_path, outputs_root=tmp_path)
 
 
 def test_duplicate_hardware_mapping_rejected():

@@ -49,6 +49,8 @@ def summarize_reference(reference_id: str, root: Path = REFERENCE_CONFIG_ROOT) -
                         logical_name=interface.get("logical_name"),
                         logical_interface=interface.get("logical_interface"),
                         mode=interface.get("mode"),
+                        type=interface.get("type"),
+                        wan_overlay=interface.get("wan_overlay"),
                         vlans=[vlan for vlan in interface.get("vlans", []) if isinstance(vlan, int)],
                         subinterfaces=[
                             ReferenceSubinterfaceSummary(

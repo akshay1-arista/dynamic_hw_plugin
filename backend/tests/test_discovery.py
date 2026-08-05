@@ -4,8 +4,15 @@ import ssl
 import httpx
 import pytest
 
-from app.discovery import DiscoveryError, LabNavigatorClient, apply_inventory_refresh, preview_inventory_refresh
-from app.models import InventoryRefreshRequest
+from app.discovery import (
+    DiscoveryError,
+    LabNavigatorClient,
+    apply_inventory_import,
+    apply_inventory_refresh,
+    preview_inventory_import,
+    preview_inventory_refresh,
+)
+from app.models import HardwareImportRequest, InventoryRefreshRequest
 
 
 class StubLabNavigatorClient:
@@ -69,6 +76,149 @@ class StubLabNavigatorClient:
                 ]
             }
         return {"connections": []}
+
+
+class ImportLabNavigatorClient:
+    devices = {
+        101: {
+            "id": 101,
+            "name": "edge-active",
+            "hostname": "edge-active",
+            "ip_address": "10.0.0.101",
+            "serial_number": "ACTIVE1",
+            "device_type": "edge",
+            "device_model": "edge6X0",
+        },
+        102: {
+            "id": 102,
+            "name": "edge-standby",
+            "hostname": "edge-standby",
+            "ip_address": "10.0.0.102",
+            "serial_number": "STANDBY1",
+            "device_type": "edge",
+            "device_model": "edge6X0",
+        },
+        11: {
+            "id": 11,
+            "name": "access-sw",
+            "ip_address": "10.0.0.10",
+            "device_type": "switch",
+            "device_model": "Dell-3048",
+        },
+        33: {
+            "id": 33,
+            "name": "esxi-01",
+            "ip_address": "10.0.0.20",
+            "device_type": "server",
+            "device_model": "ESXi",
+        },
+    }
+
+    def close(self):
+        return None
+
+    def search(self, query):
+        if query == "ambiguous":
+            return [self.devices[101], self.devices[102]]
+        return [device for device in self.devices.values() if query in {device["name"], device.get("ip_address"), device.get("serial_number")}]
+
+    def get_inventory_device(self, device_id):
+        return self.devices[device_id]
+
+    def get_wiremap(self, device_id):
+        if device_id == 101:
+            return {
+                "connections": [
+                    {
+                        "interface_name": "GE1",
+                        "remote_device": self.devices[11],
+                        "remote_interface_name": "Gi1/10",
+                    }
+                ]
+            }
+        if device_id == 102:
+            return {
+                "connections": [
+                    {
+                        "interface_name": "GE1",
+                        "remote_device": self.devices[11],
+                        "remote_interface_name": "Gi1/20",
+                    }
+                ]
+            }
+        if device_id == 11:
+            return {
+                "connections": [
+                    {
+                        "interface_name": "Gi1/48",
+                        "remote_device": self.devices[33],
+                        "remote_interface_name": "vmnic0",
+                    }
+                ]
+            }
+        if device_id == 33:
+            return {
+                "connections": [
+                    {
+                        "interface_name": "vmnic0",
+                        "remote_device": self.devices[11],
+                        "remote_interface_name": "Gi1/48",
+                    }
+                ]
+            }
+        return {"connections": []}
+
+
+def empty_inventory_path(tmp_path):
+    inventory_path = tmp_path / "inventory.json"
+    inventory_path.write_text(json.dumps({"devices": {}, "connections": [], "allocations": []}))
+    return inventory_path
+
+
+def test_inventory_import_apply_adds_ha_pair_with_wiremap(tmp_path):
+    result = apply_inventory_import(
+        HardwareImportRequest.model_validate(
+            {
+                "targets": [
+                    {"lab_navigator_id": 101, "role": "active"},
+                    {"lab_navigator_id": 102, "role": "standby"},
+                ]
+            }
+        ),
+        inventory_path=empty_inventory_path(tmp_path),
+        client=ImportLabNavigatorClient(),
+    )
+
+    hardware = result.inventory.hardware[0]
+    ports = {port.logical_interface: port for port in hardware.ports}
+
+    assert hardware.ha is True
+    assert hardware.active_serial == "ACTIVE1"
+    assert hardware.standby_serial == "STANDBY1"
+    assert ports["GE1"].switch_active_port == "gigabitethernet1/10"
+    assert ports["GE1"].switch_standby_port == "gigabitethernet1/20"
+    assert any(device.type == "hypervisor" and device.display_name == "esxi-01" for device in result.inventory.devices.values())
+
+
+def test_inventory_import_apply_adds_server_and_switch_wiremap(tmp_path):
+    result = apply_inventory_import(
+        HardwareImportRequest.model_validate({"targets": [{"lab_navigator_id": 33}]}),
+        inventory_path=empty_inventory_path(tmp_path),
+        client=ImportLabNavigatorClient(),
+    )
+
+    assert result.inventory.devices["esxi_01"].type == "hypervisor"
+    assert result.inventory.devices["access_sw"].type == "switch"
+    assert any(connection.role == "hypervisor-access" for connection in result.inventory.connections)
+
+
+def test_inventory_import_preview_rejects_ambiguous_query(tmp_path):
+    with pytest.raises(DiscoveryError, match="matched multiple devices"):
+        preview_inventory_import(
+            HardwareImportRequest.model_validate({"targets": [{"query": "ambiguous"}]}),
+            inventory_path=empty_inventory_path(tmp_path),
+            client=ImportLabNavigatorClient(),
+        )
 
 
 def test_inventory_refresh_preview_adds_upstream_path(tmp_path):

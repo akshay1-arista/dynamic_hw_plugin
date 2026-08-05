@@ -45,6 +45,16 @@ class HardwareLocalState(BaseModel):
         return self
 
 
+class HardwareMemberInfo(BaseModel):
+    role: Literal["active", "standby"]
+    device_id: str
+    display_name: str
+    serial_number: Optional[str] = None
+    lab_navigator_id: Optional[int] = None
+    available: bool = True
+    reservation: Optional[HardwareReservation] = None
+
+
 class VlanRange(BaseModel):
     start: int
     end: int
@@ -254,6 +264,7 @@ class HardwareEdge(BaseModel):
     hypervisor_ip: Optional[str] = None
     available: bool = True
     reservation: Optional[HardwareReservation] = None
+    members: list[HardwareMemberInfo] = Field(default_factory=list)
     notes: Optional[str] = None
 
     @model_validator(mode="after")
@@ -310,6 +321,7 @@ class InventoryFile(BaseModel):
 
 class InventoryStateFile(BaseModel):
     hardware: dict[str, HardwareLocalState] = Field(default_factory=dict)
+    devices: dict[str, HardwareLocalState] = Field(default_factory=dict)
 
 
 class EdgeSummary(BaseModel):
@@ -331,6 +343,8 @@ class ReferenceInterfaceSummary(BaseModel):
     logical_name: Optional[str] = None
     logical_interface: Optional[str] = None
     mode: Optional[str] = None
+    type: Optional[str] = None
+    wan_overlay: Optional[str] = None
     vlans: list[int] = Field(default_factory=list)
     subinterfaces: list[ReferenceSubinterfaceSummary] = Field(default_factory=list)
 
@@ -356,6 +370,7 @@ class MappingRequest(BaseModel):
     edge_name: str
     target_branch_name: Optional[str] = None
     target_edge_name: Optional[str] = None
+    edge_ha_mode: Literal["topology_default", "ha", "single_active", "single_standby"] = "topology_default"
     interface_overrides: list["InterfaceOverride"] = Field(default_factory=list)
     saved_hardware: Optional[HardwareEdge] = None
 
@@ -515,6 +530,58 @@ class InventoryRefreshResult(BaseModel):
     changes: list[InventoryRefreshChange] = Field(default_factory=list)
     inventory: InventoryFile
     messages: list[ValidationMessage] = Field(default_factory=list)
+
+
+class LabNavigatorDeviceCandidate(BaseModel):
+    id: int
+    name: str
+    device_type: Optional[str] = None
+    device_model: Optional[str] = None
+    display_model: Optional[str] = None
+    hostname: Optional[str] = None
+    ip_address: Optional[str] = None
+    serial_number: Optional[str] = None
+    lab: Optional[str] = None
+    location: Optional[str] = None
+    rack: Optional[str] = None
+    rack_unit: Optional[str] = None
+
+
+class LabNavigatorSearchResult(BaseModel):
+    query: str
+    count: int
+    devices: list[LabNavigatorDeviceCandidate] = Field(default_factory=list)
+
+
+class HardwareImportTarget(BaseModel):
+    lab_navigator_id: Optional[int] = None
+    query: Optional[str] = None
+    role: Optional[Literal["active", "standby"]] = None
+
+    @model_validator(mode="after")
+    def require_lookup(self) -> "HardwareImportTarget":
+        if self.lab_navigator_id is None and not (self.query and self.query.strip()):
+            raise ValueError("lab_navigator_id or query is required")
+        return self
+
+
+class HardwareImportRequest(BaseModel):
+    targets: list[HardwareImportTarget]
+    requested_by: Optional[ActorIdentity] = None
+
+    @field_validator("targets")
+    @classmethod
+    def require_targets(cls, value: list[HardwareImportTarget]) -> list[HardwareImportTarget]:
+        if not value:
+            raise ValueError("at least one import target is required")
+        roles = [target.role for target in value if target.role]
+        if roles and sorted(roles) != ["active", "standby"]:
+            raise ValueError("HA import requires exactly one active and one standby target")
+        if len(value) == 2 and sorted(roles) != ["active", "standby"]:
+            raise ValueError("two-device import requires explicit active and standby roles")
+        if len(value) > 2:
+            raise ValueError("import supports one device or one HA pair")
+        return value
 
 
 BaseBranchName = Literal["release_5.2", "release_6.1", "release_6.4", "release_7.0", "master"]
@@ -680,6 +747,9 @@ class RunMappingMetadata(BaseModel):
     hardware_id: str
     branch_name: str
     edge_name: str
+    edge_ha_mode: Literal["topology_default", "ha", "single_active", "single_standby"] = "topology_default"
+    resolved_edge_ha_mode: Optional[Literal["ha", "single_active", "single_standby"]] = None
+    reserved_device_ids: list[str] = Field(default_factory=list)
     generated_branch_name: Optional[str] = None
     generated_edge_name: Optional[str] = None
     generated_l2_switch_names: dict[str, str] = Field(default_factory=dict)

@@ -96,6 +96,24 @@ export function applyInventoryRefresh(hardwareIds) {
   });
 }
 
+export function searchLabNavigatorDevices(query) {
+  return request(`/api/lab-navigator/search?q=${encodeURIComponent(query)}`);
+}
+
+export function previewInventoryImport(payload) {
+  return request('/api/hardware/import-preview', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
+export function applyInventoryImport(payload) {
+  return request('/api/hardware/import-apply', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
 export function generateTopology(payload) {
   return request('/api/generate', {
     method: 'POST',

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from functools import lru_cache
 import json
 import re
@@ -29,6 +30,7 @@ from .models import (
     InventoryDevice,
     InventoryFile,
     JsonObject,
+    MappingRequest,
     RunMappingMetadata,
     RunMetadata,
     SavedGenerateRequest,
@@ -39,6 +41,13 @@ from .reference import resolve_reference_path
 
 class GenerationError(ValueError):
     pass
+
+
+@dataclass(frozen=True)
+class MappingHardwareView:
+    hardware: HardwareEdge
+    resolved_mode: str
+    reserved_device_ids: list[str]
 
 
 def generate_topology(
@@ -117,19 +126,21 @@ def generate_topology(
         old_branch_name = branch["name"]
         old_edge_name = edge["name"]
         reference_ha_enabled = bool(edge.get("ha_enabled"))
+        mapping_view = _resolve_mapping_hardware_view(mapping, hardware, reference_ha_enabled, request)
+        hardware = mapping_view.hardware
         new_branch_name = mapping.target_branch_name or (
             f"{old_branch_name}-{hardware.model_suffix}" if request.branch_rename else old_branch_name
         )
         new_edge_name = mapping.target_edge_name or f"{old_edge_name}-{hardware.model_suffix}"
 
         branch["name"] = new_branch_name
-        if reference_ha_enabled and not hardware.ha:
+        if reference_ha_enabled and mapping_view.resolved_mode != "ha":
             messages.append(
                 ValidationMessage(
                     level="warning",
                     message=(
                         f"{old_branch_name}/{old_edge_name} is HA enabled in the reference topology, "
-                        f"but {hardware.display_name} is standalone. Generated topology converts it to standalone."
+                        f"but {hardware.display_name} is being used as a single edge. Generated topology converts it to standalone."
                     ),
                 )
             )
@@ -191,9 +202,12 @@ def generate_topology(
             mapping_ready = True
         run_metadata.mappings.append(
             RunMappingMetadata(
-                hardware_id=hardware.id,
+                hardware_id=mapping.hardware_id,
                 branch_name=mapping.branch_name,
                 edge_name=mapping.edge_name,
+                edge_ha_mode=mapping.edge_ha_mode,
+                resolved_edge_ha_mode=mapping_view.resolved_mode,
+                reserved_device_ids=mapping_view.reserved_device_ids,
                 generated_branch_name=new_branch_name,
                 generated_edge_name=new_edge_name,
                 path=mapping_path,
@@ -202,7 +216,7 @@ def generate_topology(
         )
         mapping_statuses.append(
             GenerateMappingStatus(
-                hardware_id=hardware.id,
+                hardware_id=mapping.hardware_id,
                 hardware_display_name=hardware.display_name,
                 branch_name=mapping.branch_name,
                 edge_name=mapping.edge_name,
@@ -250,12 +264,18 @@ def generate_topology(
     run_metadata.messages = messages
     run_metadata.updated_at = _utc_now()
     _write_run_metadata(run_root, run_metadata)
+    reserved_device_ids = [
+        device_id
+        for mapping in run_metadata.mappings
+        for device_id in mapping.reserved_device_ids
+    ]
     _saved_inventory, reservation_events = reserve_generated_hardware(
         [mapping.hardware_id for mapping in request.mappings],
         request.requested_by,
         run_id,
         generated_topology_name,
         inventory_path,
+        member_device_ids=reserved_device_ids or None,
     )
     append_audit_events(reservation_events)
 
@@ -283,18 +303,134 @@ def _validate_request(request: GenerateRequest, hardware_by_id: dict[str, Hardwa
         raise GenerationError(f"Unknown hardware inventory id: {', '.join(missing)}")
     for mapping in request.mappings:
         hardware = hardware_by_id[mapping.hardware_id]
-        if not _hardware_is_available_for_request(hardware, request):
-            reservation_actor = hardware.reservation.actor if hardware.reservation else None
-            reserved_by = (
-                f"{reservation_actor.name} ({reservation_actor.email})"
-                if reservation_actor
-                else "another user"
-            )
-            raise GenerationError(
-                f"{hardware.display_name} is currently reserved. Mark it available before generating again. Reserved by {reserved_by}."
-            )
-        if not _topology_ports(hardware):
-            raise GenerationError(f"No connected switch ports found for {hardware.id}")
+        if mapping.edge_ha_mode == "ha" and not hardware.ha:
+            raise GenerationError(f"{hardware.display_name} cannot be mapped as HA because it has no standby member")
+        if mapping.edge_ha_mode == "single_standby" and not hardware.standby_serial:
+            raise GenerationError(f"{hardware.display_name} cannot be mapped as standby-only because it has no standby member")
+
+
+def _resolve_mapping_hardware_view(
+    mapping: MappingRequest,
+    hardware: HardwareEdge,
+    reference_ha_enabled: bool,
+    request: GenerateRequest,
+) -> MappingHardwareView:
+    resolved_mode = _resolve_edge_ha_mode(mapping.edge_ha_mode, hardware, reference_ha_enabled)
+    view = hardware
+    if resolved_mode == "single_active":
+        view = _single_member_hardware_view(hardware, "active")
+    elif resolved_mode == "single_standby":
+        view = _single_member_hardware_view(hardware, "standby")
+
+    if not _mapping_view_is_available(hardware, resolved_mode, request):
+        member = _member_info(hardware, "standby" if resolved_mode == "single_standby" else "active")
+        reservation = member.reservation if member else hardware.reservation
+        reservation_actor = reservation.actor if reservation else None
+        reserved_by = (
+            f"{reservation_actor.name} ({reservation_actor.email})"
+            if reservation_actor
+            else "another user"
+        )
+        raise GenerationError(
+            f"{hardware.display_name} is currently reserved for the selected HA mode. "
+            f"Mark it available before generating again. Reserved by {reserved_by}."
+        )
+
+    ports = _topology_ports(view)
+    if not ports:
+        raise GenerationError(f"No connected switch ports found for {hardware.id} in {resolved_mode} mode")
+    return MappingHardwareView(
+        hardware=view,
+        resolved_mode=resolved_mode,
+        reserved_device_ids=_reserved_device_ids_for_mode(hardware, resolved_mode),
+    )
+
+
+def _resolve_edge_ha_mode(requested_mode: str, hardware: HardwareEdge, reference_ha_enabled: bool) -> str:
+    if requested_mode == "topology_default":
+        return "ha" if reference_ha_enabled and hardware.ha else "single_active"
+    if requested_mode == "ha":
+        if not hardware.ha:
+            raise GenerationError(f"{hardware.display_name} cannot be mapped as HA because it has no standby member")
+        return "ha"
+    if requested_mode == "single_standby":
+        if not hardware.ha or not hardware.standby_serial:
+            raise GenerationError(f"{hardware.display_name} cannot be mapped as standby-only because it has no standby member")
+        return "single_standby"
+    return "single_active"
+
+
+def _single_member_hardware_view(hardware: HardwareEdge, role: str) -> HardwareEdge:
+    if role == "active":
+        return hardware.model_copy(
+            deep=True,
+            update={
+                "ha": False,
+                "standby_serial": None,
+                "display_name": f"{hardware.display_name} active member" if hardware.ha else hardware.display_name,
+                "ports": [
+                    port.model_copy(deep=True, update={"switch_standby_port": None, "manual_mapping_required": False})
+                    for port in hardware.ports
+                    if port.switch_active_port
+                ],
+            },
+        )
+
+    standby_member = _member_info(hardware, "standby")
+    standby_serial = standby_member.serial_number if standby_member and standby_member.serial_number else hardware.standby_serial
+    if not standby_serial:
+        raise GenerationError(f"{hardware.display_name} cannot be mapped as standby-only because it has no standby serial")
+    return hardware.model_copy(
+        deep=True,
+        update={
+            "ha": False,
+            "display_name": f"{hardware.display_name} standby member",
+            "active_serial": standby_serial,
+            "standby_serial": None,
+            "ports": [
+                port.model_copy(
+                    deep=True,
+                    update={
+                        "switch_active_port": port.switch_standby_port,
+                        "switch_standby_port": None,
+                        "manual_mapping_required": False,
+                        "port_warning": None,
+                    },
+                )
+                for port in hardware.ports
+                if port.switch_standby_port
+            ],
+        },
+    )
+
+
+def _mapping_view_is_available(hardware: HardwareEdge, resolved_mode: str, request: GenerateRequest) -> bool:
+    if resolved_mode == "ha":
+        return _hardware_is_available_for_request(hardware, request)
+    role = "standby" if resolved_mode == "single_standby" else "active"
+    member = _member_info(hardware, role)
+    if not member:
+        return _hardware_is_available_for_request(hardware, request)
+    if member.available:
+        return True
+    reservation = member.reservation
+    if reservation is None or reservation.reason != "topology-generation":
+        return False
+    return reservation.actor.email == request.requested_by.email
+
+
+def _reserved_device_ids_for_mode(hardware: HardwareEdge, resolved_mode: str) -> list[str]:
+    if not hardware.members:
+        return []
+    if resolved_mode == "ha":
+        return [member.device_id for member in hardware.members]
+    role = "standby" if resolved_mode == "single_standby" else "active"
+    member = _member_info(hardware, role)
+    return [member.device_id] if member else []
+
+
+def _member_info(hardware: HardwareEdge, role: str):
+    return next((member for member in hardware.members if member.role == role), None)
 
 
 def _hardware_is_available_for_request(hardware: HardwareEdge, request: GenerateRequest) -> bool:

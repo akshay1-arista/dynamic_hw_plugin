@@ -35,8 +35,24 @@ const references = [
             model: 'virtual',
             ha_enabled: true,
             interfaces: [
-              { name: 'eth0', logical_name: 'LAN1', logical_interface: 'GE1', mode: 'switched', vlans: [1, 100] },
-              { name: 'eth1', logical_name: 'LAN2', logical_interface: 'GE2', mode: 'switched', vlans: [1] },
+              {
+                name: 'eth0',
+                logical_name: 'LAN1',
+                logical_interface: 'GE1',
+                mode: 'switched',
+                type: 'private',
+                wan_overlay: 'disabled',
+                vlans: [1, 100]
+              },
+              {
+                name: 'eth1',
+                logical_name: 'LAN2',
+                logical_interface: 'GE2',
+                mode: 'switched',
+                type: 'public',
+                wan_overlay: 'auto_detect',
+                vlans: [1]
+              },
               { name: 'lo', logical_interface: 'lo', type: 'loopback' }
             ]
           }
@@ -175,6 +191,22 @@ const inventory = {
       active_serial: '13WR363',
       standby_serial: '47YP363',
       available: true,
+      members: [
+        {
+          role: 'active',
+          device_id: 'chn-3800-8-ha-active',
+          display_name: 'CHN 3800 active',
+          serial_number: '13WR363',
+          available: true
+        },
+        {
+          role: 'standby',
+          device_id: 'chn-3800-8-ha-standby',
+          display_name: 'CHN 3800 standby',
+          serial_number: '47YP363',
+          available: true
+        }
+      ],
       switch: { name: 'b2e1-l2-switch', model: 'Dell-3048', connections: { ip: '10.68.136.67' } },
       ports: [
         {
@@ -483,6 +515,106 @@ beforeEach(() => {
         ...auditTrail
       ];
       return Response.json(inventoryState);
+    }
+    if (String(url).startsWith('/api/lab-navigator/search')) {
+      return Response.json({
+        query: 'edge-import',
+        count: 2,
+        devices: [
+          {
+            id: 501,
+            name: 'edge-import-active',
+            device_type: 'edge',
+            device_model: 'edge6X0',
+            ip_address: '10.0.0.101',
+            serial_number: 'IMP-A'
+          },
+          {
+            id: 502,
+            name: 'edge-import-standby',
+            device_type: 'edge',
+            device_model: 'edge6X0',
+            ip_address: '10.0.0.102',
+            serial_number: 'IMP-S'
+          }
+        ]
+      });
+    }
+    if (url === '/api/hardware/import-preview' && options.method === 'POST') {
+      const payload = JSON.parse(options.body);
+      return Response.json({
+        hardware_ids: ['ln-ha-edge-import-active-imp-a-edge-import-standby-imp-s'],
+        summary: {
+          status: 'success',
+          requested_hardware_count: payload.targets.length,
+          change_count: 3,
+          discovered_connection_count: 2,
+          preserved_connection_count: 0,
+          skipped_unresolved_remote_count: 0,
+          skipped_unsupported_peer_count: 0,
+          skipped_missing_interface_count: 0,
+          targets: []
+        },
+        changes: [{ change_type: 'add-device', target: 'edge-import-active', summary: 'Add edge edge-import-active' }],
+        inventory: inventoryState,
+        messages: [{ level: 'info', message: 'Previewed 3 inventory change(s) across 2 hardware selection(s).' }]
+      });
+    }
+    if (url === '/api/hardware/import-apply' && options.method === 'POST') {
+      inventoryState = {
+        ...inventoryState,
+        hardware: [
+          ...inventoryState.hardware,
+          {
+            id: 'ln-ha-edge-import-active-imp-a-edge-import-standby-imp-s',
+            short_name: 'edge-import-ha',
+            display_name: 'HA Pair edge-import-active + edge-import-standby',
+            model: 'edge6X0',
+            model_suffix: '680',
+            ha: true,
+            active_serial: 'IMP-A',
+            standby_serial: 'IMP-S',
+            available: true,
+            members: [
+              {
+                role: 'active',
+                device_id: 'edge_import_active',
+                display_name: 'edge-import-active',
+                serial_number: 'IMP-A',
+                available: true
+              },
+              {
+                role: 'standby',
+                device_id: 'edge_import_standby',
+                display_name: 'edge-import-standby',
+                serial_number: 'IMP-S',
+                available: true
+              }
+            ],
+            switch: null,
+            switches: [],
+            ports: [],
+            notes: 'Imported from Lab Navigator.'
+          }
+        ]
+      };
+      return Response.json({
+        hardware_ids: ['ln-ha-edge-import-active-imp-a-edge-import-standby-imp-s'],
+        summary: {
+          status: 'success',
+          requested_hardware_count: 2,
+          change_count: 3,
+          discovered_connection_count: 2,
+          preserved_connection_count: 0,
+          skipped_unresolved_remote_count: 0,
+          skipped_unsupported_peer_count: 0,
+          skipped_missing_interface_count: 0,
+          targets: []
+        },
+        changes: [{ change_type: 'add-device', target: 'edge-import-active', summary: 'Add edge edge-import-active' }],
+        inventory: inventoryState,
+        messages: [{ level: 'info', message: 'Applied Lab Navigator inventory import.' }]
+      });
     }
     if (url === '/api/hardware/refresh-preview' && options.method === 'POST') {
       const payload = JSON.parse(options.body);
@@ -1144,6 +1276,61 @@ describe('App', () => {
     expect(screen.getAllByText('By Test User').length).toBeGreaterThan(0);
   });
 
+  test('renders HA mode controls and submits active-only mode', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await screen.findAllByText('CHN 3800 HA Pair 8');
+    await chooseHardware(user, '3800', /CHN 3800 HA Pair 8/i);
+    await user.selectOptions(screen.getByLabelText('Branch'), 'branch2');
+
+    expect(screen.getByRole('button', { name: 'Base HA' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'HA pair' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Active only' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Standby only' })).toBeEnabled();
+
+    await user.click(screen.getByRole('button', { name: 'Active only' }));
+    await user.type(screen.getByRole('combobox', { name: 'Hypervisor IP' }), '10.68.136.50');
+    await user.type(screen.getByRole('combobox', { name: 'Hypervisor interface' }), 'vmnic0');
+    await user.click(screen.getByRole('button', { name: /generate zip/i }));
+
+    const generateCall = global.fetch.mock.calls.find(([url]) => url === '/api/generate');
+    const payload = JSON.parse(generateCall[1].body);
+    expect(payload.mappings[0].edge_ha_mode).toBe('single_active');
+  });
+
+  test('imports an HA pair from Lab Navigator search results', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await screen.findAllByText('CHN 3800 HA Pair 8');
+    await user.type(screen.getByLabelText('Add from Lab Navigator'), 'edge-import');
+    await user.click(screen.getByRole('button', { name: /^Search$/ }));
+
+    expect(await screen.findByText('edge-import-active')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'HA pair' }));
+    await user.click(screen.getByRole('button', { name: /edge-import-active/i }));
+    await user.click(screen.getByRole('button', { name: /edge-import-standby/i }));
+    await user.click(screen.getByRole('button', { name: /import selected/i }));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/hardware/import-preview',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({
+            requested_by: defaultUser,
+            targets: [
+              { lab_navigator_id: 501, role: 'active' },
+              { lab_navigator_id: 502, role: 'standby' }
+            ]
+          })
+        })
+      );
+    });
+    expect(await screen.findByText('HA Pair edge-import-active + edge-import-standby')).toBeInTheDocument();
+  });
+
   test('filters audit trail events', async () => {
     const user = userEvent.setup();
     render(<App />);
@@ -1394,6 +1581,8 @@ describe('App', () => {
 
     expect(screen.getByText('Reference VLANs 1, 100')).toBeInTheDocument();
     expect(screen.getByText('Reference VLANs 1')).toBeInTheDocument();
+    expect(screen.getByText('mode switched / type private / wan overlay disabled')).toBeInTheDocument();
+    expect(screen.getByText('mode switched / type public / wan overlay auto_detect')).toBeInTheDocument();
   });
 
   test('sends optional VLAN overrides from interface mapping', async () => {

@@ -8,7 +8,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
 from .audit import AuditTrailError, append_audit_event, list_audit_events
-from .discovery import DiscoveryError, apply_inventory_refresh, preview_inventory_refresh
+from .discovery import (
+    DiscoveryError,
+    apply_inventory_import,
+    apply_inventory_refresh,
+    preview_inventory_import,
+    preview_inventory_refresh,
+    search_lab_navigator_devices,
+)
 from .config import OUTPUTS_ROOT
 from .generator import GenerationError, generate_topology, resolve_run_root
 from .hapy_repo import HapyRepoError, delete_private_branches, list_private_branches, publish_run_private_branch
@@ -23,10 +30,12 @@ from .models import (
     HapyCommitResult,
     HapyPrivateBranchListResult,
     HardwareAvailabilityUpdateRequest,
+    HardwareImportRequest,
     InventoryFile,
     InventoryRefreshRequest,
     InventoryRefreshResult,
     InventoryUpdateRequest,
+    LabNavigatorSearchResult,
     SavedRunListResult,
     SavedRunLoadResult,
     SwitchConfigureRequest,
@@ -127,6 +136,30 @@ def post_hardware_refresh_apply(request: InventoryRefreshRequest):
         raise HTTPException(status_code=400, detail=str(error)) from error
 
 
+@app.get("/api/lab-navigator/search", response_model=LabNavigatorSearchResult)
+def get_lab_navigator_search(q: str):
+    try:
+        return search_lab_navigator_devices(q)
+    except (DiscoveryError, ValueError, FileNotFoundError) as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@app.post("/api/hardware/import-preview", response_model=InventoryRefreshResult)
+def post_hardware_import_preview(request: HardwareImportRequest):
+    try:
+        return preview_inventory_import(request)
+    except (DiscoveryError, GenerationError, ValueError, FileNotFoundError) as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@app.post("/api/hardware/import-apply", response_model=InventoryRefreshResult)
+def post_hardware_import_apply(request: HardwareImportRequest):
+    try:
+        return apply_inventory_import(request)
+    except (DiscoveryError, GenerationError, ValueError, FileNotFoundError) as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
 @app.post("/api/generate", response_model=GenerateResult)
 def post_generate(request: GenerateRequest):
     try:
@@ -201,3 +234,4 @@ def get_audit_trail():
         return list_audit_events()
     except AuditTrailError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
+    LabNavigatorSearchResult,

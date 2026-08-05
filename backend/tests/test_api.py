@@ -21,6 +21,19 @@ def test_reference_topologies_include_nested_id():
     assert "5-site-cluster/hitless" in ids
 
 
+def test_reference_topologies_include_interface_mode_type_and_wan_overlay():
+    response = client.get("/api/reference-topologies")
+    assert response.status_code == 200
+    topology = next(item for item in response.json() if item["id"] == "3-site")
+    branch = next(item for item in topology["branches"] if item["name"] == "branch2")
+    edge = next(item for item in branch["edges"] if item["name"] == "b2-edge1")
+    interface = next(item for item in edge["interfaces"] if item.get("mode") and item.get("type") and item.get("wan_overlay"))
+
+    assert interface["mode"]
+    assert interface["type"]
+    assert interface["wan_overlay"]
+
+
 def test_hardware_inventory_endpoint():
     response = client.get("/api/hardware")
     assert response.status_code == 200

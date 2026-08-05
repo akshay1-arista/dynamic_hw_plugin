@@ -198,6 +198,7 @@ def _reconstruct_request(metadata: RunMetadata, run_root: Path, inventory) -> Sa
                 hardware_id=mapping.hardware_id,
                 branch_name=mapping.branch_name,
                 edge_name=mapping.edge_name,
+                edge_ha_mode=mapping.edge_ha_mode,
                 target_branch_name=(
                     target_branch_name if target_branch_name and target_branch_name != mapping.branch_name else None
                 ),

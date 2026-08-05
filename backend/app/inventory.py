@@ -14,6 +14,7 @@ from .models import (
     AuditEvent,
     HardwareEdge,
     HardwareLocalState,
+    HardwareMemberInfo,
     HardwareReservation,
     HardwarePathSummary,
     InventoryConnection,
@@ -161,42 +162,71 @@ def reserve_generated_hardware(
     run_id: str,
     topology_name: str,
     path: Path = INVENTORY_PATH,
+    *,
+    member_device_ids: list[str] | None = None,
 ) -> tuple[InventoryFile, list[AuditEvent]]:
     inventory = load_inventory(path)
     hardware_set = set(hardware_ids)
+    member_set = set(member_device_ids or [])
     events: list[AuditEvent] = []
-    for hardware in inventory.hardware:
-        if hardware.id not in hardware_set:
-            continue
-        hardware.available = False
-        hardware.reservation = HardwareReservation(
-            actor=actor,
-            reserved_at=_utc_now(),
-            reason="topology-generation",
-            run_id=run_id,
-            topology_name=topology_name,
-        )
-        events.append(
-            build_audit_event(
-                action="hardware_reserved",
-                actor=actor,
-                target_type="hardware",
-                target_id=hardware.id,
-                summary=f"Reserved {hardware.display_name} for generated topology {topology_name}.",
-                details={
-                    "hardware_id": hardware.id,
-                    "hardware_display_name": hardware.display_name,
-                    "run_id": run_id,
-                    "topology_name": topology_name,
-                },
+    reservation = HardwareReservation(
+        actor=actor,
+        reserved_at=_utc_now(),
+        reason="topology-generation",
+        run_id=run_id,
+        topology_name=topology_name,
+    )
+    if member_set:
+        for device in inventory.devices.values():
+            if device.id not in member_set:
+                continue
+            device.available = False
+            device.reservation = reservation
+            group_id = device.ha_group_id or device.id
+            events.append(
+                build_audit_event(
+                    action="hardware_reserved",
+                    actor=actor,
+                    target_type="hardware",
+                    target_id=device.id,
+                    summary=f"Reserved {device.display_name} for generated topology {topology_name}.",
+                    details={
+                        "hardware_id": group_id,
+                        "device_id": device.id,
+                        "hardware_display_name": device.display_name,
+                        "run_id": run_id,
+                        "topology_name": topology_name,
+                    },
+                )
             )
-        )
+    else:
+        for hardware in inventory.hardware:
+            if hardware.id not in hardware_set:
+                continue
+            hardware.available = False
+            hardware.reservation = reservation
+            events.append(
+                build_audit_event(
+                    action="hardware_reserved",
+                    actor=actor,
+                    target_type="hardware",
+                    target_id=hardware.id,
+                    summary=f"Reserved {hardware.display_name} for generated topology {topology_name}.",
+                    details={
+                        "hardware_id": hardware.id,
+                        "hardware_display_name": hardware.display_name,
+                        "run_id": run_id,
+                        "topology_name": topology_name,
+                    },
+                )
+            )
     saved = save_inventory(
         inventory,
         path,
         write_source="topology-reservation",
         write_context={
             "hardware_ids": sorted(hardware_set),
+            "member_device_ids": sorted(member_set),
             "run_id": run_id,
             "topology_name": topology_name,
             "actor_email": _actor_email(actor),
@@ -220,6 +250,7 @@ def update_hardware_availability(
     hardware.available = available
     if available:
         hardware.reservation = None
+        _set_hardware_member_availability(inventory, hardware_id, True, None)
         action = "hardware_released"
         summary = f"Marked {hardware.display_name} as available."
         details = {
@@ -233,6 +264,7 @@ def update_hardware_availability(
             reserved_at=_utc_now(),
             reason="manual-unavailable",
         )
+        _set_hardware_member_availability(inventory, hardware_id, False, hardware.reservation)
         action = "hardware_marked_unavailable"
         summary = f"Marked {hardware.display_name} as unavailable."
         details = {
@@ -259,6 +291,21 @@ def update_hardware_availability(
         details=details,
     )
     return saved, [event]
+
+
+def _set_hardware_member_availability(
+    inventory: InventoryFile,
+    hardware_id: str,
+    available: bool,
+    reservation: HardwareReservation | None,
+) -> None:
+    for device in inventory.devices.values():
+        if device.type != "edge":
+            continue
+        if (device.ha_group_id or device.id) != hardware_id:
+            continue
+        device.available = available
+        device.reservation = reservation
 
 
 def _sanitize_connections(connections: list[InventoryConnection]) -> list[InventoryConnection]:
@@ -456,6 +503,7 @@ def _derive_hardware(
         free_vlans = _vlan_pool(active)
         path = _derive_path_summary(active, devices, connections)
         is_ha = standby is not None
+        members_state = _hardware_member_state(active, standby)
         reservation = active.reservation or (standby.reservation if standby else None)
         available = active.available and (standby.available if standby else True)
         if available:
@@ -483,10 +531,38 @@ def _derive_hardware(
                 "hypervisor_ip": active.hypervisor_ip,
                 "available": available,
                 "reservation": reservation.model_dump(mode="json") if reservation else None,
+                "members": [member.model_dump(mode="json") for member in members_state],
                 "notes": _join_notes(active.notes, standby.notes if standby else None),
             }
         )
     return hardware
+
+
+def _hardware_member_state(active: InventoryDevice, standby: InventoryDevice | None) -> list[HardwareMemberInfo]:
+    members = [
+        HardwareMemberInfo(
+            role="active",
+            device_id=active.id,
+            display_name=active.display_name,
+            serial_number=active.serial_number,
+            lab_navigator_id=active.lab_navigator_id,
+            available=active.available,
+            reservation=active.reservation,
+        )
+    ]
+    if standby:
+        members.append(
+            HardwareMemberInfo(
+                role="standby",
+                device_id=standby.id,
+                display_name=standby.display_name,
+                serial_number=standby.serial_number,
+                lab_navigator_id=standby.lab_navigator_id,
+                available=standby.available,
+                reservation=standby.reservation,
+            )
+        )
+    return members
 
 
 def _pick_edge_member(members: list[InventoryDevice], role: str) -> InventoryDevice | None:
@@ -1065,7 +1141,7 @@ def _load_inventory_state(path: Path) -> InventoryStateFile:
 
 
 def _save_inventory_state(state: InventoryStateFile, path: Path) -> None:
-    if not state.hardware:
+    if not state.hardware and not state.devices:
         if path.exists():
             path.unlink()
         return
@@ -1082,14 +1158,25 @@ def _build_local_inventory_state(
     preserve_existing: bool,
 ) -> InventoryStateFile:
     hardware_state: dict[str, HardwareLocalState] = {}
+    device_state: dict[str, HardwareLocalState] = {}
     for hardware in inventory.hardware:
         state = HardwareLocalState(available=hardware.available, reservation=hardware.reservation)
         if preserve_existing and hardware.id in existing.hardware:
             state = existing.hardware[hardware.id]
         if state.available and state.reservation is None:
+            pass
+        else:
+            hardware_state[hardware.id] = state
+    for device in inventory.devices.values():
+        if device.type != "edge":
             continue
-        hardware_state[hardware.id] = state
-    return InventoryStateFile(hardware=hardware_state)
+        state = HardwareLocalState(available=device.available, reservation=device.reservation)
+        if preserve_existing and device.id in existing.devices:
+            state = existing.devices[device.id]
+        if state.available and state.reservation is None:
+            continue
+        device_state[device.id] = state
+    return InventoryStateFile(hardware=hardware_state, devices=device_state)
 
 
 def _apply_local_inventory_state(
@@ -1114,8 +1201,6 @@ def _apply_local_inventory_state(
         hardware.available = local_state.available
         hardware.reservation = local_state.reservation
 
-    if not inventory.devices:
-        return
     for device in inventory.devices.values():
         if device.type != "edge":
             continue
@@ -1125,6 +1210,44 @@ def _apply_local_inventory_state(
             continue
         device.available = local_state.available
         device.reservation = local_state.reservation
+
+    for device in inventory.devices.values():
+        local_state = state.devices.get(device.id)
+        if not local_state:
+            continue
+        device.available = local_state.available
+        device.reservation = local_state.reservation
+
+    _sync_hardware_state_from_edge_devices(inventory)
+
+
+def _sync_hardware_state_from_edge_devices(inventory: InventoryFile) -> None:
+    if not inventory.devices:
+        return
+    edge_members: dict[str, list[InventoryDevice]] = {}
+    for device in inventory.devices.values():
+        if device.type == "edge":
+            edge_members.setdefault(device.ha_group_id or device.id, []).append(device)
+    for hardware in inventory.hardware:
+        members = edge_members.get(hardware.id)
+        if not members:
+            continue
+        hardware.members = []
+        for device in sorted(members, key=lambda item: (0 if item.ha_role == "active" else 1, item.id)):
+            role = "standby" if device.ha_role == "standby" else "active"
+            hardware.members.append(
+                HardwareMemberInfo(
+                    role=role,
+                    device_id=device.id,
+                    display_name=device.display_name,
+                    serial_number=device.serial_number,
+                    lab_navigator_id=device.lab_navigator_id,
+                    available=device.available,
+                    reservation=device.reservation,
+                )
+            )
+        hardware.available = all(member.available for member in members)
+        hardware.reservation = None if hardware.available else next((member.reservation for member in members if member.reservation), None)
 
 
 def _strip_local_state_from_persisted_inventory(persisted: dict[str, Any]) -> None:

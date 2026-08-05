@@ -18,6 +18,7 @@ import {
   Trash2
 } from 'lucide-react';
 import {
+  applyInventoryImport,
   applyInventoryRefresh,
   configureSwitches,
   deletePrivateBranches,
@@ -30,7 +31,9 @@ import {
   generateTopology,
   publishPrivateBranch,
   previewInventoryRefresh,
+  previewInventoryImport,
   saveInventory,
+  searchLabNavigatorDevices,
   updateHardwareAvailability
 } from './api.js';
 
@@ -40,6 +43,7 @@ const emptyMapping = {
   edge_name: '',
   target_branch_name: '',
   target_edge_name: '',
+  edge_ha_mode: 'topology_default',
   interface_overrides: [],
   saved_hardware: null
 };
@@ -106,6 +110,11 @@ export function App() {
   const [previewingSwitches, setPreviewingSwitches] = useState(false);
   const [switchPreview, setSwitchPreview] = useState(null);
   const [inventorySearch, setInventorySearch] = useState('');
+  const [labNavigatorImportQuery, setLabNavigatorImportQuery] = useState('');
+  const [labNavigatorSearchResults, setLabNavigatorSearchResults] = useState([]);
+  const [selectedImportDeviceIds, setSelectedImportDeviceIds] = useState([]);
+  const [importMode, setImportMode] = useState('single');
+  const [labNavigatorImporting, setLabNavigatorImporting] = useState(false);
   const [inventoryAvailabilityFilter, setInventoryAvailabilityFilter] = useState('all');
   const [inventoryLabelFilters, setInventoryLabelFilters] = useState([]);
   const [generatedRunRequestedByFilter, setGeneratedRunRequestedByFilter] = useState('all');
@@ -259,6 +268,10 @@ export function App() {
     const validRequesters = new Set(generatedRunRequesterOptions.map((option) => option.value));
     setGeneratedRunRequestedByFilter((current) => (validRequesters.has(current) ? current : 'all'));
   }, [generatedRunRequesterOptions]);
+
+  useEffect(() => {
+    setSelectedImportDeviceIds((current) => current.slice(0, importMode === 'ha' ? 2 : 1));
+  }, [importMode]);
 
   const filteredHardware = useMemo(() => {
     const query = inventorySearch.trim().toLowerCase();
@@ -546,6 +559,80 @@ export function App() {
     }
   }
 
+  async function searchLabNavigatorForImport(event) {
+    event.preventDefault();
+    const query = labNavigatorImportQuery.trim();
+    if (!query) {
+      setError('Enter a Lab Navigator name, IP, hostname, or serial to search.');
+      return;
+    }
+    setLabNavigatorImporting(true);
+    setError('');
+    try {
+      const result = await searchLabNavigatorDevices(query);
+      setLabNavigatorSearchResults(result.devices || []);
+      setSelectedImportDeviceIds([]);
+    } catch (searchError) {
+      setError(searchError.message);
+    } finally {
+      setLabNavigatorImporting(false);
+    }
+  }
+
+  function toggleImportDevice(deviceId) {
+    setSelectedImportDeviceIds((current) => {
+      if (current.includes(deviceId)) {
+        return current.filter((item) => item !== deviceId);
+      }
+      const maxSelections = importMode === 'ha' ? 2 : 1;
+      return [...current, deviceId].slice(-maxSelections);
+    });
+  }
+
+  async function importSelectedLabNavigatorDevices() {
+    const selectedDevices = selectedImportDeviceIds
+      .map((deviceId) => labNavigatorSearchResults.find((device) => device.id === deviceId))
+      .filter(Boolean);
+    if (importMode === 'ha' && selectedDevices.length !== 2) {
+      setError('Select exactly two Lab Navigator edge devices for HA import.');
+      return;
+    }
+    if (importMode !== 'ha' && selectedDevices.length !== 1) {
+      setError('Select one Lab Navigator device to import.');
+      return;
+    }
+    const payload = {
+      requested_by: currentUser,
+      targets:
+        importMode === 'ha'
+          ? selectedDevices.map((device, index) => ({
+              lab_navigator_id: device.id,
+              role: index === 0 ? 'active' : 'standby'
+            }))
+          : [{ lab_navigator_id: selectedDevices[0].id }]
+    };
+    setLabNavigatorImporting(true);
+    setError('');
+    try {
+      const preview = await previewInventoryImport(payload);
+      setInventoryRefreshFeedback(preview);
+      const summary = buildRefreshPromptSummary(preview);
+      if (!window.confirm(`Apply Lab Navigator import?\n\n${summary}`)) {
+        return;
+      }
+      const applied = await applyInventoryImport(payload);
+      setInventory(applied.inventory);
+      setInventoryRefreshFeedback(applied);
+      setLabNavigatorSearchResults([]);
+      setSelectedImportDeviceIds([]);
+      setLabNavigatorImportQuery('');
+    } catch (importError) {
+      setError(importError.message);
+    } finally {
+      setLabNavigatorImporting(false);
+    }
+  }
+
   async function submitGenerate() {
     setGenerating(true);
     setResult(null);
@@ -580,8 +667,19 @@ export function App() {
         const hardware = resolveMappingHardware(mapping, inventory.hardware);
         return hardware && !hardwareHasConnectionData(hardware);
       });
+      const invalidHaMode = mappings.find((mapping) => {
+        const hardware = resolveMappingHardware(mapping, inventory.hardware);
+        const branch = selectedReference?.branches.find((item) => item.name === mapping.branch_name);
+        const edge = branch?.edges.find((item) => item.name === mapping.edge_name);
+        return haModeOptions(hardware, edge).some(
+          (option) => option.value === (mapping.edge_ha_mode || 'topology_default') && option.disabled
+        );
+      });
       if (!hypervisorIp.trim() || !hypervisorInterface.trim() || missingMapping) {
         throw new Error('Select Hypervisor IP, Hypervisor interface, hardware, branch, and edge before generating.');
+      }
+      if (invalidHaMode) {
+        throw new Error(`Selected HA mode is not available for ${invalidHaMode.branch_name}/${invalidHaMode.edge_name}.`);
       }
       if (hardwareMissingConnections) {
         const hardware = resolveMappingHardware(hardwareMissingConnections, inventory.hardware);
@@ -601,6 +699,7 @@ export function App() {
           edge_name: mapping.edge_name,
           target_branch_name: mapping.target_branch_name || null,
           target_edge_name: mapping.target_edge_name || null,
+          edge_ha_mode: mapping.edge_ha_mode || 'topology_default',
           ...(mapping.saved_hardware && mapping.saved_hardware.id === mapping.hardware_id
             ? { saved_hardware: mapping.saved_hardware }
             : {}),
@@ -962,6 +1061,86 @@ export function App() {
                 />
               </span>
             </label>
+            <div className="labNavigatorImport">
+              <form className="inlineImportSearch" onSubmit={searchLabNavigatorForImport}>
+                <label className="searchField">
+                  Add from Lab Navigator
+                  <span>
+                    <Search size={16} aria-hidden="true" />
+                    <input
+                      value={labNavigatorImportQuery}
+                      onChange={(event) => setLabNavigatorImportQuery(event.target.value)}
+                      placeholder="name, IP, hostname, serial"
+                    />
+                  </span>
+                </label>
+                <button className="secondary compactButton" disabled={labNavigatorImporting} type="submit">
+                  {labNavigatorImporting ? <Loader2 className="spin" size={16} /> : <Search size={16} />}
+                  Search
+                </button>
+              </form>
+              {labNavigatorSearchResults.length > 0 && (
+                <div className="importResults">
+                  <div className="quickFilterRow" role="group" aria-label="Lab Navigator import mode">
+                    <button
+                      aria-pressed={importMode === 'single'}
+                      className={`quickFilterButton ${importMode === 'single' ? 'active' : ''}`}
+                      onClick={() => setImportMode('single')}
+                      type="button"
+                    >
+                      Single
+                    </button>
+                    <button
+                      aria-pressed={importMode === 'ha'}
+                      className={`quickFilterButton ${importMode === 'ha' ? 'active' : ''}`}
+                      onClick={() => setImportMode('ha')}
+                      type="button"
+                    >
+                      HA pair
+                    </button>
+                  </div>
+                  <div className="importResultList">
+                    {labNavigatorSearchResults.map((device) => {
+                      const selected = selectedImportDeviceIds.includes(device.id);
+                      return (
+                        <button
+                          key={device.id}
+                          className={`importResult ${selected ? 'selected' : ''}`}
+                          onClick={() => toggleImportDevice(device.id)}
+                          type="button"
+                        >
+                          <span>
+                            <strong>{device.name}</strong>
+                            <small>{labNavigatorDeviceSummary(device)}</small>
+                          </span>
+                          {selected && (
+                            <StatusBadge tone="accent">
+                              {importMode === 'ha'
+                                ? selectedImportDeviceIds[0] === device.id
+                                  ? 'Active'
+                                  : 'Standby'
+                                : 'Selected'}
+                            </StatusBadge>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <button
+                    className="secondary compactButton"
+                    disabled={
+                      labNavigatorImporting ||
+                      selectedImportDeviceIds.length !== (importMode === 'ha' ? 2 : 1)
+                    }
+                    onClick={importSelectedLabNavigatorDevices}
+                    type="button"
+                  >
+                    {labNavigatorImporting ? <Loader2 className="spin" size={16} /> : <Plus size={16} />}
+                    Import selected
+                  </button>
+                </div>
+              )}
+            </div>
             <div className="inventoryFilterGroup">
               <small className="inventoryFilterLabel">Availability</small>
               <div className="quickFilterRow" aria-label="Inventory quick filters" role="group">
@@ -1836,6 +2015,7 @@ function savedMappingToEditorState(mapping) {
     edge_name: mapping.edge_name || '',
     target_branch_name: mapping.target_branch_name || '',
     target_edge_name: mapping.target_edge_name || '',
+    edge_ha_mode: mapping.edge_ha_mode || 'topology_default',
     saved_hardware: mapping.saved_hardware || null,
     interface_overrides: (mapping.interface_overrides || []).map((override) => ({
       reference_interface: override.reference_interface,
@@ -1938,6 +2118,13 @@ function hardwareSearchText(hardware) {
     hardware.reservation?.actor?.name,
     hardware.reservation?.actor?.email,
     hardware.notes,
+    ...(hardware.members || []).flatMap((member) => [
+      member.display_name,
+      member.serial_number,
+      member.device_id,
+      member.reservation?.actor?.name,
+      member.reservation?.actor?.email
+    ]),
     ...switches.flatMap((item) => [item.name, item.connections?.ip]),
     ...hardware.ports.flatMap((port) => [
       port.logical_name,
@@ -1951,6 +2138,19 @@ function hardwareSearchText(hardware) {
     .filter(Boolean)
     .join(' ')
     .toLowerCase();
+}
+
+function labNavigatorDeviceSummary(device) {
+  return [
+    device.device_type || 'device',
+    device.device_model || device.display_model,
+    device.ip_address,
+    device.serial_number,
+    device.lab,
+    device.location
+  ]
+    .filter(Boolean)
+    .join(' / ');
 }
 
 function allRefreshableHardwareIds(inventory) {
@@ -2111,6 +2311,60 @@ function hardwareOptionLabel(hardware) {
   return `${prefix}${hardware.display_name} (${hardware.model}, ${state}${asymmetry}, ${connectivity}, ${reservation})`;
 }
 
+function hardwareMemberByRole(hardware, role) {
+  return (hardware?.members || []).find((member) => member.role === role) || null;
+}
+
+function hardwareSelectableForMapping(hardware) {
+  if (!hardware) {
+    return false;
+  }
+  if (hardware.available) {
+    return true;
+  }
+  return (hardware.members || []).some((member) => member.available);
+}
+
+function hardwareMemberAvailable(hardware, role) {
+  const member = hardwareMemberByRole(hardware, role);
+  return member ? member.available : Boolean(hardware?.available);
+}
+
+function haModeOptions(hardware, edge) {
+  const baseHa = Boolean(edge?.ha_enabled);
+  const hasStandby = Boolean(hardware?.standby_serial || hardwareMemberByRole(hardware, 'standby'));
+  return [
+    {
+      value: 'topology_default',
+      label: baseHa ? 'Base HA' : 'Base single',
+      disabled: false,
+      reason: ''
+    },
+    {
+      value: 'ha',
+      label: 'HA pair',
+      disabled: !hardware?.ha || !hasStandby || !hardware?.available,
+      reason: !hardware?.ha || !hasStandby
+        ? 'Selected hardware has no standby member.'
+        : !hardware?.available
+          ? 'Both HA members must be available for HA mode.'
+          : ''
+    },
+    {
+      value: 'single_active',
+      label: 'Active only',
+      disabled: !hardwareMemberAvailable(hardware, 'active'),
+      reason: 'Active member is reserved.'
+    },
+    {
+      value: 'single_standby',
+      label: 'Standby only',
+      disabled: !hasStandby || !hardwareMemberAvailable(hardware, 'standby'),
+      reason: !hasStandby ? 'Selected hardware has no standby member.' : 'Standby member is reserved.'
+    }
+  ];
+}
+
 function getReferenceInterfaceKey(interfaceSummary) {
   return (
     interfaceSummary?.logical_interface ||
@@ -2156,6 +2410,16 @@ function referenceInterfaceVlanSummary(interfaceSummary) {
     : [];
   const vlans = [...new Set([...baseVlans, ...subinterfaceVlans])];
   return vlans.length ? `Reference VLANs ${vlans.join(', ')}` : '';
+}
+
+function referenceInterfaceMetadataSummary(interfaceSummary) {
+  return [
+    interfaceSummary?.mode ? `mode ${interfaceSummary.mode}` : '',
+    interfaceSummary?.type ? `type ${interfaceSummary.type}` : '',
+    interfaceSummary?.wan_overlay ? `wan overlay ${interfaceSummary.wan_overlay}` : ''
+  ]
+    .filter(Boolean)
+    .join(' / ');
 }
 
 function referenceInterfaceVlanRequirements(interfaceSummary) {
@@ -2630,6 +2894,16 @@ function HardwareDetails({ hardware, refreshStatus, refreshing, onVlanRangeChang
       </div>
 
       <div className="switchList">
+        {(hardware.members || []).map((member) => (
+          <small key={member.device_id}>
+            {member.role} member: {member.display_name} / {member.serial_number || 'no serial'} /{' '}
+            {member.available
+              ? 'available'
+              : member.reservation?.actor
+                ? `reserved by ${member.reservation.actor.name}`
+                : 'reserved'}
+          </small>
+        ))}
         {switches.length ? (
           switches.map((item) => (
             <small key={item.name}>
@@ -2919,7 +3193,7 @@ function HardwareCombobox({ index, hardwareOptions, selectedHardwareId, selected
   }, [filteredHardwareOptions.length, highlightedIndex]);
 
   function commitSelection(hardware) {
-    if (!hardware || !hardware.available) {
+    if (!hardware || !hardwareSelectableForMapping(hardware)) {
       return;
     }
     onSelect(hardware.id);
@@ -3012,7 +3286,7 @@ function HardwareCombobox({ index, hardwareOptions, selectedHardwareId, selected
                 role="option"
                 aria-selected={hardware.id === selectedHardwareId}
                 className={`comboboxOption${optionIndex === highlightedIndex ? ' active' : ''}`}
-                disabled={!hardware.available}
+                disabled={!hardwareSelectableForMapping(hardware)}
                 onMouseDown={(event) => event.preventDefault()}
                 onMouseEnter={() => setHighlightedIndex(optionIndex)}
                 onClick={() => commitSelection(hardware)}
@@ -3043,6 +3317,10 @@ function MappingRow({ index, mapping, mappings, reference, inventory, onChange, 
     hardwareHasConnectionData(mapping.saved_hardware);
   const missingConnectionData = Boolean(selectedHardware && !hardwareHasConnectionData(selectedHardware));
   const haMismatch = selectedHardware && selectedEdge?.ha_enabled && !selectedHardware.ha;
+  const mappingHaOptions = useMemo(
+    () => haModeOptions(selectedHardware, selectedEdge),
+    [selectedEdge, selectedHardware]
+  );
   const usedEdgeNames = useMemo(
     () =>
       new Set(
@@ -3193,6 +3471,40 @@ function MappingRow({ index, mapping, mappings, reference, inventory, onChange, 
         />
       </label>
 
+      {selectedHardware && selectedEdge && (
+        <div className="haModeControl">
+          <small className="fieldCaption">Edge HA mode</small>
+          <div className="quickFilterRow" role="group" aria-label={`HA mode for mapping ${index + 1}`}>
+            {mappingHaOptions.map((option) => (
+              <button
+                key={option.value}
+                aria-pressed={(mapping.edge_ha_mode || 'topology_default') === option.value}
+                className={`quickFilterButton ${
+                  (mapping.edge_ha_mode || 'topology_default') === option.value ? 'active' : ''
+                }`}
+                disabled={option.disabled}
+                onClick={() => onChange(index, 'edge_ha_mode', option.value)}
+                title={option.reason || option.label}
+                type="button"
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+          {mappingHaOptions.some(
+            (option) => option.value === (mapping.edge_ha_mode || 'topology_default') && option.disabled
+          ) && (
+            <small className="message warning">
+              {
+                mappingHaOptions.find(
+                  (option) => option.value === (mapping.edge_ha_mode || 'topology_default')
+                )?.reason
+              }
+            </small>
+          )}
+        </div>
+      )}
+
       <button
         type="button"
         className="iconButton danger"
@@ -3257,6 +3569,9 @@ function MappingRow({ index, mapping, mappings, reference, inventory, onChange, 
                           <span className={`interfacePill ${statusTone}`}>{statusLabel}</span>
                         </div>
                         <small>Reference interface</small>
+                        {referenceInterfaceMetadataSummary(interfaceSummary) && (
+                          <small>{referenceInterfaceMetadataSummary(interfaceSummary)}</small>
+                        )}
                         <small>{vlanPlan.summary}</small>
                         {referenceInterfaceVlanSummary(interfaceSummary) && (
                           <small>{referenceInterfaceVlanSummary(interfaceSummary)}</small>

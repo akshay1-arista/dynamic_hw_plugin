@@ -20,8 +20,10 @@ from .config import (
     LAB_NAVIGATOR_CA_BUNDLE,
     LAB_NAVIGATOR_TLS_VERIFY,
 )
+from .edge_models import normalize_edge_model
 from .inventory import build_inventory, load_inventory, save_inventory
 from .models import (
+    HardwareImportRequest,
     InventoryConnection,
     InventoryDevice,
     InventoryFile,
@@ -30,6 +32,8 @@ from .models import (
     InventoryRefreshResult,
     InventoryRefreshSummary,
     InventoryRefreshTargetStatus,
+    LabNavigatorDeviceCandidate,
+    LabNavigatorSearchResult,
     SwitchCredentials,
     SwitchMetadata,
     ValidationMessage,
@@ -159,6 +163,104 @@ class LabNavigatorClient:
     def get_server_nics(self, device_id: int) -> Any:
         return self._get_json(f"/api/server/device-nics/{device_id}")
 
+    def get_inventory_device(self, device_id: int) -> dict[str, Any]:
+        matches = self.list_inventory([{"field": "id", "operator": "equals", "value": str(device_id)}])
+        exact = [item for item in matches if item.get("id") == device_id]
+        if len(exact) == 1:
+            return exact[0]
+        wiremap = self.get_wiremap(device_id)
+        device = wiremap.get("device")
+        if isinstance(device, dict):
+            return device
+        raise DiscoveryError(f"Could not resolve Lab Navigator device id {device_id}")
+
+
+def search_lab_navigator_devices(
+    query: str,
+    *,
+    client: LabNavigatorClient | None = None,
+) -> LabNavigatorSearchResult:
+    cleaned = query.strip()
+    if not cleaned:
+        raise DiscoveryError("Search query is required")
+    owns_client = client is None
+    client = client or LabNavigatorClient()
+    try:
+        devices = [
+            LabNavigatorDeviceCandidate.model_validate(item)
+            for item in client.search(cleaned)
+            if item.get("id") is not None and item.get("name")
+        ]
+        return LabNavigatorSearchResult(query=cleaned, count=len(devices), devices=devices)
+    finally:
+        if owns_client:
+            client.close()
+
+
+def preview_inventory_import(
+    request: HardwareImportRequest,
+    *,
+    inventory_path: Path = INVENTORY_PATH,
+    client: LabNavigatorClient | None = None,
+) -> InventoryRefreshResult:
+    inventory = load_inventory(inventory_path)
+    owns_client = client is None
+    client = client or LabNavigatorClient()
+    try:
+        proposed, target_ids, stats = _build_imported_inventory(inventory, request, client)
+        changes = _diff_inventory(inventory, proposed)
+        summary = _build_refresh_summary(target_ids, changes, stats)
+        messages = _build_refresh_messages(summary, preview=True)
+        return InventoryRefreshResult(
+            hardware_ids=target_ids,
+            summary=summary,
+            changes=changes,
+            inventory=proposed,
+            messages=messages,
+        )
+    finally:
+        if owns_client:
+            client.close()
+
+
+def apply_inventory_import(
+    request: HardwareImportRequest,
+    *,
+    inventory_path: Path = INVENTORY_PATH,
+    client: LabNavigatorClient | None = None,
+) -> InventoryRefreshResult:
+    owns_client = client is None
+    client = client or LabNavigatorClient()
+    try:
+        preview = preview_inventory_import(request, inventory_path=inventory_path, client=client)
+        saved = save_inventory(
+            preview.inventory,
+            inventory_path,
+            preserve_local_state=True,
+            write_source="import-apply",
+            write_context={"targets": preview.hardware_ids},
+        )
+        return InventoryRefreshResult(
+            hardware_ids=preview.hardware_ids,
+            summary=preview.summary,
+            changes=preview.changes,
+            inventory=saved,
+            messages=[
+                *preview.messages,
+                ValidationMessage(
+                    level="warning" if preview.summary.status == "partial" else "info",
+                    message=(
+                        "Applied Lab Navigator inventory import with partial results."
+                        if preview.summary.status == "partial"
+                        else "Applied Lab Navigator inventory import."
+                    ),
+                ),
+            ],
+        )
+    finally:
+        if owns_client:
+            client.close()
+
 
 def preview_inventory_refresh(
     request: InventoryRefreshRequest,
@@ -251,6 +353,203 @@ def apply_inventory_refresh(
         )
     finally:
         _refresh_log_id.reset(token)
+
+
+def _build_imported_inventory(
+    inventory: InventoryFile,
+    request: HardwareImportRequest,
+    client: LabNavigatorClient,
+) -> tuple[InventoryFile, list[str], RefreshBuildStats]:
+    devices = {device_id: device.model_dump(mode="json") for device_id, device in inventory.devices.items()}
+    connections = [connection.model_dump(mode="json") for connection in inventory.connections]
+    stats = RefreshBuildStats()
+
+    ln_targets = [_resolve_import_target(client, target) for target in request.targets]
+    target_roles = [target.role for target in request.targets if target.role]
+    ha_group_id = _ha_import_group_id(ln_targets, target_roles) if target_roles else None
+
+    imported_roots: list[InventoryDevice] = []
+    for ln_device, target in zip(ln_targets, request.targets):
+        imported = _inventory_device_from_lab_navigator(
+            ln_device,
+            devices,
+            role=target.role,
+            ha_group_id=ha_group_id,
+        )
+        devices[imported.id] = imported.model_dump(mode="json")
+        imported_roots.append(imported)
+
+    target_ids: list[str] = []
+    if ha_group_id:
+        target_ids.append(ha_group_id)
+    else:
+        target_ids.extend(root.ha_group_id or root.id for root in imported_roots)
+
+    for root in imported_roots:
+        refreshed_ids, refreshed_devices, refreshed_connections, import_stats = _discover_import_root_subgraph(
+            root,
+            devices,
+            client,
+            target_id=root.ha_group_id or root.id,
+            target_display_name=root.display_name,
+        )
+        stats.merge(import_stats)
+        stats.refreshed_device_ids.update(refreshed_ids)
+        for device in refreshed_devices.values():
+            _merge_device(devices, device)
+        for connection in refreshed_connections:
+            _merge_connection(connections, connection)
+            if _is_lab_navigator_wiremap_connection(connection):
+                stats.discovered_connection_signatures.add(_connection_signature(connection))
+
+    proposed = build_inventory(devices, connections)
+    return proposed, list(dict.fromkeys(target_ids)), stats
+
+
+def _resolve_import_target(client: LabNavigatorClient, target) -> dict[str, Any]:
+    if target.lab_navigator_id is not None:
+        return client.get_inventory_device(target.lab_navigator_id)
+
+    query = (target.query or "").strip()
+    matches = client.search(query)
+    if len(matches) == 1:
+        return client.get_inventory_device(matches[0]["id"])
+    if not matches:
+        raise DiscoveryError(f"No Lab Navigator device matched {query!r}")
+    candidates = ", ".join(
+        f"{item.get('name') or item.get('id')} ({item.get('serial_number') or item.get('ip_address') or 'no identifier'})"
+        for item in matches[:8]
+    )
+    raise DiscoveryError(f"Lab Navigator import query {query!r} matched multiple devices: {candidates}")
+
+
+def _ha_import_group_id(ln_targets: list[dict[str, Any]], roles: list[str | None]) -> str | None:
+    if sorted(role for role in roles if role) != ["active", "standby"]:
+        return None
+    active = next(device for device, role in zip(ln_targets, roles) if role == "active")
+    standby = next(device for device, role in zip(ln_targets, roles) if role == "standby")
+    return _safe_id(
+        "ln-ha-"
+        + "-".join(
+            [
+                str(active.get("name") or active.get("id")),
+                str(active.get("serial_number") or ""),
+                str(standby.get("name") or standby.get("id")),
+                str(standby.get("serial_number") or ""),
+            ]
+        )
+    )
+
+
+def _inventory_device_from_lab_navigator(
+    device: dict[str, Any],
+    existing_devices: dict[str, dict[str, Any]],
+    *,
+    role: str | None = None,
+    ha_group_id: str | None = None,
+) -> InventoryDevice:
+    existing = _find_existing_by_lab_navigator_id(existing_devices, device["id"])
+    if existing is None:
+        existing = _existing_inventory_device(existing_devices, _safe_id(str(device.get("name") or device["id"])))
+    inventory_type = _map_device_type(device.get("device_type")) or _infer_inventory_type("switch", device)
+    if inventory_type == "switch":
+        return InventoryDevice.model_validate(
+            _inventory_switch_device(
+                str(device.get("name") or device["id"]),
+                _device_model(device),
+                device.get("ip_address") or "",
+                device["id"],
+                existing=existing,
+            )
+        )
+    if inventory_type == "hypervisor":
+        return InventoryDevice.model_validate(_inventory_hypervisor_device(device, existing_id=existing.id if existing else None))
+    if inventory_type != "edge":
+        raise DiscoveryError(
+            f"Lab Navigator device {device.get('name') or device.get('id')} has unsupported type {device.get('device_type')}"
+        )
+    model = _device_model(device)
+    normalized_model, model_suffix = normalize_edge_model(model)
+    return InventoryDevice(
+        id=existing.id if existing else _safe_id(str(device.get("name") or device["id"])),
+        type="edge",
+        display_name=str(device.get("name") or device["id"]),
+        short_name=device.get("hostname"),
+        model=normalized_model,
+        model_suffix=model_suffix,
+        serial_number=device.get("serial_number"),
+        ip_address=device.get("ip_address"),
+        lab_navigator_id=device["id"],
+        ha_group_id=ha_group_id or (existing.ha_group_id if existing else None),
+        ha_role=role or (existing.ha_role if existing else "active"),
+        dpdk_enabled=existing.dpdk_enabled if existing else None,
+        free_vlans=existing.free_vlans if existing else [],
+        vlan_range=existing.vlan_range if existing else None,
+        hypervisor_ip=existing.hypervisor_ip if existing else None,
+        notes=existing.notes if existing else None,
+    )
+
+
+def _discover_import_root_subgraph(
+    root: InventoryDevice,
+    devices: dict[str, dict[str, Any]],
+    client: LabNavigatorClient,
+    *,
+    target_id: str,
+    target_display_name: str,
+) -> tuple[set[str], dict[str, dict[str, Any]], list[dict[str, Any]], RefreshBuildStats]:
+    if root.type == "edge":
+        return _discover_lab_navigator_subgraph(
+            [root],
+            devices,
+            client,
+            hardware_id=target_id,
+            hardware_display_name=target_display_name,
+        )
+
+    refreshed_ids = {root.id}
+    discovered_devices: dict[str, dict[str, Any]] = {}
+    discovered_connections: list[dict[str, Any]] = []
+    stats = RefreshBuildStats()
+    queue: deque[tuple[InventoryDevice, dict[str, Any]]] = deque([(root, _resolve_inventory_device(client, root))])
+    visited_lab_navigator_ids: set[int] = set()
+
+    while queue:
+        current_device, ln_device = queue.popleft()
+        if ln_device["id"] in visited_lab_navigator_ids:
+            continue
+        visited_lab_navigator_ids.add(ln_device["id"])
+        for item in client.get_wiremap(ln_device["id"]).get("connections", []):
+            remote_device = _resolve_wiremap_remote_device(client, item)
+            if not remote_device:
+                continue
+            remote_inventory_device = _wiremap_remote_inventory_device(
+                current_device,
+                remote_device,
+                devices,
+                discovered_devices,
+            )
+            if remote_inventory_device is None:
+                continue
+            refreshed_ids.add(remote_inventory_device.id)
+            discovered_devices[remote_inventory_device.id] = remote_inventory_device.model_dump(mode="json")
+            connection = _build_wiremap_connection(current_device, remote_inventory_device, item)
+            if connection:
+                _merge_connection(discovered_connections, connection)
+                if _is_lab_navigator_wiremap_connection(connection):
+                    stats.discovered_connection_signatures.add(_connection_signature(connection))
+            if remote_inventory_device.type == "switch" and remote_device["id"] not in visited_lab_navigator_ids:
+                queue.append((remote_inventory_device, remote_device))
+
+    stats.target_statuses.append(
+        InventoryRefreshTargetStatus(
+            hardware_id=target_id,
+            hardware_display_name=target_display_name,
+            status="success",
+            labels=[],
+        )
+    )
+    return refreshed_ids, discovered_devices, discovered_connections, stats
 
 
 def _build_refreshed_inventory(
@@ -572,6 +871,12 @@ def _wiremap_remote_inventory_device(
         if existing is None:
             existing = _existing_inventory_device(existing_devices, _safe_id(remote_device["name"]))
         return InventoryDevice.model_validate(_inventory_hypervisor_device(remote_device, existing_id=existing.id if existing else None))
+    if remote_type == "edge":
+        existing_devices = {**devices, **discovered_devices}
+        existing = _find_existing_by_lab_navigator_id(existing_devices, remote_device["id"])
+        if existing is None:
+            existing = _existing_inventory_device(existing_devices, _safe_id(remote_device["name"]))
+        return _inventory_device_from_lab_navigator(remote_device, existing_devices)
     return None
 
 

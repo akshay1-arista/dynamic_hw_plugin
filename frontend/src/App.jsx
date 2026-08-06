@@ -114,6 +114,9 @@ export function App() {
   const [labNavigatorImportQuery, setLabNavigatorImportQuery] = useState('');
   const [labNavigatorSearchResults, setLabNavigatorSearchResults] = useState([]);
   const [selectedImportDeviceIds, setSelectedImportDeviceIds] = useState([]);
+  const [haImportQueries, setHaImportQueries] = useState({ active: '', standby: '' });
+  const [haImportResults, setHaImportResults] = useState({ active: [], standby: [] });
+  const [haImportSelections, setHaImportSelections] = useState({ active: null, standby: null });
   const [importMode, setImportMode] = useState('single');
   const [labNavigatorImporting, setLabNavigatorImporting] = useState(false);
   const [labNavigatorImportOpen, setLabNavigatorImportOpen] = useState(false);
@@ -272,7 +275,11 @@ export function App() {
   }, [generatedRunRequesterOptions]);
 
   useEffect(() => {
-    setSelectedImportDeviceIds((current) => current.slice(0, importMode === 'ha' ? 2 : 1));
+    if (importMode === 'single') {
+      setHaImportSelections({ active: null, standby: null });
+      return;
+    }
+    setSelectedImportDeviceIds([]);
   }, [importMode]);
 
   const filteredHardware = useMemo(() => {
@@ -581,6 +588,44 @@ export function App() {
     }
   }
 
+  async function searchLabNavigatorForHaImport(event, role) {
+    event.preventDefault();
+    const query = haImportQueries[role].trim();
+    if (!query) {
+      setError(`Enter a Lab Navigator name, IP, hostname, or serial for the ${role} edge.`);
+      return;
+    }
+    setLabNavigatorImporting(true);
+    setError('');
+    try {
+      const result = await searchLabNavigatorDevices(query);
+      setHaImportResults((current) => ({
+        ...current,
+        [role]: result.devices || []
+      }));
+    } catch (searchError) {
+      setError(searchError.message);
+    } finally {
+      setLabNavigatorImporting(false);
+    }
+  }
+
+  function updateHaImportQuery(role, value) {
+    setHaImportQueries((current) => ({
+      ...current,
+      [role]: value
+    }));
+  }
+
+  function selectHaImportDevice(role, device) {
+    const otherRole = role === 'active' ? 'standby' : 'active';
+    setHaImportSelections((current) => ({
+      ...current,
+      [role]: device,
+      [otherRole]: current[otherRole]?.id === device.id ? null : current[otherRole]
+    }));
+  }
+
   function toggleImportDevice(deviceId) {
     setSelectedImportDeviceIds((current) => {
       if (current.includes(deviceId)) {
@@ -592,14 +637,22 @@ export function App() {
   }
 
   async function importSelectedLabNavigatorDevices() {
-    const selectedDevices = selectedImportDeviceIds
-      .map((deviceId) => labNavigatorSearchResults.find((device) => device.id === deviceId))
-      .filter(Boolean);
-    if (importMode === 'ha' && selectedDevices.length !== 2) {
-      setError('Select exactly two Lab Navigator edge devices for HA import.');
-      return;
-    }
-    if (importMode !== 'ha' && selectedDevices.length !== 1) {
+    const selectedDevices =
+      importMode === 'ha'
+        ? [haImportSelections.active, haImportSelections.standby].filter(Boolean)
+        : selectedImportDeviceIds
+            .map((deviceId) => labNavigatorSearchResults.find((device) => device.id === deviceId))
+            .filter(Boolean);
+    if (importMode === 'ha') {
+      if (!haImportSelections.active || !haImportSelections.standby) {
+        setError('Select an active and standby Lab Navigator edge device for HA import.');
+        return;
+      }
+      if (haImportSelections.active.id === haImportSelections.standby.id) {
+        setError('Active and standby HA import devices must be different.');
+        return;
+      }
+    } else if (selectedDevices.length !== 1) {
       setError('Select one Lab Navigator device to import.');
       return;
     }
@@ -628,6 +681,9 @@ export function App() {
       setLabNavigatorSearchResults([]);
       setSelectedImportDeviceIds([]);
       setLabNavigatorImportQuery('');
+      setHaImportQueries({ active: '', standby: '' });
+      setHaImportResults({ active: [], standby: [] });
+      setHaImportSelections({ active: null, standby: null });
       setLabNavigatorImportOpen(false);
     } catch (importError) {
       setError(importError.message);
@@ -1079,45 +1135,113 @@ export function App() {
               </button>
             </div>
             <div className="labNavigatorImport">
-              <form className="inlineImportSearch" onSubmit={searchLabNavigatorForImport}>
-                <label htmlFor="lab-navigator-import-search">Search Lab Navigator</label>
-                <div className="modalSearchRow">
-                  <span className="modalSearchField">
-                    <Search size={16} aria-hidden="true" />
-                    <input
-                      autoFocus
-                      id="lab-navigator-import-search"
-                      value={labNavigatorImportQuery}
-                      onChange={(event) => setLabNavigatorImportQuery(event.target.value)}
-                      placeholder="name, IP, hostname, serial"
-                    />
-                  </span>
-                  <button className="secondary compactButton" disabled={labNavigatorImporting} type="submit">
-                    {labNavigatorImporting ? <Loader2 className="spin" size={16} /> : <Search size={16} />}
-                    Search
-                  </button>
-                </div>
-              </form>
-              {labNavigatorSearchResults.length > 0 && (
-                <div className="importResults">
-                  <div className="quickFilterRow" role="group" aria-label="Lab Navigator import mode">
-                    <button
-                      aria-pressed={importMode === 'single'}
-                      className={`quickFilterButton ${importMode === 'single' ? 'active' : ''}`}
-                      onClick={() => setImportMode('single')}
-                      type="button"
-                    >
-                      Single
-                    </button>
-                    <button
-                      aria-pressed={importMode === 'ha'}
-                      className={`quickFilterButton ${importMode === 'ha' ? 'active' : ''}`}
-                      onClick={() => setImportMode('ha')}
-                      type="button"
-                    >
-                      HA pair
+              <div className="quickFilterRow" role="group" aria-label="Lab Navigator import mode">
+                <button
+                  aria-pressed={importMode === 'single'}
+                  className={`quickFilterButton ${importMode === 'single' ? 'active' : ''}`}
+                  onClick={() => setImportMode('single')}
+                  type="button"
+                >
+                  Single
+                </button>
+                <button
+                  aria-pressed={importMode === 'ha'}
+                  className={`quickFilterButton ${importMode === 'ha' ? 'active' : ''}`}
+                  onClick={() => setImportMode('ha')}
+                  type="button"
+                >
+                  HA pair
+                </button>
+              </div>
+
+              {importMode === 'single' ? (
+                <form className="inlineImportSearch" onSubmit={searchLabNavigatorForImport}>
+                  <label htmlFor="lab-navigator-import-search">Search Lab Navigator</label>
+                  <div className="modalSearchRow">
+                    <span className="modalSearchField">
+                      <Search size={16} aria-hidden="true" />
+                      <input
+                        autoFocus
+                        id="lab-navigator-import-search"
+                        value={labNavigatorImportQuery}
+                        onChange={(event) => setLabNavigatorImportQuery(event.target.value)}
+                        placeholder="name, IP, hostname, serial"
+                      />
+                    </span>
+                    <button className="secondary compactButton" disabled={labNavigatorImporting} type="submit">
+                      {labNavigatorImporting ? <Loader2 className="spin" size={16} /> : <Search size={16} />}
+                      Search
                     </button>
                   </div>
+                </form>
+              ) : (
+                <div className="haImportGrid">
+                  {['active', 'standby'].map((role) => {
+                    const selectedDevice = haImportSelections[role];
+                    return (
+                      <div className="haImportRole" key={role}>
+                        <form
+                          className="inlineImportSearch"
+                          onSubmit={(event) => searchLabNavigatorForHaImport(event, role)}
+                        >
+                          <label htmlFor={`lab-navigator-${role}-search`}>
+                            {role === 'active' ? 'Active edge' : 'Standby edge'}
+                          </label>
+                          <div className="modalSearchRow">
+                            <span className="modalSearchField">
+                              <Search size={16} aria-hidden="true" />
+                              <input
+                                autoFocus={role === 'active'}
+                                id={`lab-navigator-${role}-search`}
+                                value={haImportQueries[role]}
+                                onChange={(event) => updateHaImportQuery(role, event.target.value)}
+                                placeholder="name, IP, hostname, serial"
+                              />
+                            </span>
+                            <button className="secondary compactButton" disabled={labNavigatorImporting} type="submit">
+                              {labNavigatorImporting ? <Loader2 className="spin" size={16} /> : <Search size={16} />}
+                              Search
+                            </button>
+                          </div>
+                        </form>
+                        {selectedDevice && (
+                          <div className="selectedImportDevice">
+                            <span>
+                              <strong>{selectedDevice.name}</strong>
+                              <small>{labNavigatorDeviceSummary(selectedDevice)}</small>
+                            </span>
+                            <StatusBadge tone="accent">{role === 'active' ? 'Active' : 'Standby'}</StatusBadge>
+                          </div>
+                        )}
+                        {haImportResults[role].length > 0 && (
+                          <div className="importResultList">
+                            {haImportResults[role].map((device) => {
+                              const selected = selectedDevice?.id === device.id;
+                              return (
+                                <button
+                                  key={device.id}
+                                  className={`importResult ${selected ? 'selected' : ''}`}
+                                  onClick={() => selectHaImportDevice(role, device)}
+                                  type="button"
+                                >
+                                  <span>
+                                    <strong>{device.name}</strong>
+                                    <small>{labNavigatorDeviceSummary(device)}</small>
+                                  </span>
+                                  {selected && <StatusBadge tone="accent">Selected</StatusBadge>}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {importMode === 'single' && labNavigatorSearchResults.length > 0 && (
+                <div className="importResults">
                   <div className="importResultList">
                     {labNavigatorSearchResults.map((device) => {
                       const selected = selectedImportDeviceIds.includes(device.id);
@@ -1132,33 +1256,27 @@ export function App() {
                             <strong>{device.name}</strong>
                             <small>{labNavigatorDeviceSummary(device)}</small>
                           </span>
-                          {selected && (
-                            <StatusBadge tone="accent">
-                              {importMode === 'ha'
-                                ? selectedImportDeviceIds[0] === device.id
-                                  ? 'Active'
-                                  : 'Standby'
-                                : 'Selected'}
-                            </StatusBadge>
-                          )}
+                          {selected && <StatusBadge tone="accent">Selected</StatusBadge>}
                         </button>
                       );
                     })}
                   </div>
-                  <button
-                    className="secondary compactButton"
-                    disabled={
-                      labNavigatorImporting ||
-                      selectedImportDeviceIds.length !== (importMode === 'ha' ? 2 : 1)
-                    }
-                    onClick={importSelectedLabNavigatorDevices}
-                    type="button"
-                  >
-                    {labNavigatorImporting ? <Loader2 className="spin" size={16} /> : <Plus size={16} />}
-                    Import selected
-                  </button>
                 </div>
               )}
+              <button
+                className="secondary compactButton"
+                disabled={
+                  labNavigatorImporting ||
+                  (importMode === 'ha'
+                    ? !haImportSelections.active || !haImportSelections.standby
+                    : selectedImportDeviceIds.length !== 1)
+                }
+                onClick={importSelectedLabNavigatorDevices}
+                type="button"
+              >
+                {labNavigatorImporting ? <Loader2 className="spin" size={16} /> : <Plus size={16} />}
+                Import selected
+              </button>
             </div>
           </div>
         </div>

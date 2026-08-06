@@ -816,6 +816,10 @@ button:disabled {
   max-height: 360px;
 }
 
+.labNavigatorImport > .compactButton {
+  justify-self: start;
+}
+
 .inlineImportSearch {
   display: grid;
   gap: 8px;
@@ -861,6 +865,40 @@ button:disabled {
   min-height: 42px;
   padding-inline: 16px;
   white-space: nowrap;
+}
+
+.haImportGrid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.haImportRole {
+  align-content: start;
+  display: grid;
+  gap: 10px;
+}
+
+.selectedImportDevice {
+  align-items: center;
+  background: var(--primary-soft);
+  border: 1px solid #b9ded8;
+  border-radius: var(--radius-sm);
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  min-height: 46px;
+  padding: 8px 10px;
+}
+
+.selectedImportDevice span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.selectedImportDevice small {
+  color: var(--muted);
 }
 
 .importResultList {
@@ -1631,6 +1669,10 @@ button:disabled {
 
   .modalSearchRow {
     align-items: stretch;
+    grid-template-columns: 1fr;
+  }
+
+  .haImportGrid {
     grid-template-columns: 1fr;
   }
 }

@@ -1306,13 +1306,21 @@ describe('App', () => {
     await screen.findAllByText('CHN 3800 HA Pair 8');
     await user.click(screen.getByRole('button', { name: 'Add from Lab Navigator' }));
     expect(screen.getByRole('dialog')).toBeInTheDocument();
-    await user.type(screen.getByLabelText('Search Lab Navigator'), 'edge-import');
-    await user.click(screen.getByRole('button', { name: /^Search$/ }));
-
-    expect(await screen.findByText('edge-import-active')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'HA pair' }));
-    await user.click(screen.getByRole('button', { name: /edge-import-active/i }));
-    await user.click(screen.getByRole('button', { name: /edge-import-standby/i }));
+
+    const activeSection = screen.getByLabelText('Active edge').closest('.haImportRole');
+    const standbySection = screen.getByLabelText('Standby edge').closest('.haImportRole');
+
+    await user.type(within(activeSection).getByLabelText('Active edge'), 'edge-import-active');
+    await user.click(within(activeSection).getByRole('button', { name: /^Search$/ }));
+    expect(await within(activeSection).findByText('edge-import-active')).toBeInTheDocument();
+    await user.click(within(activeSection).getByRole('button', { name: /edge-import-active/i }));
+
+    await user.type(within(standbySection).getByLabelText('Standby edge'), 'edge-import-standby');
+    await user.click(within(standbySection).getByRole('button', { name: /^Search$/ }));
+    expect(await within(standbySection).findByText('edge-import-standby')).toBeInTheDocument();
+    await user.click(within(standbySection).getByRole('button', { name: /edge-import-standby/i }));
+
     await user.click(screen.getByRole('button', { name: /import selected/i }));
 
     await waitFor(() => {

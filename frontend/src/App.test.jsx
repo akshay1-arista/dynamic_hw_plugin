@@ -254,6 +254,29 @@ const inventory = {
       notes: 'standalone inventory entry'
     },
     {
+      id: 'a01-680-standalone-b',
+      short_name: 'a01-680-solo-b',
+      display_name: 'A01 680 Standalone B',
+      model: 'edge6X0',
+      model_suffix: '680',
+      ha: false,
+      active_serial: '2KXFXC2',
+      standby_serial: '',
+      available: true,
+      switch: { name: 'a01-access-switch', model: 'Dell-3048', connections: { ip: '10.68.136.70' } },
+      ports: [
+        {
+          logical_name: 'LAN1',
+          logical_interface: 'GE1',
+          switch_active_port: 'gigabitethernet1/12',
+          switch_vlans: [1510],
+          tagged_vlans: [],
+          untagged_vlan: 1510
+        }
+      ],
+      notes: 'second standalone inventory entry'
+    },
+    {
       id: 'a01-3800-asymmetric-ha',
       short_name: 'a01-3800-asym',
       display_name: 'A01 3800 Asymmetric HA',
@@ -626,7 +649,7 @@ beforeEach(() => {
           requested_hardware_count: payload.hardware_ids.length,
           change_count: payload.hardware_ids.length,
           discovered_connection_count: payload.hardware_ids.length,
-          preserved_connection_count: partial ? 1 : 0,
+          preserved_connection_count: 0,
           skipped_unresolved_remote_count: partial ? 1 : 0,
           skipped_unsupported_peer_count: 0,
           skipped_missing_interface_count: 0,
@@ -653,10 +676,7 @@ beforeEach(() => {
         })),
         inventory: inventoryState,
         messages: partial
-          ? [
-              { level: 'info', message: `Previewed ${payload.hardware_ids.length} inventory change(s) across ${payload.hardware_ids.length} hardware selection(s).` },
-              { level: 'warning', message: 'Kept existing Lab Navigator connections where rediscovery did not return a replacement.' }
-            ]
+          ? [{ level: 'info', message: `Previewed ${payload.hardware_ids.length} inventory change(s) across ${payload.hardware_ids.length} hardware selection(s).` }]
           : [{ level: 'info', message: 'Previewed 1 inventory change(s) across 1 hardware selection(s).' }]
       });
     }
@@ -682,7 +702,7 @@ beforeEach(() => {
           requested_hardware_count: payload.hardware_ids.length,
           change_count: payload.hardware_ids.length,
           discovered_connection_count: payload.hardware_ids.length,
-          preserved_connection_count: partial ? 1 : 0,
+          preserved_connection_count: 0,
           skipped_unresolved_remote_count: partial ? 1 : 0,
           skipped_unsupported_peer_count: 0,
           skipped_missing_interface_count: 0,
@@ -711,7 +731,6 @@ beforeEach(() => {
         messages: partial
           ? [
               { level: 'info', message: `Previewed ${payload.hardware_ids.length} inventory change(s) across ${payload.hardware_ids.length} hardware selection(s).` },
-              { level: 'warning', message: 'Kept existing Lab Navigator connections where rediscovery did not return a replacement.' },
               { level: 'warning', message: 'Applied Lab Navigator inventory refresh with partial results.' }
             ]
           : [{ level: 'info', message: 'Applied Lab Navigator inventory refresh.' }]
@@ -722,7 +741,9 @@ beforeEach(() => {
       inventoryState = {
         ...inventoryState,
         hardware: inventoryState.hardware.map((hardware) =>
-          payload.mappings.some((mapping) => mapping.hardware_id === hardware.id)
+          payload.mappings.some(
+            (mapping) => mapping.hardware_id === hardware.id || mapping.secondary_hardware_id === hardware.id
+          )
             ? {
                 ...hardware,
                 available: false,
@@ -982,7 +1003,31 @@ async function chooseHardware(user, query, optionName, index = 0) {
   const target = comboboxes[index];
   await user.clear(target);
   await user.type(target, query);
-  await user.click(screen.getByRole('option', { name: optionName }));
+  const options = screen.getAllByRole('option');
+  const selectedOption = options.find((option) => {
+    const label = option.textContent || '';
+    return optionName instanceof RegExp ? optionName.test(label) : label === optionName;
+  });
+  if (!selectedOption) {
+    throw new Error(`Could not find hardware option matching ${String(optionName)}`);
+  }
+  await user.click(selectedOption);
+}
+
+async function chooseHardwareByLabel(user, label, query, optionName, index = 0) {
+  const comboboxes = screen.getAllByRole('combobox', { name: label });
+  const target = comboboxes[index];
+  await user.clear(target);
+  await user.type(target, query);
+  const options = screen.getAllByRole('option');
+  const selectedOption = options.find((option) => {
+    const optionLabel = option.textContent || '';
+    return optionName instanceof RegExp ? optionName.test(optionLabel) : optionLabel === optionName;
+  });
+  if (!selectedOption) {
+    throw new Error(`Could not find hardware option matching ${String(optionName)}`);
+  }
+  await user.click(selectedOption);
 }
 
 describe('App', () => {
@@ -1013,7 +1058,7 @@ describe('App', () => {
     await screen.findAllByText('CHN 3800 HA Pair 8');
     await user.type(screen.getByRole('combobox', { name: 'Hardware' }), '680');
 
-    expect(screen.getByRole('option', { name: /A01 680 Standalone/i })).toBeInTheDocument();
+    expect(screen.getAllByRole('option').length).toBeGreaterThanOrEqual(2);
     expect(screen.queryByRole('option', { name: /CHN 3800 HA Pair 8/i })).not.toBeInTheDocument();
   });
 
@@ -1150,6 +1195,7 @@ describe('App', () => {
             hardware_ids: [
               'chn-3800-8-ha',
               'a01-680-standalone',
+              'a01-680-standalone-b',
               'a01-3800-asymmetric-ha',
               'internet-dynamic-680',
               'hidden-ha-pair'
@@ -1159,13 +1205,13 @@ describe('App', () => {
       );
     });
     expect(window.confirm).toHaveBeenCalledWith(
-      expect.stringContaining('Apply Lab Navigator refresh for 5 inventory devices?')
+      expect.stringContaining('Apply Lab Navigator refresh for 6 inventory devices?')
     );
-    expect(window.confirm).toHaveBeenCalledWith(
-      expect.stringContaining(
-        'warning: Kept existing Lab Navigator connections where rediscovery did not return a replacement.'
+    expect(
+      window.confirm.mock.calls.some(([message]) =>
+        String(message).includes('Kept existing Lab Navigator connections where rediscovery did not return a replacement.')
       )
-    );
+    ).toBe(false);
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
         '/api/hardware/refresh-apply',
@@ -1175,6 +1221,7 @@ describe('App', () => {
             hardware_ids: [
               'chn-3800-8-ha',
               'a01-680-standalone',
+              'a01-680-standalone-b',
               'a01-3800-asymmetric-ha',
               'internet-dynamic-680',
               'hidden-ha-pair'
@@ -1183,11 +1230,6 @@ describe('App', () => {
         })
       );
     });
-    expect(
-      await screen.findByText(
-        'warning: Kept existing Lab Navigator connections where rediscovery did not return a replacement.'
-      )
-    ).toBeInTheDocument();
     expect(
       screen.getByText('warning: Applied Lab Navigator inventory refresh with partial results.')
     ).toBeInTheDocument();
@@ -1297,6 +1339,45 @@ describe('App', () => {
     const generateCall = global.fetch.mock.calls.find(([url]) => url === '/api/generate');
     const payload = JSON.parse(generateCall[1].body);
     expect(payload.mappings[0].edge_ha_mode).toBe('single_active');
+  });
+
+  test('allows synthesizing HA from two standalone devices and submits the standby hardware id', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await screen.findAllByText('A01 680 Standalone');
+    await chooseHardware(user, 'a01 680 standalone', /A01 680 Standalone/i);
+    await user.selectOptions(screen.getByLabelText('Branch'), 'branch2');
+
+    expect(
+      screen.getByText(/Reference edge is HA enabled, but selected hardware is standalone/i)
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'HA pair' }));
+    expect(screen.getByRole('combobox', { name: 'Standby hardware' })).toBeInTheDocument();
+
+    await chooseHardwareByLabel(
+      user,
+      'Standby hardware',
+      'standalone b',
+      /A01 680 Standalone B/i
+    );
+
+    expect(
+      screen.queryByText(/Reference edge is HA enabled, but selected hardware is standalone/i)
+    ).not.toBeInTheDocument();
+
+    await user.type(screen.getByRole('combobox', { name: 'Hypervisor IP' }), '10.68.136.50');
+    await user.type(screen.getByRole('combobox', { name: 'Hypervisor interface' }), 'vmnic0');
+    await user.click(screen.getByRole('button', { name: /generate zip/i }));
+
+    const generateCall = global.fetch.mock.calls.find(([url]) => url === '/api/generate');
+    const payload = JSON.parse(generateCall[1].body);
+    expect(payload.mappings[0]).toMatchObject({
+      hardware_id: 'a01-680-standalone',
+      secondary_hardware_id: 'a01-680-standalone-b',
+      edge_ha_mode: 'ha'
+    });
   });
 
   test('imports an HA pair from Lab Navigator search results', async () => {
@@ -1716,7 +1797,7 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: /hidden-ha-pair/i }));
 
     expect(
-      screen.getByText(/No imported switch connections in inventory\. Refresh from Lab Navigator before using this hardware for mapping\./i)
+      screen.getByText(/No imported switch connections are cached locally yet\. Generation will sync this hardware from Lab Navigator automatically\./i)
     ).toBeInTheDocument();
     expect(screen.getByText('No imported switch metadata yet.')).toBeInTheDocument();
     expect(screen.getByText('No imported edge-to-switch links yet.')).toBeInTheDocument();
@@ -1738,7 +1819,7 @@ describe('App', () => {
     ).toBeInTheDocument();
   });
 
-  test('warns and blocks generation when selected hardware has no imported switch connections', async () => {
+  test('warns but still submits generation when selected hardware has no imported switch connections', async () => {
     const user = userEvent.setup();
     render(<App />);
 
@@ -1747,17 +1828,17 @@ describe('App', () => {
     await user.selectOptions(screen.getByLabelText('Branch'), 'branch2');
 
     expect(
-      screen.getByText(/No imported switch connections in inventory\. Refresh from Lab Navigator before using this hardware for mapping\./i)
+      screen.getByText(/No imported switch connections are cached locally yet\. Generation will sync this hardware from Lab Navigator automatically\./i)
     ).toBeInTheDocument();
 
     await user.type(screen.getByRole('combobox', { name: 'Hypervisor IP' }), '10.68.136.50');
     await user.type(screen.getByRole('combobox', { name: 'Hypervisor interface' }), 'vmnic0');
     await user.click(screen.getByRole('button', { name: /generate zip/i }));
 
-    expect(
-      screen.getByText(/Hidden HA Pair has no imported switch connections in inventory\. Refresh it from Lab Navigator before generating\./i)
-    ).toBeInTheDocument();
-    expect(global.fetch).not.toHaveBeenCalledWith('/api/generate', expect.anything());
+    await waitFor(() => {
+      const generateCall = global.fetch.mock.calls.find(([url]) => url === '/api/generate');
+      expect(generateCall).toBeTruthy();
+    });
   });
 
   test('warns when HA hardware has member-specific switch links that require manual mapping', async () => {

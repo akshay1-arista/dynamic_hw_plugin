@@ -40,6 +40,7 @@ import {
 
 const emptyMapping = {
   hardware_id: '',
+  secondary_hardware_id: '',
   branch_name: '',
   edge_name: '',
   target_branch_name: '',
@@ -425,11 +426,50 @@ export function App() {
           return mapping;
         }
         const next = { ...mapping, [field]: value };
-        if (field === 'hardware_id' || field === 'branch_name' || field === 'edge_name') {
+        if (
+          field === 'hardware_id' ||
+          field === 'secondary_hardware_id' ||
+          field === 'branch_name' ||
+          field === 'edge_name' ||
+          field === 'edge_ha_mode'
+        ) {
           next.interface_overrides = [];
         }
         if (field === 'hardware_id') {
           next.saved_hardware = null;
+          const chosenHardware = inventory.hardware.find((item) => item.id === value) || null;
+          if (chosenHardware?.ha) {
+            next.secondary_hardware_id = '';
+          }
+          if (next.secondary_hardware_id === value) {
+            next.secondary_hardware_id = '';
+          }
+          if (
+            next.secondary_hardware_id &&
+            chosenHardware &&
+            !compatibleStandaloneHaCandidates(chosenHardware, inventory.hardware).some(
+              (candidate) => candidate.id === next.secondary_hardware_id
+            )
+          ) {
+            next.secondary_hardware_id = '';
+          }
+        }
+        if (field === 'secondary_hardware_id' && value === next.hardware_id) {
+          next.secondary_hardware_id = '';
+        }
+        if (field === 'secondary_hardware_id' && value) {
+          const primaryHardware = resolvePrimaryHardware(next, inventory.hardware);
+          if (
+            primaryHardware &&
+            !compatibleStandaloneHaCandidates(primaryHardware, inventory.hardware).some(
+              (candidate) => candidate.id === value
+            )
+          ) {
+            next.secondary_hardware_id = '';
+          }
+        }
+        if (field === 'edge_ha_mode' && value !== 'ha') {
+          next.secondary_hardware_id = '';
         }
         if (field === 'branch_name') {
           const branch = selectedReference?.branches.find((item) => item.name === value);
@@ -722,16 +762,22 @@ export function App() {
           `Reference edge ${duplicateTarget.branch_name}/${duplicateTarget.edge_name} is already mapped in another row.`
         );
       }
-      const hardwareMissingConnections = mappings.find((mapping) => {
-        const hardware = resolveMappingHardware(mapping, inventory.hardware);
-        return hardware && !hardwareHasConnectionData(hardware);
-      });
       const invalidHaMode = mappings.find((mapping) => {
-        const hardware = resolveMappingHardware(mapping, inventory.hardware);
+        const hardware = resolvePrimaryHardware(mapping, inventory.hardware);
+        const secondaryHardware = resolveSecondaryHardware(mapping, inventory.hardware);
         const branch = selectedReference?.branches.find((item) => item.name === mapping.branch_name);
         const edge = branch?.edges.find((item) => item.name === mapping.edge_name);
-        return haModeOptions(hardware, edge).some(
+        return haModeOptions(hardware, edge, secondaryHardware, inventory.hardware).some(
           (option) => option.value === (mapping.edge_ha_mode || 'topology_default') && option.disabled
+        );
+      });
+      const missingSecondaryHaMapping = mappings.find((mapping) => {
+        const hardware = resolvePrimaryHardware(mapping, inventory.hardware);
+        return (
+          mapping.edge_ha_mode === 'ha' &&
+          hardware &&
+          !hardware.ha &&
+          !mapping.secondary_hardware_id
         );
       });
       if (!hypervisorIp.trim() || !hypervisorInterface.trim() || missingMapping) {
@@ -740,10 +786,9 @@ export function App() {
       if (invalidHaMode) {
         throw new Error(`Selected HA mode is not available for ${invalidHaMode.branch_name}/${invalidHaMode.edge_name}.`);
       }
-      if (hardwareMissingConnections) {
-        const hardware = resolveMappingHardware(hardwareMissingConnections, inventory.hardware);
+      if (missingSecondaryHaMapping) {
         throw new Error(
-          `${hardware.display_name} has no imported switch connections in inventory. Refresh it from Lab Navigator before generating.`
+          `Select an additional standalone device before using HA mode for ${missingSecondaryHaMapping.branch_name}/${missingSecondaryHaMapping.edge_name}.`
         );
       }
       const payload = {
@@ -754,6 +799,7 @@ export function App() {
         requested_by: currentUser,
         mappings: mappings.map((mapping) => ({
           hardware_id: mapping.hardware_id,
+          ...(mapping.secondary_hardware_id ? { secondary_hardware_id: mapping.secondary_hardware_id } : {}),
           branch_name: mapping.branch_name,
           edge_name: mapping.edge_name,
           target_branch_name: mapping.target_branch_name || null,
@@ -2037,7 +2083,7 @@ function hardwareConnectionWarning(hardware) {
   if (hardwareHasConnectionData(hardware)) {
     return '';
   }
-  return 'No imported switch connections in inventory. Refresh from Lab Navigator before using this hardware for mapping.';
+  return 'No imported switch connections are cached locally yet. Generation will sync this hardware from Lab Navigator automatically.';
 }
 
 const inventoryLabelFilterPriority = {
@@ -2179,6 +2225,7 @@ function savedMappingToEditorState(mapping) {
   return {
     ...emptyMapping,
     hardware_id: mapping.hardware_id || '',
+    secondary_hardware_id: mapping.secondary_hardware_id || '',
     branch_name: mapping.branch_name || '',
     edge_name: mapping.edge_name || '',
     target_branch_name: mapping.target_branch_name || '',
@@ -2193,13 +2240,143 @@ function savedMappingToEditorState(mapping) {
   };
 }
 
-function resolveMappingHardware(mapping, hardwareOptions) {
+function resolvePrimaryHardware(mapping, hardwareOptions) {
   const currentHardware = hardwareOptions.find((item) => item.id === mapping.hardware_id) || null;
   const savedHardware = mapping.saved_hardware?.id === mapping.hardware_id ? mapping.saved_hardware : null;
   if (currentHardware && (!hardwareHasConnectionData(currentHardware) && hardwareHasConnectionData(savedHardware))) {
     return savedHardware;
   }
   return currentHardware || savedHardware;
+}
+
+function resolveSecondaryHardware(mapping, hardwareOptions) {
+  if (!mapping?.secondary_hardware_id) {
+    return null;
+  }
+  return hardwareOptions.find((item) => item.id === mapping.secondary_hardware_id) || null;
+}
+
+function resolveMappingHardware(mapping, hardwareOptions) {
+  const primaryHardware = resolvePrimaryHardware(mapping, hardwareOptions);
+  const secondaryHardware = resolveSecondaryHardware(mapping, hardwareOptions);
+  if (
+    primaryHardware &&
+    secondaryHardware &&
+    (mapping.edge_ha_mode || 'topology_default') === 'ha' &&
+    !primaryHardware.ha
+  ) {
+    return buildSyntheticHaHardware(primaryHardware, secondaryHardware);
+  }
+  return primaryHardware;
+}
+
+function buildSyntheticHaHardware(primaryHardware, secondaryHardware) {
+  const ports = mergeStandalonePortsToHa(primaryHardware, secondaryHardware);
+  const switches = mergeHardwareSwitches(primaryHardware, secondaryHardware);
+  const activeMember = standaloneMemberInfo(primaryHardware, 'active');
+  const standbyMember = standaloneMemberInfo(secondaryHardware, 'standby');
+  const available = Boolean(primaryHardware.available && secondaryHardware.available);
+  return {
+    ...primaryHardware,
+    display_name: `HA Pair ${primaryHardware.display_name} + ${secondaryHardware.display_name}`,
+    ha: true,
+    standby_serial: secondaryHardware.active_serial,
+    switch: switches[0] || null,
+    switches,
+    ports,
+    members: [activeMember, standbyMember],
+    available,
+    reservation: available ? null : primaryHardware.reservation || secondaryHardware.reservation || null,
+    notes: [primaryHardware.notes, secondaryHardware.notes].filter(Boolean).join(' ') || null
+  };
+}
+
+function standaloneMemberInfo(hardware, role) {
+  const existingMember = (hardware.members || []).find((member) => member.role === 'active' || member.role === 'standby');
+  return {
+    role,
+    device_id: existingMember?.device_id || hardware.id,
+    display_name: existingMember?.display_name || hardware.display_name,
+    serial_number: existingMember?.serial_number || hardware.active_serial,
+    lab_navigator_id: existingMember?.lab_navigator_id || null,
+    available: existingMember?.available ?? Boolean(hardware.available),
+    reservation: existingMember?.reservation || hardware.reservation || null
+  };
+}
+
+function mergeHardwareSwitches(primaryHardware, secondaryHardware) {
+  const merged = [];
+  const seen = new Set();
+  const allSwitches = [
+    ...normalizeHardwareSwitchList(primaryHardware),
+    ...normalizeHardwareSwitchList(secondaryHardware)
+  ];
+  allSwitches.forEach((item) => {
+    const key = `${item.name}::${item.connections?.ip || ''}`;
+    if (seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    merged.push(item);
+  });
+  return merged;
+}
+
+function normalizeHardwareSwitchList(hardware) {
+  if (hardware?.switches?.length) {
+    return hardware.switches;
+  }
+  return hardware?.switch ? [hardware.switch] : [];
+}
+
+function mergeStandalonePortsToHa(primaryHardware, secondaryHardware) {
+  const primaryByInterface = new Map((primaryHardware.ports || []).map((port) => [port.logical_interface?.toUpperCase(), port]));
+  const secondaryByInterface = new Map((secondaryHardware.ports || []).map((port) => [port.logical_interface?.toUpperCase(), port]));
+  const logicalInterfaces = [
+    ...new Set([
+      ...(primaryHardware.ports || []).map((port) => port.logical_interface?.toUpperCase()).filter(Boolean),
+      ...(secondaryHardware.ports || []).map((port) => port.logical_interface?.toUpperCase()).filter(Boolean)
+    ])
+  ];
+  return logicalInterfaces.map((logicalInterface) => {
+    const primaryPort = primaryByInterface.get(logicalInterface) || null;
+    const secondaryPort = secondaryByInterface.get(logicalInterface) || null;
+    const basePort = primaryPort || secondaryPort;
+    let manualMappingRequired = false;
+    let portWarning = null;
+    if (!primaryPort || !secondaryPort) {
+      manualMappingRequired = true;
+      portWarning = primaryPort
+        ? `${logicalInterface} has only an active-member switch connection. Review interface mapping before generation.`
+        : `${logicalInterface} has only a standby-member switch connection. Review interface mapping before generation.`;
+    } else if (!hardwarePortSignaturesEqual(primaryPort, secondaryPort)) {
+      manualMappingRequired = true;
+      portWarning = `${logicalInterface} active and standby VLAN mappings differ. Review interface mapping before generation.`;
+    }
+    return {
+      ...basePort,
+      switch_name: primaryPort?.switch_name || secondaryPort?.switch_name || '',
+      switch_active_port: primaryPort?.switch_active_port || null,
+      switch_standby_port: secondaryPort?.switch_active_port || secondaryPort?.switch_standby_port || null,
+      switch_vlans: [...(primaryPort?.switch_vlans || secondaryPort?.switch_vlans || [])],
+      tagged_vlans: [...(primaryPort?.tagged_vlans || secondaryPort?.tagged_vlans || [])],
+      untagged_vlan: primaryPort?.untagged_vlan ?? secondaryPort?.untagged_vlan ?? null,
+      manual_mapping_required: manualMappingRequired,
+      port_warning: portWarning
+    };
+  });
+}
+
+function hardwarePortSignaturesEqual(left, right) {
+  return JSON.stringify({
+    switch_vlans: left?.switch_vlans || [],
+    tagged_vlans: left?.tagged_vlans || [],
+    untagged_vlan: left?.untagged_vlan ?? null
+  }) === JSON.stringify({
+    switch_vlans: right?.switch_vlans || [],
+    tagged_vlans: right?.tagged_vlans || [],
+    untagged_vlan: right?.untagged_vlan ?? null
+  });
 }
 
 function formatAuditAction(action) {
@@ -2498,9 +2675,26 @@ function hardwareMemberAvailable(hardware, role) {
   return member ? member.available : Boolean(hardware?.available);
 }
 
-function haModeOptions(hardware, edge) {
+function compatibleStandaloneHaCandidates(hardware, hardwareOptions) {
+  if (!hardware || hardware.ha) {
+    return [];
+  }
+  return (hardwareOptions || []).filter(
+    (candidate) =>
+      candidate.id !== hardware.id &&
+      !candidate.ha &&
+      candidate.model_suffix === hardware.model_suffix
+  );
+}
+
+function haModeOptions(hardware, edge, secondaryHardware = null, hardwareOptions = []) {
   const baseHa = Boolean(edge?.ha_enabled);
   const hasStandby = Boolean(hardware?.standby_serial || hardwareMemberByRole(hardware, 'standby'));
+  const compatibleSecondaries = compatibleStandaloneHaCandidates(hardware, hardwareOptions);
+  const selectableCompatibleSecondaries = compatibleSecondaries.filter((candidate) =>
+    hardwareSelectableForMapping(candidate)
+  );
+  const canSynthesizeHa = !hardware?.ha && Boolean(secondaryHardware || selectableCompatibleSecondaries.length);
   return [
     {
       value: 'topology_default',
@@ -2510,12 +2704,16 @@ function haModeOptions(hardware, edge) {
     },
     {
       value: 'ha',
-      label: 'HA pair',
-      disabled: !hardware?.ha || !hasStandby || !hardware?.available,
-      reason: !hardware?.ha || !hasStandby
-        ? 'Selected hardware has no standby member.'
+      label: !hardware?.ha && secondaryHardware ? 'HA from standalones' : 'HA pair',
+      disabled: (!hardware?.ha && !canSynthesizeHa) || !hardware?.available || (secondaryHardware && !secondaryHardware.available),
+      reason: (!hardware?.ha && !canSynthesizeHa)
+        ? 'Selected hardware has no standby member and no compatible standalone devices are available.'
         : !hardware?.available
           ? 'Both HA members must be available for HA mode.'
+          : secondaryHardware && !secondaryHardware.available
+            ? 'Selected standby hardware is reserved.'
+            : !hardware?.ha && !secondaryHardware
+              ? 'Select an additional standalone device to use HA mode.'
           : ''
     },
     {
@@ -3327,7 +3525,16 @@ function SearchableTextCombobox({
   );
 }
 
-function HardwareCombobox({ index, hardwareOptions, selectedHardwareId, selectedHardwareFallback, onSelect }) {
+function HardwareCombobox({
+  index,
+  hardwareOptions,
+  selectedHardwareId,
+  selectedHardwareFallback,
+  onSelect,
+  ariaLabel = 'Hardware',
+  placeholder = 'Search and select hardware',
+  fieldKey = 'primary'
+}) {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [highlightedIndex, setHighlightedIndex] = useState(0);
@@ -3336,7 +3543,7 @@ function HardwareCombobox({ index, hardwareOptions, selectedHardwareId, selected
     [hardwareOptions, selectedHardwareFallback, selectedHardwareId]
   );
   const selectedLabel = selectedHardware ? hardwareOptionLabel(selectedHardware) : '';
-  const listId = `hardware-options-${index}`;
+  const listId = `hardware-options-${fieldKey}-${index}`;
   const filteredHardwareOptions = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     if (!normalizedQuery) {
@@ -3420,13 +3627,13 @@ function HardwareCombobox({ index, hardwareOptions, selectedHardwareId, selected
       <div className={`comboboxField${isOpen ? ' open' : ''}`}>
         <Search size={16} aria-hidden="true" />
         <input
-          aria-label="Hardware"
+          aria-label={ariaLabel}
           aria-autocomplete="list"
           aria-controls={listId}
           aria-expanded={isOpen}
           aria-haspopup="listbox"
           className="comboboxInput"
-          placeholder="Search and select hardware"
+          placeholder={placeholder}
           role="combobox"
           value={query}
           onChange={handleInputChange}
@@ -3437,7 +3644,7 @@ function HardwareCombobox({ index, hardwareOptions, selectedHardwareId, selected
           type="button"
           className="comboboxToggle"
           tabIndex={-1}
-          aria-label={`Toggle hardware options for mapping ${index + 1}`}
+          aria-label={`Toggle ${ariaLabel.toLowerCase()} options for mapping ${index + 1}`}
           onMouseDown={(event) => event.preventDefault()}
           onClick={() => setIsOpen((current) => !current)}
         >
@@ -3474,8 +3681,8 @@ function HardwareCombobox({ index, hardwareOptions, selectedHardwareId, selected
 function MappingRow({ index, mapping, mappings, reference, inventory, onChange, onRemove, canRemove }) {
   const [interfaceOverridesOpen, setInterfaceOverridesOpen] = useState(false);
   const branch = reference?.branches.find((item) => item.name === mapping.branch_name);
-  const currentInventoryHardware =
-    inventory.hardware.find((item) => item.id === mapping.hardware_id) || null;
+  const currentInventoryHardware = resolvePrimaryHardware(mapping, inventory.hardware);
+  const secondaryHardware = resolveSecondaryHardware(mapping, inventory.hardware);
   const selectedHardware = resolveMappingHardware(mapping, inventory.hardware);
   const selectedEdge = branch?.edges.find((edge) => edge.name === mapping.edge_name);
   const usingSavedHardwareSnapshot =
@@ -3486,8 +3693,21 @@ function MappingRow({ index, mapping, mappings, reference, inventory, onChange, 
   const missingConnectionData = Boolean(selectedHardware && !hardwareHasConnectionData(selectedHardware));
   const haMismatch = selectedHardware && selectedEdge?.ha_enabled && !selectedHardware.ha;
   const mappingHaOptions = useMemo(
-    () => haModeOptions(selectedHardware, selectedEdge),
-    [selectedEdge, selectedHardware]
+    () => haModeOptions(currentInventoryHardware, selectedEdge, secondaryHardware, inventory.hardware),
+    [currentInventoryHardware, inventory.hardware, secondaryHardware, selectedEdge]
+  );
+  const secondaryHardwareOptions = useMemo(
+    () =>
+      compatibleStandaloneHaCandidates(currentInventoryHardware, inventory.hardware).filter(
+        (candidate) =>
+          candidate.id === mapping.secondary_hardware_id ||
+          !mappings.some(
+            (item, mappingIndex) =>
+              mappingIndex !== index &&
+              (item.hardware_id === candidate.id || item.secondary_hardware_id === candidate.id)
+          )
+      ),
+    [currentInventoryHardware, index, inventory.hardware, mapping.secondary_hardware_id, mappings]
   );
   const usedEdgeNames = useMemo(
     () =>
@@ -3583,7 +3803,7 @@ function MappingRow({ index, mapping, mappings, reference, inventory, onChange, 
             index={index}
             hardwareOptions={inventory.hardware}
             selectedHardwareId={mapping.hardware_id}
-            selectedHardwareFallback={selectedHardware}
+            selectedHardwareFallback={currentInventoryHardware}
             onSelect={(hardwareId) => onChange(index, 'hardware_id', hardwareId)}
           />
         </label>
@@ -3685,6 +3905,31 @@ function MappingRow({ index, mapping, mappings, reference, inventory, onChange, 
               </small>
             )}
           </div>
+          {(mapping.edge_ha_mode || 'topology_default') === 'ha' && currentInventoryHardware && !currentInventoryHardware.ha && (
+            <div className="haModeControl">
+              <span>
+                <small className="fieldCaption">Standby hardware</small>
+                <small>Add a second standalone device to synthesize an HA pair</small>
+              </span>
+              <HardwareCombobox
+                index={index}
+                fieldKey="secondary"
+                ariaLabel="Standby hardware"
+                placeholder="Search and select standby hardware"
+                hardwareOptions={secondaryHardwareOptions}
+                selectedHardwareId={mapping.secondary_hardware_id}
+                selectedHardwareFallback={secondaryHardware}
+                onSelect={(hardwareId) => onChange(index, 'secondary_hardware_id', hardwareId)}
+              />
+              {mapping.edge_ha_mode === 'ha' && !secondaryHardware && (
+                <small className="message warning">
+                  {secondaryHardwareOptions.length
+                    ? 'Select an additional standalone device to complete this HA mapping.'
+                    : 'No compatible standalone devices are available for HA pairing.'}
+                </small>
+              )}
+            </div>
+          )}
         </div>
       )}
       {selectedHardware && selectedEdge && referenceInterfaces.length > 0 && hardwarePorts.length > 0 && (

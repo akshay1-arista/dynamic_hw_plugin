@@ -196,6 +196,7 @@ def _reconstruct_request(metadata: RunMetadata, run_root: Path, inventory) -> Sa
         mappings.append(
             MappingRequest(
                 hardware_id=mapping.hardware_id,
+                secondary_hardware_id=mapping.secondary_hardware_id,
                 branch_name=mapping.branch_name,
                 edge_name=mapping.edge_name,
                 edge_ha_mode=mapping.edge_ha_mode,

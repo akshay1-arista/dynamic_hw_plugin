@@ -320,6 +320,8 @@ class InventoryFile(BaseModel):
 
 
 class InventoryStateFile(BaseModel):
+    managed_hardware_ids: list[str] = Field(default_factory=list)
+    vlan_ranges: dict[str, VlanRange] = Field(default_factory=dict)
     hardware: dict[str, HardwareLocalState] = Field(default_factory=dict)
     devices: dict[str, HardwareLocalState] = Field(default_factory=dict)
 
@@ -366,6 +368,7 @@ class ReferenceTopologySummary(BaseModel):
 
 class MappingRequest(BaseModel):
     hardware_id: str
+    secondary_hardware_id: Optional[str] = None
     branch_name: str
     edge_name: str
     target_branch_name: Optional[str] = None
@@ -373,6 +376,14 @@ class MappingRequest(BaseModel):
     edge_ha_mode: Literal["topology_default", "ha", "single_active", "single_standby"] = "topology_default"
     interface_overrides: list["InterfaceOverride"] = Field(default_factory=list)
     saved_hardware: Optional[HardwareEdge] = None
+
+    @field_validator("secondary_hardware_id")
+    @classmethod
+    def clean_secondary_hardware_id(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        cleaned = value.strip()
+        return cleaned or None
 
 
 class InterfaceOverride(BaseModel):
@@ -745,6 +756,7 @@ class SwitchConfigureResult(BaseModel):
 
 class RunMappingMetadata(BaseModel):
     hardware_id: str
+    secondary_hardware_id: Optional[str] = None
     branch_name: str
     edge_name: str
     edge_ha_mode: Literal["topology_default", "ha", "single_active", "single_standby"] = "topology_default"

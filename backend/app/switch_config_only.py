@@ -307,6 +307,7 @@ def _build_port_allocations(
                 logical_interface=port.logical_interface,
                 link=port.link or port.logical_interface.lower(),
                 switch_name=switch_name,
+                switch_standby_name=port.switch_standby_name,
                 switch_active_port=port.switch_active_port,
                 switch_standby_port=port.switch_standby_port,
                 switch_vlans=_combined_vlans(assignment),

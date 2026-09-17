@@ -98,6 +98,7 @@ class EdgePortMapping(BaseModel):
     logical_interface: str
     link: str
     switch_name: Optional[str] = None
+    switch_standby_name: Optional[str] = None
     switch_active_port: Optional[str] = None
     switch_standby_port: Optional[str] = None
     switch_vlans: list[int] = Field(default_factory=list)
@@ -125,6 +126,7 @@ class HardwarePortAllocation(BaseModel):
     logical_interface: str
     link: Optional[str] = None
     switch_name: str
+    switch_standby_name: Optional[str] = None
     switch_active_port: Optional[str] = None
     switch_standby_port: Optional[str] = None
     switch_vlans: list[int] = Field(default_factory=list)

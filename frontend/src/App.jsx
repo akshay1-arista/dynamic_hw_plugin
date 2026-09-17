@@ -2518,6 +2518,10 @@ function mergeStandalonePortsToHa(primaryHardware, secondaryHardware) {
     return {
       ...basePort,
       switch_name: primaryPort?.switch_name || secondaryPort?.switch_name || '',
+      switch_standby_name:
+        secondaryPort?.switch_name && secondaryPort.switch_name !== (primaryPort?.switch_name || secondaryPort?.switch_name)
+          ? secondaryPort.switch_name
+          : null,
       switch_active_port: primaryPort?.switch_active_port || null,
       switch_standby_port: secondaryPort?.switch_active_port || secondaryPort?.switch_standby_port || null,
       switch_vlans: [...(primaryPort?.switch_vlans || secondaryPort?.switch_vlans || [])],

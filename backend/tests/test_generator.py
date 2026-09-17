@@ -3,9 +3,9 @@ from pathlib import Path
 import pytest
 
 from app.config import INVENTORY_PATH
-from app.generator import GenerationError, generate_topology
+from app.generator import GenerationError, generate_topology, _resolve_mapping_hardware_view, _synthetic_ha_hardware_view
 from app.inventory import build_inventory, load_inventory, save_inventory
-from app.models import GenerateRequest
+from app.models import GenerateRequest, HardwareReservation
 
 
 TARGET_HARDWARE_ID = "ln-ha-a01-327-dgd10q2-a01-328-16c10q2"
@@ -262,4 +262,64 @@ def test_generate_topology_requires_secondary_standalone_for_ha_mode(tmp_path, m
             ),
             inventory_path=inventory_path,
             outputs_root=outputs_root,
+        )
+
+
+def test_synthetic_ha_keeps_secondary_switch_name_on_standby_ports(tmp_path):
+    inventory = load_inventory(_standalone_ha_candidate_inventory(tmp_path))
+    hardware_by_id = {item.id: item for item in inventory.hardware}
+    primary = hardware_by_id[STANDALONE_PRIMARY_ID]
+    secondary = hardware_by_id[STANDALONE_SECONDARY_ID]
+    for port in primary.ports:
+        port.switch_name = "a01-access-switch-a"
+    for port in secondary.ports:
+        port.switch_name = "a01-access-switch-b"
+
+    view = _synthetic_ha_hardware_view(primary, secondary)
+    ge1 = next(port for port in view.ports if port.logical_interface == "GE1")
+
+    assert ge1.switch_name == "a01-access-switch-a"
+    assert ge1.switch_standby_name == "a01-access-switch-b"
+    assert ge1.switch_active_port == "gigabitethernet1/11"
+    assert ge1.switch_standby_port == "gigabitethernet1/21"
+
+
+def test_synthetic_ha_rejects_secondary_reserved_by_another_user(tmp_path):
+    inventory = load_inventory(_standalone_ha_candidate_inventory(tmp_path))
+    hardware_by_id = {item.id: item for item in inventory.hardware}
+    primary = hardware_by_id[STANDALONE_PRIMARY_ID]
+    secondary = hardware_by_id[STANDALONE_SECONDARY_ID]
+    requester = HardwareReservation(
+        actor={"name": "Test User", "email": "test@example.com"},
+        reserved_at="2026-01-01T00:00:00Z",
+        reason="topology-generation",
+    )
+    other = HardwareReservation(
+        actor={"name": "Other User", "email": "other@example.com"},
+        reserved_at="2026-01-01T00:00:00Z",
+        reason="topology-generation",
+    )
+    primary.available = False
+    primary.reservation = requester
+    for member in primary.members:
+        member.available = False
+        member.reservation = requester
+    secondary.available = False
+    secondary.reservation = other
+    for member in secondary.members:
+        member.available = False
+        member.reservation = other
+
+    request = _base_generate_request(
+        hardware_id=STANDALONE_PRIMARY_ID,
+        secondary_hardware_id=STANDALONE_SECONDARY_ID,
+        edge_ha_mode="ha",
+    )
+    with pytest.raises(GenerationError, match="Reserved by Other User"):
+        _resolve_mapping_hardware_view(
+            request.mappings[0],
+            primary,
+            hardware_by_id,
+            True,
+            request,
         )

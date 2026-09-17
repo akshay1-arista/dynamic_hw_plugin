@@ -28,6 +28,7 @@ from .models import (
     HardwareEdge,
     HardwareMemberInfo,
     HardwarePortAllocation,
+    HardwareReservation,
     InterfaceOverride,
     InventoryDevice,
     InventoryFile,
@@ -389,8 +390,7 @@ def _resolve_mapping_hardware_view(
         view = _single_member_hardware_view(base_hardware, "standby")
 
     if not _mapping_view_is_available(base_hardware, resolved_mode, request):
-        member = _member_info(base_hardware, "standby" if resolved_mode == "single_standby" else "active")
-        reservation = member.reservation if member else base_hardware.reservation
+        display_name, reservation = _unavailable_mapping_target(base_hardware, resolved_mode, request)
         reservation_actor = reservation.actor if reservation else None
         reserved_by = (
             f"{reservation_actor.name} ({reservation_actor.email})"
@@ -398,7 +398,7 @@ def _resolve_mapping_hardware_view(
             else "another user"
         )
         raise GenerationError(
-            f"{base_hardware.display_name} is currently reserved for the selected HA mode. "
+            f"{display_name} is currently reserved for the selected HA mode. "
             f"Mark it available before generating again. Reserved by {reserved_by}."
         )
 
@@ -501,11 +501,20 @@ def _merge_standalone_ports_to_ha(primary: HardwareEdge, secondary: HardwareEdge
             warning = (
                 f"{logical_interface} active and standby VLAN mappings differ. Review interface mapping before generation."
             )
+        active_switch_name = (
+            primary_port.switch_name if primary_port and primary_port.switch_name else (secondary_port.switch_name if secondary_port else None)
+        )
+        standby_switch_name = secondary_port.switch_name if secondary_port and secondary_port.switch_name else None
         merged_ports.append(
             base_port.model_copy(
                 deep=True,
                 update={
-                    "switch_name": primary_port.switch_name if primary_port and primary_port.switch_name else (secondary_port.switch_name if secondary_port else None),
+                    "switch_name": active_switch_name,
+                    "switch_standby_name": (
+                        standby_switch_name
+                        if standby_switch_name and standby_switch_name != active_switch_name
+                        else None
+                    ),
                     "switch_active_port": primary_port.switch_active_port if primary_port else None,
                     "switch_standby_port": (
                         secondary_port.switch_active_port if secondary_port and secondary_port.switch_active_port else secondary_port.switch_standby_port if secondary_port else None
@@ -573,7 +582,14 @@ def _single_member_hardware_view(hardware: HardwareEdge, role: str) -> HardwareE
                 "standby_serial": None,
                 "display_name": f"{hardware.display_name} active member" if hardware.ha else hardware.display_name,
                 "ports": [
-                    port.model_copy(deep=True, update={"switch_standby_port": None, "manual_mapping_required": False})
+                    port.model_copy(
+                        deep=True,
+                        update={
+                            "switch_standby_name": None,
+                            "switch_standby_port": None,
+                            "manual_mapping_required": False,
+                        },
+                    )
                     for port in hardware.ports
                     if port.switch_active_port
                 ],
@@ -595,6 +611,8 @@ def _single_member_hardware_view(hardware: HardwareEdge, role: str) -> HardwareE
                 port.model_copy(
                     deep=True,
                     update={
+                        "switch_name": port.switch_standby_name or port.switch_name,
+                        "switch_standby_name": None,
                         "switch_active_port": port.switch_standby_port,
                         "switch_standby_port": None,
                         "manual_mapping_required": False,
@@ -610,17 +628,31 @@ def _single_member_hardware_view(hardware: HardwareEdge, role: str) -> HardwareE
 
 def _mapping_view_is_available(hardware: HardwareEdge, resolved_mode: str, request: GenerateRequest) -> bool:
     if resolved_mode == "ha":
+        if hardware.members:
+            return all(_member_is_available_for_request(member, request) for member in hardware.members)
         return _hardware_is_available_for_request(hardware, request)
     role = "standby" if resolved_mode == "single_standby" else "active"
     member = _member_info(hardware, role)
     if not member:
         return _hardware_is_available_for_request(hardware, request)
-    if member.available:
-        return True
-    reservation = member.reservation
-    if reservation is None or reservation.reason not in _WORKFLOW_RESERVATION_REASONS:
-        return False
-    return reservation.actor.email == request.requested_by.email
+    return _member_is_available_for_request(member, request)
+
+
+def _unavailable_mapping_target(
+    hardware: HardwareEdge,
+    resolved_mode: str,
+    request: GenerateRequest,
+) -> tuple[str, HardwareReservation | None]:
+    if resolved_mode == "ha" and hardware.members:
+        for member in hardware.members:
+            if not _member_is_available_for_request(member, request):
+                return member.display_name, member.reservation
+    elif resolved_mode != "ha":
+        role = "standby" if resolved_mode == "single_standby" else "active"
+        member = _member_info(hardware, role)
+        if member and not _member_is_available_for_request(member, request):
+            return member.display_name, member.reservation
+    return hardware.display_name, hardware.reservation
 
 
 def _reserved_device_ids_for_mode(hardware: HardwareEdge, resolved_mode: str) -> list[str]:
@@ -637,13 +669,23 @@ def _member_info(hardware: HardwareEdge, role: str):
     return next((member for member in hardware.members if member.role == role), None)
 
 
+def _member_is_available_for_request(member: HardwareMemberInfo, request: GenerateRequest) -> bool:
+    if member.available:
+        return True
+    return _reservation_usable_by_request(member.reservation, request)
+
+
 def _hardware_is_available_for_request(hardware: HardwareEdge, request: GenerateRequest) -> bool:
     if hardware.available:
         return True
-    reservation = hardware.reservation
+    return _reservation_usable_by_request(hardware.reservation, request)
+
+
+def _reservation_usable_by_request(reservation, request: GenerateRequest) -> bool:
     if reservation is None or reservation.reason not in _WORKFLOW_RESERVATION_REASONS:
         return False
-    return reservation.actor.email == request.requested_by.email
+    requester = request.requested_by.email if request.requested_by else None
+    return bool(requester) and reservation.actor.email == requester
 
 
 def _merge_saved_hardware_snapshots(
@@ -1113,6 +1155,7 @@ def _port_allocation_from_port(
         logical_interface=port.logical_interface,
         link=port.link,
         switch_name=_allocation_switch_name(hardware, port),
+        switch_standby_name=port.switch_standby_name,
         switch_active_port=port.switch_active_port,
         switch_standby_port=port.switch_standby_port,
         switch_vlans=switch_vlans,
@@ -1147,6 +1190,7 @@ def _port_allocation_from_override(
             logical_interface=port.logical_interface,
             link=port.link,
             switch_name=_allocation_switch_name(hardware, port),
+            switch_standby_name=port.switch_standby_name,
             switch_active_port=port.switch_active_port,
             switch_standby_port=port.switch_standby_port,
             switch_vlans=list(switch_vlans),
@@ -1166,6 +1210,7 @@ def _port_allocation_from_override(
         logical_interface=port.logical_interface,
         link=port.link,
         switch_name=_allocation_switch_name(hardware, port),
+        switch_standby_name=port.switch_standby_name,
         switch_active_port=port.switch_active_port,
         switch_standby_port=port.switch_standby_port,
         switch_vlans=list(switch_vlans),
@@ -1479,7 +1524,10 @@ def _build_l2_switches(
                 }
             )
         if hardware.ha and port.switch_standby_port:
-            interfaces_by_switch[switch_name].append(
+            standby_switch_name = port.switch_standby_name or switch_name
+            if standby_switch_name not in interfaces_by_switch:
+                standby_switch_name = switch_name
+            interfaces_by_switch[standby_switch_name].append(
                 {
                     "name": port.switch_standby_port,
                     "link": f"standby_{port.link}",

@@ -636,8 +636,18 @@ def _derive_ports(
     for connection, edge_endpoint, switch_endpoint, switch in active_port_rows:
         standby_connection = matched_standby_connections.get(connection.id)
         standby_port = None
+        standby_switch_name = None
         if standby_connection and standby:
-            standby_port = _other_endpoint(standby_connection, standby.id).interface
+            standby_endpoint = _other_endpoint(standby_connection, standby.id)
+            standby_port = standby_endpoint.interface
+            standby_switch = devices.get(standby_endpoint.device_id)
+            if (
+                standby_switch
+                and standby_switch.type == "switch"
+                and standby_switch.display_name
+                and standby_switch.display_name != switch.display_name
+            ):
+                standby_switch_name = standby_switch.display_name
 
         logical_interface = edge_endpoint.interface.upper()
         ports.append(
@@ -647,6 +657,7 @@ def _derive_ports(
                 "logical_interface": logical_interface,
                 "link": f"{_safe_id(group_id)}_{logical_interface.lower()}",
                 "switch_name": switch.display_name,
+                "switch_standby_name": standby_switch_name,
                 "switch_active_port": switch_endpoint.interface,
                 "switch_standby_port": standby_port,
                 "switch_vlans": connection.vlans,
@@ -690,6 +701,8 @@ def _derive_ports(
         )
         if existing_port is not None:
             existing_port["switch_standby_port"] = switch_endpoint.interface
+            if switch.display_name and switch.display_name != existing_port.get("switch_name"):
+                existing_port["switch_standby_name"] = switch.display_name
             existing_port["manual_mapping_required"] = True
             existing_port["port_warning"] = (
                 f"{logical_interface} active and standby switch connections differ. "
@@ -793,18 +806,21 @@ def _derive_switches(ports: list[dict[str, Any]], devices: dict[str, InventoryDe
     seen: set[str] = set()
     switches: list[dict[str, Any]] = []
     for port in ports:
-        switch = next(
-            (
-                device
-                for device in devices.values()
-                if device.type == "switch" and device.display_name == port["switch_name"]
-            ),
-            None,
-        )
-        if not switch or switch.id in seen:
-            continue
-        seen.add(switch.id)
-        switches.append(_switch_metadata(switch).model_dump(mode="json"))
+        for switch_name in [port.get("switch_name"), port.get("switch_standby_name")]:
+            if not switch_name:
+                continue
+            switch = next(
+                (
+                    device
+                    for device in devices.values()
+                    if device.type == "switch" and device.display_name == switch_name
+                ),
+                None,
+            )
+            if not switch or switch.id in seen:
+                continue
+            seen.add(switch.id)
+            switches.append(_switch_metadata(switch).model_dump(mode="json"))
     return switches
 
 
@@ -972,7 +988,7 @@ def _dfs_path(
             new_path = path[:-1] + [updated_last, next_hop]
             queue.append((remote_endpoint.device_id, new_path, seen | {remote_endpoint.device_id}))
 
-    return found
+    return None
 
 
 def _hypervisor_access_links(

@@ -1729,3 +1729,172 @@ def test_os9_access_uplink_transports_vlans_when_inventory_link_contains_ha_grou
     assert " tagged GigabitEthernet 1/14" in vlan602_block
     assert " tagged TenGigabitEthernet 1/50" in vlan602_block
     assert "interface TenGigabitEthernet 1/50" in access_commands
+
+
+def test_configure_switches_places_standby_ports_on_secondary_switch(tmp_path, monkeypatch):
+    inventory = InventoryFile.model_validate(
+        {
+            "devices": {
+                "access_sw_a": {
+                    "id": "access_sw_a",
+                    "type": "switch",
+                    "display_name": "A01-PF-S3048-A",
+                    "model": "Dell-3048",
+                    "ip_address": "10.0.0.10",
+                    "switch_metadata": {
+                        "name": "A01-PF-S3048-A",
+                        "model": "Dell-3048",
+                        "os_family": "os9",
+                        "connections": {"ip": "10.0.0.10", "port": None},
+                        "credentials": {"username": "velocloud", "password": "N#1sdwan"},
+                    },
+                },
+                "access_sw_b": {
+                    "id": "access_sw_b",
+                    "type": "switch",
+                    "display_name": "A01-PF-S3048-B",
+                    "model": "Dell-3048",
+                    "ip_address": "10.0.0.12",
+                    "switch_metadata": {
+                        "name": "A01-PF-S3048-B",
+                        "model": "Dell-3048",
+                        "os_family": "os9",
+                        "connections": {"ip": "10.0.0.12", "port": None},
+                        "credentials": {"username": "velocloud", "password": "N#1sdwan"},
+                    },
+                },
+                "upstream_sw": {
+                    "id": "upstream_sw",
+                    "type": "switch",
+                    "display_name": "A01-PF-S4048-1",
+                    "model": "Dell-4048",
+                    "ip_address": "10.0.0.11",
+                    "switch_metadata": {
+                        "name": "A01-PF-S4048-1",
+                        "model": "Dell-4048",
+                        "os_family": "os9",
+                        "connections": {"ip": "10.0.0.11", "port": None},
+                        "credentials": {"username": "velocloud", "password": "N#1sdwan"},
+                    },
+                },
+                "esxi_01": {
+                    "id": "esxi_01",
+                    "type": "hypervisor",
+                    "display_name": "esxi-01",
+                    "ip_address": "10.0.0.20",
+                },
+            },
+            "connections": [
+                {
+                    "id": "access-a-upstream",
+                    "a": {"device_id": "access_sw_a", "interface": "tengigabitethernet1/51"},
+                    "b": {"device_id": "upstream_sw", "interface": "tengigabitethernet1/43"},
+                    "vlans": [1, 101],
+                    "tagged_vlans": [101],
+                    "untagged_vlan": 1,
+                    "role": "switch-uplink",
+                },
+                {
+                    "id": "access-b-upstream",
+                    "a": {"device_id": "access_sw_b", "interface": "tengigabitethernet1/51"},
+                    "b": {"device_id": "upstream_sw", "interface": "tengigabitethernet1/44"},
+                    "vlans": [1, 101],
+                    "tagged_vlans": [101],
+                    "untagged_vlan": 1,
+                    "role": "switch-uplink",
+                },
+                {
+                    "id": "upstream-hypervisor",
+                    "a": {"device_id": "upstream_sw", "interface": "tengigabitethernet1/9"},
+                    "b": {"device_id": "esxi_01", "interface": "vmnic0"},
+                    "vlans": [1],
+                    "tagged_vlans": [],
+                    "untagged_vlan": 1,
+                    "role": "hypervisor-access",
+                },
+            ],
+            "hardware": [
+                {
+                    "id": "edge-ha",
+                    "display_name": "HA Pair edge-a + edge-b",
+                    "model": "edge6X0",
+                    "model_suffix": "680",
+                    "ha": True,
+                    "active_serial": "STANDALONE-A",
+                    "standby_serial": "STANDALONE-B",
+                    "switch": {
+                        "name": "A01-PF-S3048-A",
+                        "model": "Dell-3048",
+                        "os_family": "os9",
+                        "connections": {"ip": "10.0.0.10", "port": None},
+                        "credentials": {"username": "velocloud", "password": "N#1sdwan"},
+                    },
+                    "path": {
+                        "hops": [
+                            {"switch_id": "access_sw_a", "switch_name": "A01-PF-S3048-A", "switch_ip": "10.0.0.10", "egress_port": "tengigabitethernet1/51"},
+                            {"switch_id": "upstream_sw", "switch_name": "A01-PF-S4048-1", "switch_ip": "10.0.0.11", "ingress_port": "tengigabitethernet1/43", "egress_port": "tengigabitethernet1/9"},
+                        ],
+                        "hypervisor_id": "esxi_01",
+                        "hypervisor_name": "esxi-01",
+                        "hypervisor_ip": "10.0.0.20",
+                        "complete": True,
+                    },
+                }
+            ],
+        }
+    )
+    run_root = tmp_path / "outputs" / "run123-abcdef"
+    run_root.mkdir(parents=True)
+    (run_root / "run_metadata.json").write_text(
+        json.dumps(
+            {
+                "run_id": "run123",
+                "topology_name": "topo-1",
+                "reference_topology_id": "3-site",
+                "mappings": [
+                    {
+                        "hardware_id": "edge-ha",
+                        "branch_name": "branch1",
+                        "edge_name": "edge1",
+                        "path": inventory.hardware[0].path.model_dump(mode="json"),
+                        "allocations": [
+                            {
+                                "reference_interface": "GE1",
+                                "logical_interface": "GE1",
+                                "switch_name": "A01-PF-S3048-A",
+                                "switch_standby_name": "A01-PF-S3048-B",
+                                "switch_active_port": "gigabitethernet1/11",
+                                "switch_standby_port": "gigabitethernet1/21",
+                                "switch_vlans": [101],
+                                "tagged_vlans": [],
+                                "untagged_vlan": 101,
+                                "segment_vlans": {},
+                            }
+                        ],
+                    }
+                ],
+            }
+        )
+    )
+
+    monkeypatch.setattr("app.switch_config.load_inventory", lambda _path: inventory)
+    monkeypatch.setattr("app.switch_config._fetch_running_config", lambda _device: "")
+
+    result = configure_switches_for_run(
+        "run123",
+        SwitchConfigureRequest(dry_run=True),
+        inventory_path=tmp_path / "inventory.json",
+        outputs_root=tmp_path / "outputs",
+    )
+
+    access_a_commands = next(item.commands for item in result.devices if item.device_id == "access_sw_a")
+    access_b_commands = next(item.commands for item in result.devices if item.device_id == "access_sw_b")
+    joined_a = "\n".join(access_a_commands).lower()
+    joined_b = "\n".join(access_b_commands).lower()
+
+    assert "interface gigabitethernet 1/11" in joined_a
+    assert "interface gigabitethernet 1/21" not in joined_a
+    assert "interface gigabitethernet 1/21" in joined_b
+    assert "interface gigabitethernet 1/11" not in joined_b
+    assert "interface tengigabitethernet 1/51" in joined_b
+    assert " member gigabitethernet 1/21" in joined_b

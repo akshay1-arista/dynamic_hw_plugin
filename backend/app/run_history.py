@@ -436,6 +436,7 @@ def _build_saved_port_snapshot(
             "logical_interface": logical_interface,
             "link": allocation.link or f"{_safe_id(hardware_id)}_{logical_interface.lower()}",
             "switch_name": allocation.switch_name,
+            "switch_standby_name": allocation.switch_standby_name,
             "switch_active_port": allocation.switch_active_port,
             "switch_standby_port": allocation.switch_standby_port,
             "switch_vlans": list(allocation.switch_vlans),
@@ -451,8 +452,9 @@ def _build_saved_port_snapshot(
 def _build_saved_switch_metadata(mapping_metadata, inventory) -> list[dict[str, Any]]:
     switch_names: list[str] = []
     for allocation in mapping_metadata.allocations:
-        if allocation.switch_name and allocation.switch_name not in switch_names:
-            switch_names.append(allocation.switch_name)
+        for switch_name in [allocation.switch_name, allocation.switch_standby_name]:
+            if switch_name and switch_name not in switch_names:
+                switch_names.append(switch_name)
     if not switch_names and mapping_metadata.path and mapping_metadata.path.access_switch_name:
         switch_names.append(mapping_metadata.path.access_switch_name)
 

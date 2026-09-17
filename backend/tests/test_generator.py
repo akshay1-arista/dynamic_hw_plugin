@@ -148,7 +148,6 @@ def _standalone_ha_candidate_inventory(tmp_path):
     inventory = build_inventory(
         raw_devices,
         raw_connections,
-        managed_hardware_ids={STANDALONE_PRIMARY_ID, STANDALONE_SECONDARY_ID},
     )
     inventory_path = tmp_path / "standalone-ha-inventory.json"
     save_inventory(inventory, inventory_path)

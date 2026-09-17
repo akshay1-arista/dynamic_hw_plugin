@@ -156,6 +156,12 @@ def get_hardware_by_id(hardware_id: str, path: Path = INVENTORY_PATH) -> Hardwar
     return next((item for item in inventory.hardware if item.id == hardware_id), None)
 
 
+def _reservation_summary(display_name: str, topology_name: str, reason: str) -> str:
+    if reason == "switch-config":
+        return f"Reserved {display_name} for switch configuration {topology_name}."
+    return f"Reserved {display_name} for generated topology {topology_name}."
+
+
 def reserve_generated_hardware(
     hardware_ids: list[str],
     actor: ActorIdentity,
@@ -164,15 +170,17 @@ def reserve_generated_hardware(
     path: Path = INVENTORY_PATH,
     *,
     member_device_ids: list[str] | None = None,
+    reason: str = "topology-generation",
 ) -> tuple[InventoryFile, list[AuditEvent]]:
     inventory = load_inventory(path)
     hardware_set = set(hardware_ids)
     member_set = set(member_device_ids or [])
     events: list[AuditEvent] = []
+    reservation_reason = reason if reason in {"topology-generation", "switch-config"} else "topology-generation"
     reservation = HardwareReservation(
         actor=actor,
         reserved_at=_utc_now(),
-        reason="topology-generation",
+        reason=reservation_reason,
         run_id=run_id,
         topology_name=topology_name,
     )
@@ -189,7 +197,7 @@ def reserve_generated_hardware(
                     actor=actor,
                     target_type="hardware",
                     target_id=device.id,
-                    summary=f"Reserved {device.display_name} for generated topology {topology_name}.",
+                    summary=_reservation_summary(device.display_name, topology_name, reservation_reason),
                     details={
                         "hardware_id": group_id,
                         "device_id": device.id,
@@ -211,7 +219,7 @@ def reserve_generated_hardware(
                     actor=actor,
                     target_type="hardware",
                     target_id=hardware.id,
-                    summary=f"Reserved {hardware.display_name} for generated topology {topology_name}.",
+                    summary=_reservation_summary(hardware.display_name, topology_name, reservation_reason),
                     details={
                         "hardware_id": hardware.id,
                         "hardware_display_name": hardware.display_name,

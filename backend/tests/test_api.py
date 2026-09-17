@@ -412,6 +412,48 @@ def test_list_saved_runs_route(monkeypatch):
     assert body["runs"][0]["requested_topology_name"] == "demo-topology"
 
 
+def test_switch_config_runs_route(monkeypatch):
+    captured = {}
+
+    def fake_create(request):
+        captured["request"] = request
+        return {
+            "run_id": "sw123",
+            "topology_name": "switch-config-abc123",
+            "topology_path": "/tmp/sw123",
+            "zip_path": "",
+            "download_url": "",
+            "can_configure_switches": True,
+            "switch_config_only": True,
+            "mapping_statuses": [],
+            "messages": [{"level": "info", "message": "Mapped switch path"}],
+        }
+
+    monkeypatch.setattr(app_main, "create_switch_config_run", fake_create)
+    response = client.post(
+        "/api/switch-config-runs",
+        json={
+            "hypervisor_ip": "10.68.136.50",
+            "hypervisor_interface": "vmnic0",
+            "requested_by": {"name": "Test User", "email": "test@example.com"},
+            "mappings": [
+                {
+                    "hardware_id": "a01-680-standalone-a",
+                    "edge_ha_mode": "single_active",
+                    "interfaces": [{"hardware_interface": "GE1", "untagged_vlan": 200, "tagged_vlans": [201]}],
+                }
+            ],
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["switch_config_only"] is True
+    assert body["zip_path"] == ""
+    assert captured["request"].mappings[0].interfaces[0].untagged_vlan == 200
+    assert captured["request"].mappings[0].interfaces[0].tagged_vlans == [201]
+
+
 def test_load_saved_run_route(monkeypatch):
     monkeypatch.setattr(
         app_main,

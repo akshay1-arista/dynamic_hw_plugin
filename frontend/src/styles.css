@@ -1116,12 +1116,23 @@ button:disabled {
   grid-template-columns: minmax(220px, 1.15fr) repeat(4, minmax(140px, 1fr)) 40px;
 }
 
+.mappingMainFields.switchConfigMappingFields {
+  grid-template-columns: minmax(220px, 320px) 40px;
+  justify-content: start;
+}
+
 .mappingMainFields > label {
   margin-bottom: 0;
 }
 
 .mappingMainFields > .iconButton {
   align-self: end;
+}
+
+.mappingMainFields.switchConfigMappingFields > .iconButton {
+  height: 40px;
+  justify-self: start;
+  width: 40px;
 }
 
 .mappingOptionsBar {
@@ -1267,13 +1278,55 @@ button:disabled {
 
 .interfaceOverrideRow {
   align-items: start;
-  background: #ffffff;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
   display: grid;
   gap: 12px;
-  grid-template-columns: minmax(170px, 0.9fr) minmax(250px, 1.2fr) minmax(220px, 1fr);
-  padding: 13px;
+  grid-template-columns: minmax(180px, 1.1fr) minmax(180px, 1fr) minmax(180px, 1fr);
+}
+
+.switchConfigInterfaceList {
+  gap: 8px;
+}
+
+.switchConfigInterfaceHeader,
+.interfaceOverrideRow.switchConfigOnly {
+  align-items: center;
+  display: grid;
+  gap: 8px 12px;
+  grid-template-columns: minmax(170px, 1.1fr) minmax(110px, 0.7fr) minmax(180px, 1.3fr);
+}
+
+.switchConfigInterfaceHeader {
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 760;
+  padding: 0 10px;
+  text-transform: uppercase;
+}
+
+.interfaceOverrideRow.switchConfigOnly {
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+}
+
+.interfaceOverrideRow.switchConfigOnly .interfaceOverrideMeta {
+  min-width: 0;
+}
+
+.interfaceOverrideRow.switchConfigOnly .interfaceOverrideHeader {
+  flex-wrap: nowrap;
+}
+
+.interfaceOverrideRow.switchConfigOnly .interfaceOverrideMeta small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.interfaceOverrideRow.switchConfigOnly input {
+  min-width: 0;
+  width: 100%;
 }
 
 .interfaceOverrideMeta,
@@ -1658,8 +1711,16 @@ button:disabled {
     grid-template-columns: repeat(2, minmax(0, 1fr)) 40px;
   }
 
+  .mappingMainFields.switchConfigMappingFields {
+    grid-template-columns: minmax(0, 1fr) 40px;
+  }
+
   .mappingMainFields > label:first-child {
     grid-column: span 2;
+  }
+
+  .mappingMainFields.switchConfigMappingFields > label:first-child {
+    grid-column: auto;
   }
 
   .mappingOptionsBar {
@@ -1738,6 +1799,11 @@ button:disabled {
   .detailGrid,
   .interfaceOverrideRow {
     grid-template-columns: 1fr;
+  }
+
+  .switchConfigInterfaceHeader,
+  .interfaceOverrideRow.switchConfigOnly {
+    grid-template-columns: minmax(120px, 0.9fr) minmax(90px, 0.7fr) minmax(120px, 1fr);
   }
 
   .mappingRow .iconButton {

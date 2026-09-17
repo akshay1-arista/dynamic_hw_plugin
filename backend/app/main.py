@@ -38,12 +38,14 @@ from .models import (
     LabNavigatorSearchResult,
     SavedRunListResult,
     SavedRunLoadResult,
+    SwitchConfigOnlyRequest,
     SwitchConfigureRequest,
     SwitchConfigureResult,
 )
 from .reference import list_references
 from .run_history import RunHistoryError, list_saved_runs, load_saved_run
 from .switch_config import SwitchConfigError, configure_switches_for_run
+from .switch_config_only import create_switch_config_run
 
 
 def _cors_allowed_origins() -> list[str]:
@@ -164,7 +166,15 @@ def post_hardware_import_apply(request: HardwareImportRequest):
 def post_generate(request: GenerateRequest):
     try:
         return generate_topology(request)
-    except (GenerationError, ValueError, FileNotFoundError) as error:
+    except (DiscoveryError, GenerationError, ValueError, FileNotFoundError) as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@app.post("/api/switch-config-runs", response_model=GenerateResult)
+def post_switch_config_run(request: SwitchConfigOnlyRequest):
+    try:
+        return create_switch_config_run(request)
+    except (DiscoveryError, GenerationError, ValueError, FileNotFoundError) as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
 
 
@@ -234,4 +244,3 @@ def get_audit_trail():
         return list_audit_events()
     except AuditTrailError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
-    LabNavigatorSearchResult,

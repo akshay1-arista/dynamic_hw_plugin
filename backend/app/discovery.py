@@ -355,6 +355,26 @@ def apply_inventory_refresh(
         _refresh_log_id.reset(token)
 
 
+def sync_inventory_for_generate(
+    hardware_ids: list[str],
+    *,
+    inventory_path: Path = INVENTORY_PATH,
+    client: LabNavigatorClient | None = None,
+) -> tuple[InventoryFile, RefreshBuildStats]:
+    target_ids = list(dict.fromkeys(item for item in hardware_ids if item))
+    if not target_ids:
+        return load_inventory(inventory_path), RefreshBuildStats()
+    try:
+        result = apply_inventory_refresh(
+            InventoryRefreshRequest(hardware_ids=target_ids),
+            inventory_path=inventory_path,
+            client=client,
+        )
+        return result.inventory, RefreshBuildStats()
+    except (DiscoveryError, ValueError, FileNotFoundError, OSError):
+        return load_inventory(inventory_path), RefreshBuildStats()
+
+
 def _build_imported_inventory(
     inventory: InventoryFile,
     request: HardwareImportRequest,

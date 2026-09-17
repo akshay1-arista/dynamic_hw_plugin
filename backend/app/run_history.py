@@ -165,13 +165,15 @@ def _build_generate_result(metadata: RunMetadata, run_root: Path, inventory) -> 
     can_configure_switches = bool(mapping_statuses) and all(
         item.path_resolved and item.auto_config_ready for item in mapping_statuses
     )
+    zip_exists = zip_path.exists()
     return GenerateResult(
         run_id=metadata.run_id,
         topology_name=metadata.topology_name,
         topology_path=str(topology_path),
-        zip_path=str(zip_path),
-        download_url=f"/api/runs/{metadata.run_id}/download",
+        zip_path=str(zip_path) if zip_exists else "",
+        download_url=f"/api/runs/{metadata.run_id}/download" if zip_exists else "",
         can_configure_switches=can_configure_switches,
+        switch_config_only=bool(metadata.switch_config_only),
         mapping_statuses=mapping_statuses,
         messages=messages,
     )
@@ -213,6 +215,8 @@ def _reconstruct_request(metadata: RunMetadata, run_root: Path, inventory) -> Sa
                         reference_interface=allocation.reference_interface,
                         hardware_interface=allocation.logical_interface,
                         switch_vlans=allocation.switch_vlans,
+                        tagged_vlans=list(allocation.tagged_vlans),
+                        untagged_vlan=allocation.untagged_vlan,
                     )
                     for allocation in mapping.allocations
                 ],

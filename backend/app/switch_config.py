@@ -325,6 +325,14 @@ def _port_link(
     return generated_switch_links.get((port.switch_name, port.switch_active_port))
 
 
+def _is_ha_interconnect_link(link: str | None) -> bool:
+    if not link:
+        return False
+    # Reference HA cables are named like B1E1_HA. Inventory links for HA hardware
+    # also contain "_ha_" inside the group id and must still be transported.
+    return bool(re.search(r"(^|_)HA$", link.strip(), flags=re.IGNORECASE))
+
+
 def _transport_vlans_for_port(
     port: HardwarePortAllocation,
     generated_switch_links: dict[tuple[str, str], str],
@@ -333,7 +341,7 @@ def _transport_vlans_for_port(
     if link is None:
         if not port.tagged_vlans:
             return []
-    elif "_HA" in link.upper():
+    elif _is_ha_interconnect_link(link):
         return []
     return [vlan for vlan in port.switch_vlans if vlan is not None]
 
@@ -347,7 +355,7 @@ def _uses_vlan_stack_access(
     link = _port_link(port, generated_switch_links)
     if link is None:
         return True
-    return "_HA" in link.upper()
+    return _is_ha_interconnect_link(link)
 
 
 def _add_edge_port_to_state(

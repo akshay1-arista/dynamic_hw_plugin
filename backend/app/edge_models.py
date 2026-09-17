@@ -91,6 +91,25 @@ def normalize_edge_model(
     return model, model_suffix or extract_edge_model_suffix(model)
 
 
+_KNOWN_EDGE_INTERFACES = {
+    ("edge6X0", "610"): ("GE1", "GE2", "GE3", "GE4", "GE5", "GE6", "SFP1", "SFP2"),
+    ("edge6X0", "620"): ("GE1", "GE2", "GE3", "GE4", "GE5", "GE6", "SFP1", "SFP2"),
+    ("edge6X0", "640"): ("GE1", "GE2", "GE3", "GE4", "GE5", "GE6", "SFP1", "SFP2"),
+    ("edge6X0", "680"): ("GE1", "GE2", "GE3", "GE4", "GE5", "GE6", "SFP1", "SFP2"),
+    ("edge7X0", "720"): ("GE1", "GE2", "GE3", "GE4", "GE5", "GE6", "SFP1", "SFP2"),
+    ("edge7X0", "740"): ("GE1", "GE2", "GE3", "GE4", "GE5", "GE6", "SFP1", "SFP2"),
+    ("edge3X00", "3400"): ("GE1", "GE2", "GE3", "GE4", "GE5", "GE6", "GE7", "GE8"),
+    ("edge3X00", "3800"): ("GE1", "GE2", "GE3", "GE4", "GE5", "GE6", "GE7", "GE8"),
+}
+
+
+def known_edge_interfaces(model: str | None, model_suffix: str | None = None) -> tuple[str, ...]:
+    normalized_model, normalized_suffix = normalize_edge_model(model, model_suffix)
+    if not normalized_model:
+        return ()
+    return _KNOWN_EDGE_INTERFACES.get((normalized_model, normalized_suffix or ""), ())
+
+
 def extract_edge_model_suffix(model: str | None) -> str | None:
     if not model:
         return None

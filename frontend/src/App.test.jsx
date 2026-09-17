@@ -240,6 +240,8 @@ const inventory = {
       active_serial: '1KXFXC2',
       standby_serial: '',
       available: true,
+      vlan_range: { start: 1510, end: 1520 },
+      free_vlans: [1510, 1511, 1512],
       switch: { name: 'a01-access-switch', model: 'Dell-3048', connections: { ip: '10.68.136.70' } },
       ports: [
         {
@@ -734,6 +736,70 @@ beforeEach(() => {
               { level: 'warning', message: 'Applied Lab Navigator inventory refresh with partial results.' }
             ]
           : [{ level: 'info', message: 'Applied Lab Navigator inventory refresh.' }]
+      });
+    }
+    if (url === '/api/switch-config-runs') {
+      const payload = JSON.parse(options.body);
+      inventoryState = {
+        ...inventoryState,
+        hardware: inventoryState.hardware.map((hardware) =>
+          payload.mappings.some(
+            (mapping) => mapping.hardware_id === hardware.id || mapping.secondary_hardware_id === hardware.id
+          )
+            ? {
+                ...hardware,
+                available: false,
+                reservation: {
+                  actor: payload.requested_by,
+                  reserved_at: '2026-07-12T00:00:00+00:00',
+                  reason: 'switch-config',
+                  run_id: 'abc123',
+                  topology_name: 'switch-config-a1b2c3'
+                }
+              }
+            : hardware
+        )
+      };
+      generatedRuns = [
+        {
+          run_id: 'abc123',
+          topology_name: 'switch-config-a1b2c3',
+          requested_topology_name: 'switch-config',
+          reference_topology_id: '__switch_config_only__',
+          requested_by: payload.requested_by,
+          created_at: '2026-07-12T00:00:00+00:00',
+          updated_at: '2026-07-12T00:00:00+00:00',
+          private_branch_name: null,
+          private_branch_pushed: false
+        },
+        ...generatedRuns.filter((run) => run.run_id !== 'abc123')
+      ];
+      return Response.json({
+        run_id: 'abc123',
+        topology_name: 'switch-config-a1b2c3',
+        topology_path: '/tmp/switch-config-a1b2c3',
+        zip_path: '',
+        download_url: '',
+        can_configure_switches: true,
+        switch_config_only: true,
+        mapping_statuses: [
+          {
+            hardware_id: payload.mappings[0].hardware_id,
+            hardware_display_name: 'A01 680 Standalone',
+            branch_name: 'switch-config',
+            edge_name: payload.mappings[0].hardware_id,
+            path_resolved: true,
+            auto_config_ready: true,
+            path: {
+              hops: [{ switch_name: 'a01-access-switch' }],
+              hypervisor_name: 'chn-rnd-srv-640-298VF33'
+            }
+          }
+        ],
+        messages: [
+          { level: 'info', message: 'Recommended VLAN range for A01 680 Standalone: 1510-1520. Free VLANs: 1510, 1511.' },
+          { level: 'info', message: 'Mapped switch path for A01 680 Standalone' }
+        ]
       });
     }
     if (url === '/api/generate') {
@@ -1860,5 +1926,56 @@ describe('App', () => {
     ).toBeInTheDocument();
     expect(screen.getByLabelText('Hardware interface for GE1')).toHaveValue('');
     expect(screen.getByLabelText('Hardware interface for GE2')).toHaveValue('');
+  });
+
+  test('maps switch config only without generating a topology zip', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await screen.findAllByText('CHN 3800 HA Pair 8');
+    await user.selectOptions(screen.getByLabelText('Topology'), '__switch_config_only__');
+
+    expect(screen.queryByLabelText('Output topology name')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Branch')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /map path & preview switch config/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Remove mapping' })).toBeInTheDocument();
+
+    await chooseHardware(user, 'a01 680 standalone', /A01 680 Standalone/i);
+    await user.type(screen.getByRole('combobox', { name: 'Hypervisor IP' }), '10.68.136.50');
+    await user.type(screen.getByRole('combobox', { name: 'Hypervisor interface' }), 'vmnic0');
+
+    expect(await screen.findByText(/Recommended range from inventory: 1510-1520/i)).toBeInTheDocument();
+    expect(screen.getByText('Untagged VLAN')).toBeInTheDocument();
+    expect(screen.getByText('Tagged VLANs')).toBeInTheDocument();
+    const untaggedInput = screen.getByLabelText('Untagged VLAN for GE1');
+    expect(untaggedInput).toHaveValue('1510');
+    expect(untaggedInput.closest('.interfaceOverrideRow')).toContainElement(
+      screen.getByLabelText('Tagged VLANs for GE1')
+    );
+
+    await user.clear(screen.getByLabelText('Tagged VLANs for GE1'));
+    await user.type(screen.getByLabelText('Tagged VLANs for GE1'), '1511');
+    await user.click(screen.getByRole('button', { name: /map path & preview switch config/i }));
+
+    await waitFor(() => expect(screen.getByText(/path resolved/i)).toBeInTheDocument());
+    expect(screen.queryByRole('link', { name: /download zip/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /commit and push gerrit private branch/i })).not.toBeInTheDocument();
+
+    const switchConfigCall = global.fetch.mock.calls.find(([url]) => url === '/api/switch-config-runs');
+    const payload = JSON.parse(switchConfigCall[1].body);
+    expect(payload.mappings[0]).toMatchObject({
+      hardware_id: 'a01-680-standalone',
+      edge_ha_mode: 'single_active'
+    });
+    expect(payload.mappings[0].interfaces).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          hardware_interface: 'GE1',
+          untagged_vlan: 1510,
+          tagged_vlans: [1511]
+        })
+      ])
+    );
+    expect(await screen.findByLabelText('Switch commands for a01-access-switch')).toBeInTheDocument();
   });
 });

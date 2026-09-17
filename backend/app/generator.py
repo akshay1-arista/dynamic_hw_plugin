@@ -45,6 +45,9 @@ class GenerationError(ValueError):
     pass
 
 
+_WORKFLOW_RESERVATION_REASONS = {"topology-generation", "switch-config"}
+
+
 @dataclass(frozen=True)
 class MappingHardwareView:
     hardware: HardwareEdge
@@ -615,7 +618,7 @@ def _mapping_view_is_available(hardware: HardwareEdge, resolved_mode: str, reque
     if member.available:
         return True
     reservation = member.reservation
-    if reservation is None or reservation.reason != "topology-generation":
+    if reservation is None or reservation.reason not in _WORKFLOW_RESERVATION_REASONS:
         return False
     return reservation.actor.email == request.requested_by.email
 
@@ -638,7 +641,7 @@ def _hardware_is_available_for_request(hardware: HardwareEdge, request: Generate
     if hardware.available:
         return True
     reservation = hardware.reservation
-    if reservation is None or reservation.reason != "topology-generation":
+    if reservation is None or reservation.reason not in _WORKFLOW_RESERVATION_REASONS:
         return False
     return reservation.actor.email == request.requested_by.email
 

@@ -22,6 +22,7 @@ import {
   applyInventoryImport,
   applyInventoryRefresh,
   configureSwitches,
+  createSwitchConfigRun,
   deletePrivateBranches,
   fetchAuditTrail,
   fetchGeneratedRun,
@@ -52,6 +53,7 @@ const emptyMapping = {
 
 const hapyBaseBranches = ['release_5.2', 'release_6.1', 'release_6.4', 'release_7.0', 'master'];
 const userStorageKey = 'dynamic-topology-user';
+const SWITCH_CONFIG_ONLY_ID = '__switch_config_only__';
 
 async function copyTextToClipboard(text) {
   if (navigator?.clipboard?.writeText) {
@@ -145,6 +147,7 @@ export function App() {
     () => references.find((reference) => reference.id === selectedReferenceId),
     [references, selectedReferenceId]
   );
+  const isSwitchConfigOnly = selectedReferenceId === SWITCH_CONFIG_ONLY_ID;
   const hypervisorOptions = useMemo(() => buildHypervisorOptions(inventory), [inventory]);
   const selectedHypervisorOption = useMemo(
     () => hypervisorOptions.find((option) => option.ip === hypervisorIp.trim()) || null,
@@ -189,7 +192,22 @@ export function App() {
     return mappings
       .map((mapping) => {
         const hardware = resolveMappingHardware(mapping, inventory.hardware);
-        if (!hardware || !mapping.branch_name || !mapping.edge_name) {
+        if (!hardware) {
+          return null;
+        }
+        if (isSwitchConfigOnly) {
+          const vlanCount = (mapping.interface_overrides || []).filter(
+            (item) => item.untagged_vlan_text?.trim() || item.tagged_vlans_text?.trim()
+          ).length;
+          return {
+            hardware: hardware.display_name,
+            branch: 'Switch config only',
+            edge: hardware.ha ? 'HA' : 'Standalone',
+            ports: hardware.ports.length,
+            configurablePorts: vlanCount
+          };
+        }
+        if (!mapping.branch_name || !mapping.edge_name) {
           return null;
         }
         const branchName = mapping.target_branch_name || mapping.branch_name;
@@ -203,7 +221,7 @@ export function App() {
         };
       })
       .filter(Boolean);
-  }, [inventory.hardware, mappings]);
+  }, [inventory.hardware, isSwitchConfigOnly, mappings]);
 
   const filteredAuditTrail = useMemo(() => {
     const query = auditSearch.trim().toLowerCase();
@@ -352,8 +370,11 @@ export function App() {
     [inventory.hardware]
   );
   const selectedMappingCount = useMemo(
-    () => mappings.filter((mapping) => mapping.hardware_id && mapping.branch_name && mapping.edge_name).length,
-    [mappings]
+    () =>
+      mappings.filter((mapping) =>
+        isSwitchConfigOnly ? Boolean(mapping.hardware_id) : mapping.hardware_id && mapping.branch_name && mapping.edge_name
+      ).length,
+    [isSwitchConfigOnly, mappings]
   );
   const allPrivateBranchesSelected =
     privateBranches.length > 0 && selectedPrivateBranchNames.length === privateBranches.length;
@@ -441,6 +462,9 @@ export function App() {
           if (chosenHardware?.ha) {
             next.secondary_hardware_id = '';
           }
+          if (isSwitchConfigOnly) {
+            next.edge_ha_mode = chosenHardware?.ha ? 'ha' : 'single_active';
+          }
           if (next.secondary_hardware_id === value) {
             next.secondary_hardware_id = '';
           }
@@ -490,7 +514,10 @@ export function App() {
   }
 
   function addMapping() {
-    setMappings((current) => [...current, { ...emptyMapping }]);
+    setMappings((current) => [
+      ...current,
+      { ...emptyMapping, ...(isSwitchConfigOnly ? { edge_ha_mode: 'single_active' } : {}) }
+    ]);
   }
 
   function removeMapping(index) {
@@ -733,6 +760,10 @@ export function App() {
   }
 
   async function submitGenerate() {
+    if (isSwitchConfigOnly) {
+      await submitSwitchConfigOnly();
+      return;
+    }
     setGenerating(true);
     setResult(null);
     setPublishResult(null);
@@ -835,6 +866,96 @@ export function App() {
       setInventory(inventoryData);
       setGeneratedRuns(generatedRunData.runs || []);
       setAuditTrail(auditData.events || []);
+    } catch (generateError) {
+      setError(generateError.message);
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  async function submitSwitchConfigOnly() {
+    setGenerating(true);
+    setResult(null);
+    setPublishResult(null);
+    setSwitchPreview(null);
+    setCopyState({});
+    setError('');
+    try {
+      const missingMapping = mappings.find((mapping) => !mapping.hardware_id);
+      if (!hypervisorIp.trim() || !hypervisorInterface.trim() || missingMapping) {
+        throw new Error('Select Hypervisor IP, Hypervisor interface, and hardware before mapping switch paths.');
+      }
+      const invalidHaMode = mappings.find((mapping) => {
+        const hardware = resolvePrimaryHardware(mapping, inventory.hardware);
+        const secondaryHardware = resolveSecondaryHardware(mapping, inventory.hardware);
+        return haModeOptions(hardware, null, secondaryHardware, inventory.hardware, { switchConfigOnly: true }).some(
+          (option) => option.value === (mapping.edge_ha_mode || 'single_active') && option.disabled
+        );
+      });
+      const missingSecondaryHaMapping = mappings.find((mapping) => {
+        const hardware = resolvePrimaryHardware(mapping, inventory.hardware);
+        return mapping.edge_ha_mode === 'ha' && hardware && !hardware.ha && !mapping.secondary_hardware_id;
+      });
+      if (invalidHaMode) {
+        throw new Error('Selected HA mode is not available for one or more hardware mappings.');
+      }
+      if (missingSecondaryHaMapping) {
+        throw new Error('Select an additional standalone device before using HA mode.');
+      }
+      const payload = {
+        hypervisor_ip: hypervisorIp,
+        hypervisor_interface: hypervisorInterface,
+        requested_by: currentUser,
+        mappings: mappings.map((mapping) => {
+          const interfaces = (mapping.interface_overrides || [])
+            .map((override) => {
+              const hardwareInterface = override.hardware_interface || override.reference_interface;
+              if (!hardwareInterface) {
+                return null;
+              }
+              const untaggedVlan = parseUntaggedVlan(override.untagged_vlan_text || '', hardwareInterface);
+              const taggedVlans = parseSwitchVlanOverride(override.tagged_vlans_text || '', hardwareInterface);
+              if (untaggedVlan == null && taggedVlans.length === 0) {
+                return null;
+              }
+              return {
+                hardware_interface: hardwareInterface,
+                ...(untaggedVlan != null ? { untagged_vlan: untaggedVlan } : {}),
+                ...(taggedVlans.length ? { tagged_vlans: taggedVlans } : {})
+              };
+            })
+            .filter(Boolean);
+          if (!interfaces.length) {
+            throw new Error('Add an untagged VLAN or tagged VLANs on at least one interface for each hardware mapping.');
+          }
+          return {
+            hardware_id: mapping.hardware_id,
+            ...(mapping.secondary_hardware_id ? { secondary_hardware_id: mapping.secondary_hardware_id } : {}),
+            edge_ha_mode: mapping.edge_ha_mode === 'topology_default' ? 'single_active' : mapping.edge_ha_mode || 'single_active',
+            interfaces
+          };
+        })
+      };
+      const generated = await createSwitchConfigRun(payload);
+      setResult(generated);
+      const [inventoryData, generatedRunData, auditData] = await Promise.all([
+        fetchInventory(),
+        fetchGeneratedRuns(),
+        fetchAuditTrail()
+      ]);
+      setInventory(inventoryData);
+      setGeneratedRuns(generatedRunData.runs || []);
+      setAuditTrail(auditData.events || []);
+      if (generated.can_configure_switches && generated.run_id) {
+        const preview = await configureSwitches(generated.run_id, { dry_run: true });
+        setSwitchPreview({
+          devices: preview.devices.map((device) => ({
+            ...device,
+            command_text: commandsToEditorText(device.commands)
+          })),
+          messages: preview.messages || []
+        });
+      }
     } catch (generateError) {
       setError(generateError.message);
     } finally {
@@ -1054,7 +1175,9 @@ export function App() {
         !window.confirm(
           switchPreview?.devices?.length
             ? 'Apply the current previewed switch configuration for the generated run?'
-            : 'Apply switch configuration for the generated run?'
+            : result?.switch_config_only
+              ? 'Apply switch configuration for this mapped hardware?'
+              : 'Apply switch configuration for the generated run?'
         )
       ) {
         return;
@@ -1729,7 +1852,11 @@ export function App() {
               <GitBranch size={18} />
               <div>
                 <h2>Topology Setup</h2>
-                <p>Choose the virtual reference and target hypervisor context.</p>
+                <p>
+                  {isSwitchConfigOnly
+                    ? 'Configure switches without generating a topology zip.'
+                    : 'Choose the virtual reference and target hypervisor context.'}
+                </p>
               </div>
             </div>
             <label>
@@ -1739,11 +1866,21 @@ export function App() {
                 required
                 value={selectedReferenceId}
                 onChange={(event) => {
-                  setSelectedReferenceId(event.target.value);
-                  setTopologyName(`${event.target.value.replaceAll('/', '-')}-hw`);
+                  const nextId = event.target.value;
+                  setSelectedReferenceId(nextId);
+                  setResult(null);
+                  setPublishResult(null);
+                  setSwitchPreview(null);
+                  if (nextId === SWITCH_CONFIG_ONLY_ID) {
+                    setTopologyName('switch-config');
+                    setMappings([{ ...emptyMapping, edge_ha_mode: 'single_active' }]);
+                    return;
+                  }
+                  setTopologyName(`${nextId.replaceAll('/', '-')}-hw`);
                   setMappings([{ ...emptyMapping }]);
                 }}
               >
+                <option value={SWITCH_CONFIG_ONLY_ID}>No reference topology — switch config only</option>
                 {references.map((reference) => (
                   <option key={reference.id} value={reference.id} disabled={!reference.exists}>
                     {reference.id}
@@ -1753,6 +1890,7 @@ export function App() {
               </select>
             </label>
 
+            {!isSwitchConfigOnly && (
             <label>
               <RequiredLabel>Output topology name</RequiredLabel>
               <input
@@ -1762,6 +1900,7 @@ export function App() {
                 onChange={(event) => setTopologyName(event.target.value)}
               />
             </label>
+            )}
 
             <label htmlFor={hypervisorIpFieldId}>
               <RequiredLabel>Hypervisor IP</RequiredLabel>
@@ -1787,6 +1926,7 @@ export function App() {
               />
             </label>
 
+            {!isSwitchConfigOnly && (
             <div className="branchList">
               {selectedReference?.branches.map((branch) => (
                 <div key={branch.name} className="branchItem">
@@ -1798,6 +1938,7 @@ export function App() {
                 </div>
               ))}
             </div>
+            )}
           </div>
 
           <div className="panel wide mappingPanel">
@@ -1816,6 +1957,7 @@ export function App() {
               mappings={mappings}
               reference={selectedReference}
               inventory={inventory}
+              switchConfigOnly={isSwitchConfigOnly}
               onChange={updateMapping}
               onRemove={removeMapping}
               canRemove={mappings.length > 1}
@@ -1827,8 +1969,8 @@ export function App() {
               Add mapping
             </button>
             <button className="primary" onClick={submitGenerate} disabled={generating}>
-              {generating ? <Loader2 className="spin" size={16} /> : <Archive size={16} />}
-              Generate zip
+              {generating ? <Loader2 className="spin" size={16} /> : isSwitchConfigOnly ? <Server size={16} /> : <Archive size={16} />}
+              {isSwitchConfigOnly ? 'Map path & preview switch config' : 'Generate zip'}
             </button>
           </div>
           </div>
@@ -1838,21 +1980,29 @@ export function App() {
             <CheckCircle2 size={18} />
             <div>
               <h2>Preview & Delivery</h2>
-              <p>Validate generated names, download output, publish branches, and configure switches.</p>
+              <p>
+                {isSwitchConfigOnly
+                  ? 'Review resolved switch paths and apply switch configuration.'
+                  : 'Validate generated names, download output, publish branches, and configure switches.'}
+              </p>
             </div>
           </div>
           {previewRows.length === 0 ? (
             <div className="emptyState">
               <Archive size={18} aria-hidden="true" />
-              <p>Select hardware, branch, and edge to preview generated names.</p>
+              <p>
+                {isSwitchConfigOnly
+                  ? 'Select hardware and VLAN assignments to preview switch mapping.'
+                  : 'Select hardware, branch, and edge to preview generated names.'}
+              </p>
             </div>
           ) : (
             <div className="previewTable">
               <div className="previewRow previewHeader" aria-hidden="true">
                 <span>Hardware</span>
-                <span>Branch</span>
-                <span>Edge</span>
-                <span>Links</span>
+                <span>{isSwitchConfigOnly ? 'Mode' : 'Branch'}</span>
+                <span>{isSwitchConfigOnly ? 'Role' : 'Edge'}</span>
+                <span>{isSwitchConfigOnly ? 'VLAN ports' : 'Links'}</span>
               </div>
               {previewRows.map((row, index) => (
                 <div className="previewRow" key={`${row.hardware}-${index}`}>
@@ -1874,7 +2024,7 @@ export function App() {
                 <span>
                   <strong>{result.topology_name}</strong>
                   <small>Run {result.run_id}</small>
-                  <small>{result.topology_path}</small>
+                  {result.topology_path ? <small>{result.topology_path}</small> : null}
                 </span>
               </div>
               {result.mapping_statuses?.length > 0 && (
@@ -1886,7 +2036,7 @@ export function App() {
                       }`}
                       key={`${status.hardware_id}-${index}`}
                     >
-                      {status.branch_name}/{status.edge_name}: {status.path_resolved ? 'path resolved' : 'path unresolved'}
+                      {result.switch_config_only ? status.hardware_display_name : `${status.branch_name}/${status.edge_name}`}: {status.path_resolved ? 'path resolved' : 'path unresolved'}
                       {status.path?.hops?.length > 0 ? ` via ${status.path.hops.map((h) => h.switch_name).join(' -> ')}` : ''}
                       {status.path?.hypervisor_name ? ` -> ${status.path.hypervisor_name}` : ''}
                       {status.auto_config_ready ? ' (switch auto-config ready)' : ''}
@@ -1902,6 +2052,7 @@ export function App() {
                   </small>
                 ))}
               </div>
+              {!result.switch_config_only && (
               <div className="copyRow">
                 <button className="secondary" onClick={copyTopologyName} type="button">
                   <Copy size={16} />
@@ -1910,6 +2061,9 @@ export function App() {
                 {copyState.topology === 'copied' && <small className="muted">Copied</small>}
                 {copyState.topology === 'failed' && <small className="message error">Copy failed</small>}
               </div>
+              )}
+              {!result.switch_config_only && (
+              <>
               <div className="publishControls">
                 <label className="publishField">
                   Base branch for Gerrit private branch
@@ -1960,11 +2114,16 @@ export function App() {
                   )}
                 </div>
               )}
+              </>
+              )}
               <div className="resultActions">
+                {!result.switch_config_only && (
                 <a className="download" href={result.download_url}>
                   <Download size={16} />
                   Download zip
                 </a>
+                )}
+                {!result.switch_config_only && (
                 <button
                   className="secondary"
                   onClick={submitPublishPrivateBranch}
@@ -1973,6 +2132,7 @@ export function App() {
                   {publishingAction === 'publish' ? <Loader2 className="spin" size={16} /> : <GitBranch size={16} />}
                   Commit And Push Gerrit Private Branch
                 </button>
+                )}
                 <button
                   className="secondary"
                   onClick={submitPreviewSwitches}
@@ -2235,7 +2395,9 @@ function savedMappingToEditorState(mapping) {
     interface_overrides: (mapping.interface_overrides || []).map((override) => ({
       reference_interface: override.reference_interface,
       hardware_interface: override.hardware_interface || '',
-      switch_vlans_text: Array.isArray(override.switch_vlans) ? override.switch_vlans.join(', ') : ''
+      switch_vlans_text: Array.isArray(override.switch_vlans) ? override.switch_vlans.join(', ') : '',
+      untagged_vlan_text: override.untagged_vlan != null ? String(override.untagged_vlan) : '',
+      tagged_vlans_text: Array.isArray(override.tagged_vlans) ? override.tagged_vlans.join(', ') : ''
     }))
   };
 }
@@ -2687,7 +2849,8 @@ function compatibleStandaloneHaCandidates(hardware, hardwareOptions) {
   );
 }
 
-function haModeOptions(hardware, edge, secondaryHardware = null, hardwareOptions = []) {
+function haModeOptions(hardware, edge, secondaryHardware = null, hardwareOptions = [], options = {}) {
+  const switchConfigOnly = Boolean(options.switchConfigOnly);
   const baseHa = Boolean(edge?.ha_enabled);
   const hasStandby = Boolean(hardware?.standby_serial || hardwareMemberByRole(hardware, 'standby'));
   const compatibleSecondaries = compatibleStandaloneHaCandidates(hardware, hardwareOptions);
@@ -2695,7 +2858,7 @@ function haModeOptions(hardware, edge, secondaryHardware = null, hardwareOptions
     hardwareSelectableForMapping(candidate)
   );
   const canSynthesizeHa = !hardware?.ha && Boolean(secondaryHardware || selectableCompatibleSecondaries.length);
-  return [
+  const allOptions = [
     {
       value: 'topology_default',
       label: baseHa ? 'Base HA' : 'Base single',
@@ -2729,6 +2892,7 @@ function haModeOptions(hardware, edge, secondaryHardware = null, hardwareOptions
       reason: !hasStandby ? 'Selected hardware has no standby member.' : 'Standby member is reserved.'
     }
   ];
+  return switchConfigOnly ? allOptions.filter((option) => option.value !== 'topology_default') : allOptions;
 }
 
 function getReferenceInterfaceKey(interfaceSummary) {
@@ -2869,6 +3033,97 @@ function hardwareVlanPool(hardware) {
     return [];
   }
   return Array.from({ length: end - start + 1 }, (_, index) => start + index);
+}
+
+function hardwareVlanRangeSummary(hardware) {
+  if (hardware?.vlan_range?.start && hardware?.vlan_range?.end) {
+    return `${hardware.vlan_range.start}-${hardware.vlan_range.end}`;
+  }
+  const pool = hardwareVlanPool(hardware);
+  if (!pool.length) {
+    return '';
+  }
+  return `${pool[0]}-${pool[pool.length - 1]}`;
+}
+
+const KNOWN_EDGE_INTERFACES = {
+  610: ['GE1', 'GE2', 'GE3', 'GE4', 'GE5', 'GE6', 'SFP1', 'SFP2'],
+  620: ['GE1', 'GE2', 'GE3', 'GE4', 'GE5', 'GE6', 'SFP1', 'SFP2'],
+  640: ['GE1', 'GE2', 'GE3', 'GE4', 'GE5', 'GE6', 'SFP1', 'SFP2'],
+  680: ['GE1', 'GE2', 'GE3', 'GE4', 'GE5', 'GE6', 'SFP1', 'SFP2'],
+  720: ['GE1', 'GE2', 'GE3', 'GE4', 'GE5', 'GE6', 'SFP1', 'SFP2'],
+  740: ['GE1', 'GE2', 'GE3', 'GE4', 'GE5', 'GE6', 'SFP1', 'SFP2'],
+  3400: ['GE1', 'GE2', 'GE3', 'GE4', 'GE5', 'GE6', 'GE7', 'GE8'],
+  3800: ['GE1', 'GE2', 'GE3', 'GE4', 'GE5', 'GE6', 'GE7', 'GE8']
+};
+
+function knownHardwareInterfaces(hardware) {
+  const suffix = String(hardware?.model_suffix || '').replace(/[^0-9]/g, '');
+  return KNOWN_EDGE_INTERFACES[suffix] || KNOWN_EDGE_INTERFACES[hardware?.model_suffix] || [];
+}
+
+function switchConfigInterfaceNames(hardware) {
+  const names = new Set(knownHardwareInterfaces(hardware));
+  (hardware?.ports || []).forEach((port) => {
+    if (port?.logical_interface) {
+      names.add(String(port.logical_interface).toUpperCase());
+    }
+  });
+  return [...names].sort(compareInterfaceNames);
+}
+
+function parseUntaggedVlan(value, interfaceName) {
+  const trimmed = String(value || '').trim();
+  if (!trimmed) {
+    return null;
+  }
+  if (!/^\d+$/.test(trimmed)) {
+    throw new Error(`Untagged VLAN for ${interfaceName} must be a single VLAN number.`);
+  }
+  const vlan = Number(trimmed);
+  if (vlan < 1 || vlan > 4094) {
+    throw new Error(`Untagged VLAN for ${interfaceName} must stay between 1 and 4094.`);
+  }
+  return vlan;
+}
+
+function buildSwitchConfigInterfaceAssignments(hardware) {
+  const ports = topologyHardwarePorts(hardware);
+  const portByInterface = new Map(ports.map((port) => [port.logical_interface.toUpperCase(), port]));
+  const pool = hardwareVlanPool(hardware);
+  const used = new Set();
+  ports.forEach((port) => {
+    if (port.untagged_vlan != null) {
+      used.add(port.untagged_vlan);
+    }
+    (port.tagged_vlans || []).forEach((vlan) => used.add(vlan));
+  });
+  let cursor = 0;
+  function nextPoolVlan() {
+    while (cursor < pool.length && used.has(pool[cursor])) {
+      cursor += 1;
+    }
+    if (cursor >= pool.length) {
+      return '';
+    }
+    const vlan = pool[cursor];
+    used.add(vlan);
+    cursor += 1;
+    return String(vlan);
+  }
+  return switchConfigInterfaceNames(hardware).map((interfaceName) => {
+    const port = portByInterface.get(interfaceName);
+    const untagged =
+      port?.untagged_vlan != null ? String(port.untagged_vlan) : port ? nextPoolVlan() : '';
+    const tagged = Array.isArray(port?.tagged_vlans) ? port.tagged_vlans.join(', ') : '';
+    return {
+      reference_interface: interfaceName,
+      hardware_interface: interfaceName,
+      untagged_vlan_text: untagged,
+      tagged_vlans_text: tagged,
+      switch_vlans_text: ''
+    };
+  });
 }
 
 function parseVlanPreview(value) {
@@ -3678,7 +3933,17 @@ function HardwareCombobox({
   );
 }
 
-function MappingRow({ index, mapping, mappings, reference, inventory, onChange, onRemove, canRemove }) {
+function MappingRow({
+  index,
+  mapping,
+  mappings,
+  reference,
+  inventory,
+  switchConfigOnly = false,
+  onChange,
+  onRemove,
+  canRemove
+}) {
   const [interfaceOverridesOpen, setInterfaceOverridesOpen] = useState(false);
   const branch = reference?.branches.find((item) => item.name === mapping.branch_name);
   const currentInventoryHardware = resolvePrimaryHardware(mapping, inventory.hardware);
@@ -3693,8 +3958,11 @@ function MappingRow({ index, mapping, mappings, reference, inventory, onChange, 
   const missingConnectionData = Boolean(selectedHardware && !hardwareHasConnectionData(selectedHardware));
   const haMismatch = selectedHardware && selectedEdge?.ha_enabled && !selectedHardware.ha;
   const mappingHaOptions = useMemo(
-    () => haModeOptions(currentInventoryHardware, selectedEdge, secondaryHardware, inventory.hardware),
-    [currentInventoryHardware, inventory.hardware, secondaryHardware, selectedEdge]
+    () =>
+      haModeOptions(currentInventoryHardware, selectedEdge, secondaryHardware, inventory.hardware, {
+        switchConfigOnly
+      }),
+    [currentInventoryHardware, inventory.hardware, secondaryHardware, selectedEdge, switchConfigOnly]
   );
   const secondaryHardwareOptions = useMemo(
     () =>
@@ -3763,10 +4031,31 @@ function MappingRow({ index, mapping, mappings, reference, inventory, onChange, 
   );
 
   useEffect(() => {
-    if (!selectedHardware || !selectedEdge) {
+    if (!selectedHardware || (!switchConfigOnly && !selectedEdge)) {
       setInterfaceOverridesOpen(false);
     }
-  }, [selectedEdge, selectedHardware]);
+  }, [selectedEdge, selectedHardware, switchConfigOnly]);
+
+  useEffect(() => {
+    if (!switchConfigOnly || !selectedHardware) {
+      return;
+    }
+    if ((mapping.interface_overrides || []).length) {
+      return;
+    }
+    const assignments = buildSwitchConfigInterfaceAssignments(selectedHardware);
+    if (assignments.length) {
+      onChange(index, 'interface_overrides', assignments);
+    }
+  }, [
+    index,
+    mapping.edge_ha_mode,
+    mapping.hardware_id,
+    mapping.interface_overrides,
+    mapping.secondary_hardware_id,
+    selectedHardware,
+    switchConfigOnly
+  ]);
 
   function updateInterfaceOverrides(referenceInterface, changes) {
     const nextAssignments = displayedInterfaceAssignments.map((assignment) => {
@@ -3794,9 +4083,31 @@ function MappingRow({ index, mapping, mappings, reference, inventory, onChange, 
     );
   }
 
+  function updateSwitchConfigInterface(interfaceName, changes) {
+    const current = (mapping.interface_overrides || []).length
+      ? mapping.interface_overrides
+      : buildSwitchConfigInterfaceAssignments(selectedHardware);
+    onChange(
+      index,
+      'interface_overrides',
+      current.map((item) =>
+        item.hardware_interface === interfaceName || item.reference_interface === interfaceName
+          ? { ...item, ...changes }
+          : item
+      )
+    );
+  }
+
+  const switchConfigAssignments = (mapping.interface_overrides || []).length
+    ? mapping.interface_overrides
+    : selectedHardware
+      ? buildSwitchConfigInterfaceAssignments(selectedHardware)
+      : [];
+  const recommendedRange = hardwareVlanRangeSummary(selectedHardware);
+
   return (
     <div className="mappingRow">
-      <div className="mappingMainFields">
+      <div className={`mappingMainFields${switchConfigOnly ? ' switchConfigMappingFields' : ''}`}>
         <label>
           <RequiredLabel>Hardware</RequiredLabel>
           <HardwareCombobox
@@ -3808,6 +4119,8 @@ function MappingRow({ index, mapping, mappings, reference, inventory, onChange, 
           />
         </label>
 
+        {!switchConfigOnly && (
+        <>
         <label>
           <RequiredLabel>Branch</RequiredLabel>
           <select
@@ -3859,6 +4172,8 @@ function MappingRow({ index, mapping, mappings, reference, inventory, onChange, 
             onChange={(event) => onChange(index, 'target_edge_name', event.target.value)}
           />
         </label>
+        </>
+        )}
 
         <button
           type="button"
@@ -3872,12 +4187,20 @@ function MappingRow({ index, mapping, mappings, reference, inventory, onChange, 
         </button>
       </div>
 
-      {selectedHardware && selectedEdge && (
+      {selectedHardware && (switchConfigOnly || selectedEdge) && (
         <div className="mappingOptionsBar">
           <div className="haModeControl">
             <span>
               <small className="fieldCaption">HA mode</small>
-              <small>{selectedEdge.ha_enabled ? 'Base edge is HA' : 'Base edge is single'}</small>
+              <small>
+                {switchConfigOnly
+                  ? selectedHardware.ha
+                    ? 'Inventory hardware is HA'
+                    : 'Inventory hardware is standalone'
+                  : selectedEdge.ha_enabled
+                    ? 'Base edge is HA'
+                    : 'Base edge is single'}
+              </small>
             </span>
             <div className="segmentedControl" role="group" aria-label={`HA mode for mapping ${index + 1}`}>
               {mappingHaOptions.map((option) => (
@@ -3932,7 +4255,62 @@ function MappingRow({ index, mapping, mappings, reference, inventory, onChange, 
           )}
         </div>
       )}
-      {selectedHardware && selectedEdge && referenceInterfaces.length > 0 && hardwarePorts.length > 0 && (
+      {switchConfigOnly && selectedHardware && (
+        <div className="interfaceOverrideCard">
+          <div className="interfaceOverrideEditor">
+            <p className="muted">
+              Assign an untagged VLAN and optional tagged VLANs for each interface. Recommended range from inventory
+              {recommendedRange ? `: ${recommendedRange}` : ' is not set for this hardware'}.
+              Leave an interface blank to skip it.
+            </p>
+            {selectedHardware.free_vlans?.length > 0 && (
+              <p className="muted">Free VLANs: {selectedHardware.free_vlans.join(', ')}.</p>
+            )}
+            <div className="interfaceOverrideList switchConfigInterfaceList">
+              <div className="switchConfigInterfaceHeader">
+                <span>Interface</span>
+                <span>Untagged VLAN</span>
+                <span>Tagged VLANs</span>
+              </div>
+              {switchConfigAssignments.map((assignment) => {
+                const interfaceName = assignment.hardware_interface || assignment.reference_interface;
+                const port = hardwarePortByInterface.get(interfaceName);
+                const connected = Boolean(port?.switch_active_port || port?.switch_standby_port);
+                return (
+                  <div className="interfaceOverrideRow switchConfigOnly" key={interfaceName}>
+                    <div className="interfaceOverrideMeta">
+                      <div className="interfaceOverrideHeader">
+                        <strong>{interfaceName}</strong>
+                        <span className={`interfacePill ${connected ? 'neutral' : 'warning'}`}>
+                          {connected ? 'Connected' : 'Not connected'}
+                        </span>
+                      </div>
+                      <small>{port ? hardwarePortConnectionSummary(port) : 'No switch member port in inventory'}</small>
+                    </div>
+                    <input
+                      aria-label={`Untagged VLAN for ${interfaceName}`}
+                      placeholder={recommendedRange ? `e.g. ${recommendedRange.split('-')[0]}` : 'Optional'}
+                      value={assignment.untagged_vlan_text || ''}
+                      onChange={(event) =>
+                        updateSwitchConfigInterface(interfaceName, { untagged_vlan_text: event.target.value })
+                      }
+                    />
+                    <input
+                      aria-label={`Tagged VLANs for ${interfaceName}`}
+                      placeholder="Comma-separated, optional"
+                      value={assignment.tagged_vlans_text || ''}
+                      onChange={(event) =>
+                        updateSwitchConfigInterface(interfaceName, { tagged_vlans_text: event.target.value })
+                      }
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+      {!switchConfigOnly && selectedHardware && selectedEdge && referenceInterfaces.length > 0 && hardwarePorts.length > 0 && (
         <div className="interfaceOverrideCard">
           <button
             type="button"
@@ -4042,7 +4420,7 @@ function MappingRow({ index, mapping, mappings, reference, inventory, onChange, 
           )}
         </div>
       )}
-      {haMismatch && (
+      {!switchConfigOnly && haMismatch && (
         <div className="mappingCaveat">
           <TriangleAlert size={16} aria-hidden="true" />
           Reference edge is HA enabled, but selected hardware is standalone. Generation will convert this branch edge to standalone.

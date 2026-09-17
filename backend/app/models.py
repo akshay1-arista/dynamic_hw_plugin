@@ -29,7 +29,7 @@ class ActorIdentity(BaseModel):
 class HardwareReservation(BaseModel):
     actor: ActorIdentity
     reserved_at: str
-    reason: Literal["topology-generation", "manual-unavailable"]
+    reason: Literal["topology-generation", "switch-config", "manual-unavailable"]
     run_id: Optional[str] = None
     topology_name: Optional[str] = None
 
@@ -98,6 +98,7 @@ class EdgePortMapping(BaseModel):
     logical_interface: str
     link: str
     switch_name: Optional[str] = None
+    switch_standby_name: Optional[str] = None
     switch_active_port: Optional[str] = None
     switch_standby_port: Optional[str] = None
     switch_vlans: list[int] = Field(default_factory=list)
@@ -125,6 +126,7 @@ class HardwarePortAllocation(BaseModel):
     logical_interface: str
     link: Optional[str] = None
     switch_name: str
+    switch_standby_name: Optional[str] = None
     switch_active_port: Optional[str] = None
     switch_standby_port: Optional[str] = None
     switch_vlans: list[int] = Field(default_factory=list)
@@ -320,6 +322,8 @@ class InventoryFile(BaseModel):
 
 
 class InventoryStateFile(BaseModel):
+    managed_hardware_ids: list[str] = Field(default_factory=list)
+    vlan_ranges: dict[str, VlanRange] = Field(default_factory=dict)
     hardware: dict[str, HardwareLocalState] = Field(default_factory=dict)
     devices: dict[str, HardwareLocalState] = Field(default_factory=dict)
 
@@ -366,6 +370,7 @@ class ReferenceTopologySummary(BaseModel):
 
 class MappingRequest(BaseModel):
     hardware_id: str
+    secondary_hardware_id: Optional[str] = None
     branch_name: str
     edge_name: str
     target_branch_name: Optional[str] = None
@@ -374,11 +379,21 @@ class MappingRequest(BaseModel):
     interface_overrides: list["InterfaceOverride"] = Field(default_factory=list)
     saved_hardware: Optional[HardwareEdge] = None
 
+    @field_validator("secondary_hardware_id")
+    @classmethod
+    def clean_secondary_hardware_id(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        cleaned = value.strip()
+        return cleaned or None
+
 
 class InterfaceOverride(BaseModel):
     reference_interface: str
     hardware_interface: Optional[str] = None
     switch_vlans: list[int] = Field(default_factory=list)
+    tagged_vlans: list[int] = Field(default_factory=list)
+    untagged_vlan: Optional[int] = None
 
     @field_validator("reference_interface")
     @classmethod
@@ -396,23 +411,34 @@ class InterfaceOverride(BaseModel):
         cleaned = value.strip()
         return cleaned or None
 
-    @field_validator("switch_vlans")
+    @field_validator("switch_vlans", "tagged_vlans")
     @classmethod
     def validate_switch_vlans(cls, value: list[int]) -> list[int]:
         cleaned: list[int] = []
         seen: set[int] = set()
         for vlan in value:
             if vlan < 1 or vlan > 4094:
-                raise ValueError("switch_vlans values must be between 1 and 4094")
+                raise ValueError("VLAN values must be between 1 and 4094")
             if vlan not in seen:
                 cleaned.append(vlan)
                 seen.add(vlan)
         return cleaned
 
+    @field_validator("untagged_vlan")
+    @classmethod
+    def validate_untagged_vlan(cls, value: Optional[int]) -> Optional[int]:
+        if value is None:
+            return None
+        if value < 1 or value > 4094:
+            raise ValueError("VLAN values must be between 1 and 4094")
+        return value
+
     @model_validator(mode="after")
     def validate_switch_vlan_usage(self) -> "InterfaceOverride":
-        if self.hardware_interface is None and self.switch_vlans:
-            raise ValueError("switch_vlans require hardware_interface")
+        if self.hardware_interface is None and (
+            self.switch_vlans or self.tagged_vlans or self.untagged_vlan is not None
+        ):
+            raise ValueError("VLAN assignments require hardware_interface")
         return self
 
 
@@ -474,6 +500,7 @@ class GenerateResult(BaseModel):
     zip_path: str
     download_url: str
     can_configure_switches: bool = False
+    switch_config_only: bool = False
     mapping_statuses: list[GenerateMappingStatus] = Field(default_factory=list)
     messages: list[ValidationMessage] = Field(default_factory=list)
 
@@ -731,6 +758,93 @@ class SwitchCommandOverride(BaseModel):
         return cleaned
 
 
+SWITCH_CONFIG_ONLY_REFERENCE_ID = "__switch_config_only__"
+SWITCH_CONFIG_ONLY_BRANCH_NAME = "switch-config"
+
+
+class SwitchPortVlanAssignment(BaseModel):
+    hardware_interface: str
+    untagged_vlan: Optional[int] = None
+    tagged_vlans: list[int] = Field(default_factory=list)
+
+    @field_validator("hardware_interface")
+    @classmethod
+    def require_hardware_interface(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("hardware_interface is required")
+        return cleaned.upper()
+
+    @field_validator("untagged_vlan")
+    @classmethod
+    def validate_untagged_vlan(cls, value: Optional[int]) -> Optional[int]:
+        if value is None:
+            return None
+        if value < 1 or value > 4094:
+            raise ValueError("VLAN values must be between 1 and 4094")
+        return value
+
+    @field_validator("tagged_vlans")
+    @classmethod
+    def validate_tagged_vlans(cls, value: list[int]) -> list[int]:
+        cleaned: list[int] = []
+        seen: set[int] = set()
+        for vlan in value:
+            if vlan < 1 or vlan > 4094:
+                raise ValueError("VLAN values must be between 1 and 4094")
+            if vlan not in seen:
+                cleaned.append(vlan)
+                seen.add(vlan)
+        return cleaned
+
+    @model_validator(mode="after")
+    def drop_untagged_from_tagged(self) -> "SwitchPortVlanAssignment":
+        if self.untagged_vlan is not None:
+            self.tagged_vlans = [vlan for vlan in self.tagged_vlans if vlan != self.untagged_vlan]
+        return self
+
+    @property
+    def has_vlans(self) -> bool:
+        return self.untagged_vlan is not None or bool(self.tagged_vlans)
+
+
+class SwitchConfigMappingRequest(BaseModel):
+    hardware_id: str
+    secondary_hardware_id: Optional[str] = None
+    edge_ha_mode: Literal["ha", "single_active", "single_standby"] = "single_active"
+    interfaces: list[SwitchPortVlanAssignment] = Field(default_factory=list)
+
+    @field_validator("secondary_hardware_id")
+    @classmethod
+    def clean_secondary_hardware_id(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        cleaned = value.strip()
+        return cleaned or None
+
+
+class SwitchConfigOnlyRequest(BaseModel):
+    hypervisor_ip: str
+    hypervisor_interface: str
+    mappings: list[SwitchConfigMappingRequest]
+    requested_by: ActorIdentity
+
+    @field_validator("hypervisor_ip", "hypervisor_interface")
+    @classmethod
+    def require_hypervisor_values(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("hypervisor_ip and hypervisor_interface are required")
+        return cleaned
+
+    @field_validator("mappings")
+    @classmethod
+    def require_mappings(cls, value: list[SwitchConfigMappingRequest]) -> list[SwitchConfigMappingRequest]:
+        if not value:
+            raise ValueError("at least one mapping is required")
+        return value
+
+
 class SwitchConfigureRequest(BaseModel):
     dry_run: bool = False
     command_overrides: list[SwitchCommandOverride] = Field(default_factory=list)
@@ -745,6 +859,7 @@ class SwitchConfigureResult(BaseModel):
 
 class RunMappingMetadata(BaseModel):
     hardware_id: str
+    secondary_hardware_id: Optional[str] = None
     branch_name: str
     edge_name: str
     edge_ha_mode: Literal["topology_default", "ha", "single_active", "single_standby"] = "topology_default"
@@ -766,6 +881,7 @@ class RunMetadata(BaseModel):
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
     can_configure_switches: bool = False
+    switch_config_only: bool = False
     mapping_statuses: list[GenerateMappingStatus] = Field(default_factory=list)
     messages: list[ValidationMessage] = Field(default_factory=list)
     mappings: list[RunMappingMetadata] = Field(default_factory=list)

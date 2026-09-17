@@ -12,6 +12,7 @@ from typing import Any
 
 from .audit import append_audit_events
 from .config import INVENTORY_PATH, OUTPUTS_ROOT, REFERENCE_CONFIG_ROOT
+from .discovery import sync_inventory_for_generate
 from .inventory import (
     load_inventory,
     path_has_credentials,
@@ -25,7 +26,9 @@ from .models import (
     GenerateMappingStatus,
     HardwareAllocation,
     HardwareEdge,
+    HardwareMemberInfo,
     HardwarePortAllocation,
+    HardwareReservation,
     InterfaceOverride,
     InventoryDevice,
     InventoryFile,
@@ -41,6 +44,9 @@ from .reference import resolve_reference_path
 
 class GenerationError(ValueError):
     pass
+
+
+_WORKFLOW_RESERVATION_REASONS = {"topology-generation", "switch-config"}
 
 
 @dataclass(frozen=True)
@@ -61,10 +67,23 @@ def generate_topology(
     if not reference_path.exists():
         raise GenerationError(f"Reference topology does not exist: {request.reference_topology_id}")
 
+    selected_hardware_ids = list(
+        dict.fromkeys(
+            hardware_id
+            for mapping in request.mappings
+            for hardware_id in [mapping.hardware_id, mapping.secondary_hardware_id]
+            if hardware_id
+        )
+    )
+    sync_inventory_for_generate(
+        selected_hardware_ids,
+        inventory_path=inventory_path,
+    )
     inventory = load_inventory(inventory_path)
     hardware_by_id = {item.id: item for item in inventory.hardware}
     recovered_hardware_ids = _merge_saved_hardware_snapshots(request.mappings, hardware_by_id)
     _validate_request(request, hardware_by_id)
+    _validate_synced_hardware(request, hardware_by_id, recovered_hardware_ids)
 
     topology_suffix = uuid.uuid4().hex[:6]
     generated_topology_name = f"{request.topology_name}-{topology_suffix}"
@@ -126,7 +145,7 @@ def generate_topology(
         old_branch_name = branch["name"]
         old_edge_name = edge["name"]
         reference_ha_enabled = bool(edge.get("ha_enabled"))
-        mapping_view = _resolve_mapping_hardware_view(mapping, hardware, reference_ha_enabled, request)
+        mapping_view = _resolve_mapping_hardware_view(mapping, hardware, hardware_by_id, reference_ha_enabled, request)
         hardware = mapping_view.hardware
         new_branch_name = mapping.target_branch_name or (
             f"{old_branch_name}-{hardware.model_suffix}" if request.branch_rename else old_branch_name
@@ -203,6 +222,7 @@ def generate_topology(
         run_metadata.mappings.append(
             RunMappingMetadata(
                 hardware_id=mapping.hardware_id,
+                secondary_hardware_id=mapping.secondary_hardware_id,
                 branch_name=mapping.branch_name,
                 edge_name=mapping.edge_name,
                 edge_ha_mode=mapping.edge_ha_mode,
@@ -293,38 +313,84 @@ def generate_topology(
 
 def _validate_request(request: GenerateRequest, hardware_by_id: dict[str, HardwareEdge]) -> None:
     hardware_ids = [mapping.hardware_id for mapping in request.mappings]
+    secondary_hardware_ids = [mapping.secondary_hardware_id for mapping in request.mappings if mapping.secondary_hardware_id]
     target_edges = [(mapping.branch_name, mapping.edge_name) for mapping in request.mappings]
-    if len(hardware_ids) != len(set(hardware_ids)):
+    all_selected_hardware_ids = hardware_ids + secondary_hardware_ids
+    if len(all_selected_hardware_ids) != len(set(all_selected_hardware_ids)):
         raise GenerationError("A hardware inventory item can only be mapped once per run")
     if len(target_edges) != len(set(target_edges)):
         raise GenerationError("A target branch/edge can only be mapped once per run")
-    missing = [hardware_id for hardware_id in hardware_ids if hardware_id not in hardware_by_id]
+    missing = [hardware_id for hardware_id in all_selected_hardware_ids if hardware_id not in hardware_by_id]
     if missing:
         raise GenerationError(f"Unknown hardware inventory id: {', '.join(missing)}")
     for mapping in request.mappings:
         hardware = hardware_by_id[mapping.hardware_id]
-        if mapping.edge_ha_mode == "ha" and not hardware.ha:
-            raise GenerationError(f"{hardware.display_name} cannot be mapped as HA because it has no standby member")
+        secondary_hardware = hardware_by_id.get(mapping.secondary_hardware_id) if mapping.secondary_hardware_id else None
+        if mapping.edge_ha_mode == "ha":
+            if hardware.ha:
+                if mapping.secondary_hardware_id:
+                    raise GenerationError(
+                        f"{hardware.display_name} already has a standby member; do not select an additional standalone device."
+                    )
+            else:
+                if mapping.secondary_hardware_id is None:
+                    raise GenerationError(
+                        f"{hardware.display_name} cannot be mapped as HA without selecting an additional standalone device"
+                    )
+                _validate_secondary_ha_hardware(hardware, secondary_hardware)
+        elif mapping.secondary_hardware_id:
+            raise GenerationError(
+                f"Additional standalone hardware can only be selected when HA mode is enabled for {mapping.branch_name}/{mapping.edge_name}"
+            )
         if mapping.edge_ha_mode == "single_standby" and not hardware.standby_serial:
             raise GenerationError(f"{hardware.display_name} cannot be mapped as standby-only because it has no standby member")
+
+
+def _validate_synced_hardware(
+    request: GenerateRequest,
+    hardware_by_id: dict[str, HardwareEdge],
+    recovered_hardware_ids: set[str],
+) -> None:
+    for mapping in request.mappings:
+        if mapping.hardware_id in recovered_hardware_ids:
+            pass
+        hardware = hardware_by_id[mapping.hardware_id]
+        if not _topology_ports(hardware):
+            raise GenerationError(
+                f"Lab Navigator sync for {hardware.display_name} did not produce usable switch connection data, "
+                "and no saved hardware snapshot was available for recovery."
+            )
+        if mapping.secondary_hardware_id:
+            secondary_hardware = hardware_by_id[mapping.secondary_hardware_id]
+            if not _topology_ports(secondary_hardware):
+                raise GenerationError(
+                    f"Lab Navigator sync for {secondary_hardware.display_name} did not produce usable switch connection data."
+                )
 
 
 def _resolve_mapping_hardware_view(
     mapping: MappingRequest,
     hardware: HardwareEdge,
+    hardware_by_id: dict[str, HardwareEdge],
     reference_ha_enabled: bool,
     request: GenerateRequest,
 ) -> MappingHardwareView:
-    resolved_mode = _resolve_edge_ha_mode(mapping.edge_ha_mode, hardware, reference_ha_enabled)
-    view = hardware
+    secondary_hardware = hardware_by_id.get(mapping.secondary_hardware_id) if mapping.secondary_hardware_id else None
+    resolved_mode = _resolve_edge_ha_mode(mapping.edge_ha_mode, hardware, secondary_hardware, reference_ha_enabled)
+    pairing_secondary = bool(resolved_mode == "ha" and secondary_hardware and not hardware.ha)
+    base_hardware = (
+        _synthetic_ha_hardware_view(hardware, secondary_hardware)
+        if pairing_secondary
+        else hardware
+    )
+    view = base_hardware
     if resolved_mode == "single_active":
-        view = _single_member_hardware_view(hardware, "active")
+        view = _single_member_hardware_view(base_hardware, "active")
     elif resolved_mode == "single_standby":
-        view = _single_member_hardware_view(hardware, "standby")
+        view = _single_member_hardware_view(base_hardware, "standby")
 
-    if not _mapping_view_is_available(hardware, resolved_mode, request):
-        member = _member_info(hardware, "standby" if resolved_mode == "single_standby" else "active")
-        reservation = member.reservation if member else hardware.reservation
+    if not _mapping_view_is_available(base_hardware, resolved_mode, request):
+        display_name, reservation = _unavailable_mapping_target(base_hardware, resolved_mode, request)
         reservation_actor = reservation.actor if reservation else None
         reserved_by = (
             f"{reservation_actor.name} ({reservation_actor.email})"
@@ -332,32 +398,179 @@ def _resolve_mapping_hardware_view(
             else "another user"
         )
         raise GenerationError(
-            f"{hardware.display_name} is currently reserved for the selected HA mode. "
+            f"{display_name} is currently reserved for the selected HA mode. "
             f"Mark it available before generating again. Reserved by {reserved_by}."
         )
 
     ports = _topology_ports(view)
     if not ports:
-        raise GenerationError(f"No connected switch ports found for {hardware.id} in {resolved_mode} mode")
+        raise GenerationError(f"No connected switch ports found for {base_hardware.id} in {resolved_mode} mode")
     return MappingHardwareView(
         hardware=view,
         resolved_mode=resolved_mode,
-        reserved_device_ids=_reserved_device_ids_for_mode(hardware, resolved_mode),
+        reserved_device_ids=_reserved_device_ids_for_mode(base_hardware, resolved_mode),
     )
 
 
-def _resolve_edge_ha_mode(requested_mode: str, hardware: HardwareEdge, reference_ha_enabled: bool) -> str:
+def _resolve_edge_ha_mode(
+    requested_mode: str,
+    hardware: HardwareEdge,
+    secondary_hardware: HardwareEdge | None,
+    reference_ha_enabled: bool,
+) -> str:
     if requested_mode == "topology_default":
-        return "ha" if reference_ha_enabled and hardware.ha else "single_active"
+        return "ha" if reference_ha_enabled and (hardware.ha or secondary_hardware is not None) else "single_active"
     if requested_mode == "ha":
-        if not hardware.ha:
-            raise GenerationError(f"{hardware.display_name} cannot be mapped as HA because it has no standby member")
+        if not hardware.ha and secondary_hardware is None:
+            raise GenerationError(
+                f"{hardware.display_name} cannot be mapped as HA because it has no standby member and no additional standalone device was selected"
+            )
         return "ha"
     if requested_mode == "single_standby":
         if not hardware.ha or not hardware.standby_serial:
             raise GenerationError(f"{hardware.display_name} cannot be mapped as standby-only because it has no standby member")
         return "single_standby"
     return "single_active"
+
+
+def _validate_secondary_ha_hardware(primary: HardwareEdge, secondary: HardwareEdge | None) -> None:
+    if secondary is None:
+        raise GenerationError(f"{primary.display_name} requires an additional standalone device for HA mode")
+    if secondary.id == primary.id:
+        raise GenerationError("Primary and secondary standalone hardware must be different")
+    if primary.ha or secondary.ha:
+        raise GenerationError("Only standalone hardware can be combined into a generated HA pair")
+    if primary.model_suffix != secondary.model_suffix:
+        raise GenerationError(
+            f"{primary.display_name} and {secondary.display_name} cannot be combined as HA because their models differ"
+        )
+
+
+def _synthetic_ha_hardware_view(primary: HardwareEdge, secondary: HardwareEdge) -> HardwareEdge:
+    _validate_secondary_ha_hardware(primary, secondary)
+    ports = _merge_standalone_ports_to_ha(primary, secondary)
+    switches = _merge_switch_metadata(primary, secondary)
+    members = [
+        _standalone_member_info(primary, "active"),
+        _standalone_member_info(secondary, "standby"),
+    ]
+    available = primary.available and secondary.available
+    reservation = None if available else (primary.reservation or secondary.reservation)
+    return primary.model_copy(
+        deep=True,
+        update={
+            "display_name": f"HA Pair {primary.display_name} + {secondary.display_name}",
+            "ha": True,
+            "standby_serial": secondary.active_serial,
+            "switch": switches[0] if switches else None,
+            "switches": switches,
+            "ports": ports,
+            "members": members,
+            "available": available,
+            "reservation": reservation,
+            "notes": _join_hardware_notes(primary.notes, secondary.notes),
+        },
+    )
+
+
+def _merge_standalone_ports_to_ha(primary: HardwareEdge, secondary: HardwareEdge):
+    primary_by_interface = {port.logical_interface.upper(): port for port in primary.ports}
+    secondary_by_interface = {port.logical_interface.upper(): port for port in secondary.ports}
+    ordered_interfaces = list(dict.fromkeys([
+        *(port.logical_interface.upper() for port in primary.ports),
+        *(port.logical_interface.upper() for port in secondary.ports),
+    ]))
+    merged_ports = []
+    for logical_interface in ordered_interfaces:
+        primary_port = primary_by_interface.get(logical_interface)
+        secondary_port = secondary_by_interface.get(logical_interface)
+        base_port = primary_port or secondary_port
+        if base_port is None:
+            continue
+        warning = None
+        manual_mapping_required = False
+        if primary_port is None or secondary_port is None:
+            manual_mapping_required = True
+            warning = (
+                f"{logical_interface} has only an active-member switch connection. Review interface mapping before generation."
+                if primary_port is not None
+                else f"{logical_interface} has only a standby-member switch connection. Review interface mapping before generation."
+            )
+        elif _port_vlan_signature(primary_port) != _port_vlan_signature(secondary_port):
+            manual_mapping_required = True
+            warning = (
+                f"{logical_interface} active and standby VLAN mappings differ. Review interface mapping before generation."
+            )
+        active_switch_name = (
+            primary_port.switch_name if primary_port and primary_port.switch_name else (secondary_port.switch_name if secondary_port else None)
+        )
+        standby_switch_name = secondary_port.switch_name if secondary_port and secondary_port.switch_name else None
+        merged_ports.append(
+            base_port.model_copy(
+                deep=True,
+                update={
+                    "switch_name": active_switch_name,
+                    "switch_standby_name": (
+                        standby_switch_name
+                        if standby_switch_name and standby_switch_name != active_switch_name
+                        else None
+                    ),
+                    "switch_active_port": primary_port.switch_active_port if primary_port else None,
+                    "switch_standby_port": (
+                        secondary_port.switch_active_port if secondary_port and secondary_port.switch_active_port else secondary_port.switch_standby_port if secondary_port else None
+                    ),
+                    "switch_vlans": list(primary_port.switch_vlans if primary_port else secondary_port.switch_vlans),
+                    "tagged_vlans": list(primary_port.tagged_vlans if primary_port else secondary_port.tagged_vlans),
+                    "untagged_vlan": primary_port.untagged_vlan if primary_port else secondary_port.untagged_vlan,
+                    "manual_mapping_required": manual_mapping_required,
+                    "port_warning": warning,
+                },
+            )
+        )
+    return merged_ports
+
+
+def _port_vlan_signature(port) -> tuple[tuple[int, ...], tuple[int, ...], int | None]:
+    return (tuple(port.switch_vlans), tuple(port.tagged_vlans), port.untagged_vlan)
+
+
+def _merge_switch_metadata(primary: HardwareEdge, secondary: HardwareEdge) -> list[Any]:
+    merged = []
+    seen = set()
+    for switch in [
+        *(primary.switches or ([] if primary.switch is None else [primary.switch])),
+        *(secondary.switches or ([] if secondary.switch is None else [secondary.switch])),
+    ]:
+        key = (switch.name, switch.connections.ip if switch.connections else None)
+        if key in seen:
+            continue
+        seen.add(key)
+        merged.append(switch)
+    return merged
+
+
+def _standalone_member_info(hardware: HardwareEdge, role: str):
+    member = _member_info(hardware, "active") or _member_info(hardware, "standby")
+    device_id = member.device_id if member else hardware.id
+    display_name = member.display_name if member else hardware.display_name
+    serial_number = member.serial_number if member and member.serial_number else hardware.active_serial
+    available = member.available if member else hardware.available
+    reservation = member.reservation if member else hardware.reservation
+    lab_navigator_id = member.lab_navigator_id if member else None
+    return member.model_copy(deep=True, update={"role": role}) if member else HardwareMemberInfo(
+        role=role,
+        device_id=device_id,
+        display_name=display_name,
+        serial_number=serial_number,
+        lab_navigator_id=lab_navigator_id,
+        available=available,
+        reservation=reservation,
+    )
+
+
+def _join_hardware_notes(*notes: str | None) -> str | None:
+    values = [note for note in notes if note]
+    return " ".join(values) if values else None
 
 
 def _single_member_hardware_view(hardware: HardwareEdge, role: str) -> HardwareEdge:
@@ -369,7 +582,14 @@ def _single_member_hardware_view(hardware: HardwareEdge, role: str) -> HardwareE
                 "standby_serial": None,
                 "display_name": f"{hardware.display_name} active member" if hardware.ha else hardware.display_name,
                 "ports": [
-                    port.model_copy(deep=True, update={"switch_standby_port": None, "manual_mapping_required": False})
+                    port.model_copy(
+                        deep=True,
+                        update={
+                            "switch_standby_name": None,
+                            "switch_standby_port": None,
+                            "manual_mapping_required": False,
+                        },
+                    )
                     for port in hardware.ports
                     if port.switch_active_port
                 ],
@@ -391,6 +611,8 @@ def _single_member_hardware_view(hardware: HardwareEdge, role: str) -> HardwareE
                 port.model_copy(
                     deep=True,
                     update={
+                        "switch_name": port.switch_standby_name or port.switch_name,
+                        "switch_standby_name": None,
                         "switch_active_port": port.switch_standby_port,
                         "switch_standby_port": None,
                         "manual_mapping_required": False,
@@ -406,17 +628,31 @@ def _single_member_hardware_view(hardware: HardwareEdge, role: str) -> HardwareE
 
 def _mapping_view_is_available(hardware: HardwareEdge, resolved_mode: str, request: GenerateRequest) -> bool:
     if resolved_mode == "ha":
+        if hardware.members:
+            return all(_member_is_available_for_request(member, request) for member in hardware.members)
         return _hardware_is_available_for_request(hardware, request)
     role = "standby" if resolved_mode == "single_standby" else "active"
     member = _member_info(hardware, role)
     if not member:
         return _hardware_is_available_for_request(hardware, request)
-    if member.available:
-        return True
-    reservation = member.reservation
-    if reservation is None or reservation.reason != "topology-generation":
-        return False
-    return reservation.actor.email == request.requested_by.email
+    return _member_is_available_for_request(member, request)
+
+
+def _unavailable_mapping_target(
+    hardware: HardwareEdge,
+    resolved_mode: str,
+    request: GenerateRequest,
+) -> tuple[str, HardwareReservation | None]:
+    if resolved_mode == "ha" and hardware.members:
+        for member in hardware.members:
+            if not _member_is_available_for_request(member, request):
+                return member.display_name, member.reservation
+    elif resolved_mode != "ha":
+        role = "standby" if resolved_mode == "single_standby" else "active"
+        member = _member_info(hardware, role)
+        if member and not _member_is_available_for_request(member, request):
+            return member.display_name, member.reservation
+    return hardware.display_name, hardware.reservation
 
 
 def _reserved_device_ids_for_mode(hardware: HardwareEdge, resolved_mode: str) -> list[str]:
@@ -433,13 +669,23 @@ def _member_info(hardware: HardwareEdge, role: str):
     return next((member for member in hardware.members if member.role == role), None)
 
 
+def _member_is_available_for_request(member: HardwareMemberInfo, request: GenerateRequest) -> bool:
+    if member.available:
+        return True
+    return _reservation_usable_by_request(member.reservation, request)
+
+
 def _hardware_is_available_for_request(hardware: HardwareEdge, request: GenerateRequest) -> bool:
     if hardware.available:
         return True
-    reservation = hardware.reservation
-    if reservation is None or reservation.reason != "topology-generation":
+    return _reservation_usable_by_request(hardware.reservation, request)
+
+
+def _reservation_usable_by_request(reservation, request: GenerateRequest) -> bool:
+    if reservation is None or reservation.reason not in _WORKFLOW_RESERVATION_REASONS:
         return False
-    return reservation.actor.email == request.requested_by.email
+    requester = request.requested_by.email if request.requested_by else None
+    return bool(requester) and reservation.actor.email == requester
 
 
 def _merge_saved_hardware_snapshots(
@@ -909,6 +1155,7 @@ def _port_allocation_from_port(
         logical_interface=port.logical_interface,
         link=port.link,
         switch_name=_allocation_switch_name(hardware, port),
+        switch_standby_name=port.switch_standby_name,
         switch_active_port=port.switch_active_port,
         switch_standby_port=port.switch_standby_port,
         switch_vlans=switch_vlans,
@@ -943,6 +1190,7 @@ def _port_allocation_from_override(
             logical_interface=port.logical_interface,
             link=port.link,
             switch_name=_allocation_switch_name(hardware, port),
+            switch_standby_name=port.switch_standby_name,
             switch_active_port=port.switch_active_port,
             switch_standby_port=port.switch_standby_port,
             switch_vlans=list(switch_vlans),
@@ -962,6 +1210,7 @@ def _port_allocation_from_override(
         logical_interface=port.logical_interface,
         link=port.link,
         switch_name=_allocation_switch_name(hardware, port),
+        switch_standby_name=port.switch_standby_name,
         switch_active_port=port.switch_active_port,
         switch_standby_port=port.switch_standby_port,
         switch_vlans=list(switch_vlans),
@@ -1275,7 +1524,10 @@ def _build_l2_switches(
                 }
             )
         if hardware.ha and port.switch_standby_port:
-            interfaces_by_switch[switch_name].append(
+            standby_switch_name = port.switch_standby_name or switch_name
+            if standby_switch_name not in interfaces_by_switch:
+                standby_switch_name = switch_name
+            interfaces_by_switch[standby_switch_name].append(
                 {
                     "name": port.switch_standby_port,
                     "link": f"standby_{port.link}",

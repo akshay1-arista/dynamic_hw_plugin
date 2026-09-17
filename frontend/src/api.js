@@ -121,6 +121,13 @@ export function generateTopology(payload) {
   });
 }
 
+export function createSwitchConfigRun(payload) {
+  return request('/api/switch-config-runs', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
 export function updateHardwareAvailability(hardwareId, available, requestedBy) {
   return request(`/api/hardware/${hardwareId}/availability`, {
     method: 'POST',

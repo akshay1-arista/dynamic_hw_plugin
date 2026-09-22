@@ -200,6 +200,79 @@ def test_inventory_import_apply_adds_ha_pair_with_wiremap(tmp_path):
     assert any(device.type == "hypervisor" and device.display_name == "esxi-01" for device in result.inventory.devices.values())
 
 
+class FlakyAccessSwitchClient(ImportLabNavigatorClient):
+    def get_wiremap(self, device_id):
+        if device_id == 11:
+            raise DiscoveryError("Lab Navigator request failed with HTTP 502 for /api/device/11/wiremap")
+        return super().get_wiremap(device_id)
+
+
+def test_inventory_import_keeps_edge_when_access_switch_wiremap_fails(tmp_path):
+    result = apply_inventory_import(
+        HardwareImportRequest.model_validate({"targets": [{"lab_navigator_id": 101}]}),
+        inventory_path=empty_inventory_path(tmp_path),
+        client=FlakyAccessSwitchClient(),
+    )
+
+    assert "edge-active" in {device.display_name for device in result.inventory.devices.values()}
+    assert "access-sw" in {device.display_name for device in result.inventory.devices.values()}
+    assert any(connection.role == "edge-access" for connection in result.inventory.connections)
+    assert result.summary.status == "partial"
+    assert "skipped switch wiremaps: access-sw" in result.summary.targets[0].labels
+
+
+class DownstreamFlakySwitchClient(ImportLabNavigatorClient):
+    def __init__(self):
+        self.devices = {
+            **ImportLabNavigatorClient.devices,
+            22: {
+                "id": 22,
+                "name": "agg-sw",
+                "ip_address": "10.0.0.11",
+                "device_type": "switch",
+                "device_model": "Dell-4048",
+            },
+        }
+        self.wiremap_ids: list[int] = []
+
+    def get_wiremap(self, device_id):
+        self.wiremap_ids.append(device_id)
+        if device_id == 22:
+            raise DiscoveryError("Lab Navigator request failed with HTTP 502 for /api/device/22/wiremap")
+        if device_id == 11:
+            return {
+                "connections": [
+                    {
+                        "interface_name": "Gi1/48",
+                        "remote_device": self.devices[33],
+                        "remote_interface_name": "vmnic0",
+                    },
+                    {
+                        "interface_name": "Gi1/52",
+                        "remote_device": self.devices[22],
+                        "remote_interface_name": "Te1/49",
+                    },
+                ]
+            }
+        return super().get_wiremap(device_id)
+
+
+def test_inventory_import_skips_failed_downstream_switch_wiremap(tmp_path):
+    client = DownstreamFlakySwitchClient()
+    result = apply_inventory_import(
+        HardwareImportRequest.model_validate({"targets": [{"lab_navigator_id": 101}]}),
+        inventory_path=empty_inventory_path(tmp_path),
+        client=client,
+    )
+
+    assert 22 in client.wiremap_ids
+    assert "edge-active" in {device.display_name for device in result.inventory.devices.values()}
+    assert "access-sw" in {device.display_name for device in result.inventory.devices.values()}
+    assert any(device.type == "hypervisor" and device.display_name == "esxi-01" for device in result.inventory.devices.values())
+    assert result.summary.status == "partial"
+    assert "skipped switch wiremaps: agg-sw" in result.summary.targets[0].labels
+
+
 def test_inventory_import_apply_adds_server_and_switch_wiremap(tmp_path):
     result = apply_inventory_import(
         HardwareImportRequest.model_validate({"targets": [{"lab_navigator_id": 33}]}),

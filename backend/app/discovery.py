@@ -533,13 +533,19 @@ def _discover_import_root_subgraph(
     stats = RefreshBuildStats()
     queue: deque[tuple[InventoryDevice, dict[str, Any]]] = deque([(root, _resolve_inventory_device(client, root))])
     visited_lab_navigator_ids: set[int] = set()
+    skipped_switch_wiremaps: list[str] = []
 
     while queue:
         current_device, ln_device = queue.popleft()
         if ln_device["id"] in visited_lab_navigator_ids:
             continue
         visited_lab_navigator_ids.add(ln_device["id"])
-        for item in client.get_wiremap(ln_device["id"]).get("connections", []):
+        required = current_device.id == root.id
+        wiremap = _try_get_wiremap(client, ln_device["id"], required=required)
+        if wiremap is None:
+            skipped_switch_wiremaps.append(_wiremap_device_label(ln_device, current_device))
+            continue
+        for item in wiremap.get("connections", []):
             remote_device = _resolve_wiremap_remote_device(client, item)
             if not remote_device:
                 continue
@@ -561,12 +567,15 @@ def _discover_import_root_subgraph(
             if remote_inventory_device.type == "switch" and remote_device["id"] not in visited_lab_navigator_ids:
                 queue.append((remote_inventory_device, remote_device))
 
+    labels = []
+    if skipped_switch_wiremaps:
+        labels.append("skipped switch wiremaps: " + ", ".join(sorted(skipped_switch_wiremaps)))
     stats.target_statuses.append(
         InventoryRefreshTargetStatus(
             hardware_id=target_id,
             hardware_display_name=target_display_name,
-            status="success",
-            labels=[],
+            status="partial" if labels else "success",
+            labels=labels,
         )
     )
     return refreshed_ids, discovered_devices, discovered_connections, stats
@@ -706,6 +715,7 @@ def _discover_lab_navigator_subgraph(
     # the set of directly connected switches. Issues here are reported as partial failures.
     switch_queue: deque[tuple[InventoryDevice, dict[str, Any]]] = deque()
     visited_lab_navigator_ids: set[int] = set()
+    skipped_switch_wiremaps: list[str] = []
     for edge in root_edges:
         ln_edge = _resolve_inventory_device(client, edge)
         _log(
@@ -717,7 +727,8 @@ def _discover_lab_navigator_subgraph(
         )
         visited_lab_navigator_ids.add(ln_edge["id"])
         _log(logging.INFO, "Walking edge wiremap for inventory_device=%s lab_navigator_id=%s", edge.id, ln_edge["id"])
-        for item in client.get_wiremap(ln_edge["id"]).get("connections", []):
+        wiremap = _try_get_wiremap(client, ln_edge["id"], required=True)
+        for item in wiremap.get("connections", []):
             interface_name = _edge_interface_name(item)
             remote_name = _wiremap_remote_name(item)
             remote_device = _resolve_wiremap_remote_device(client, item)
@@ -787,6 +798,7 @@ def _discover_lab_navigator_subgraph(
     # Phase 2: BFS through the switch subgraph to find switch-uplink and hypervisor-access
     # connections. Issues here (unresolved/unsupported ports on switches) are not counted as
     # partial failures for the hardware group — they are noise from the switch's full port list.
+    # A missing switch wiremap is different: skip that switch instead of aborting the import.
     while switch_queue:
         current_switch, ln_switch = switch_queue.popleft()
         _log(
@@ -795,7 +807,17 @@ def _discover_lab_navigator_subgraph(
             current_switch.id,
             ln_switch["id"],
         )
-        for item in client.get_wiremap(ln_switch["id"]).get("connections", []):
+        wiremap = _try_get_wiremap(client, ln_switch["id"], required=False)
+        if wiremap is None:
+            skipped_switch_wiremaps.append(_wiremap_device_label(ln_switch, current_switch))
+            _log(
+                logging.WARNING,
+                "Skipping switch wiremap for inventory_device=%s lab_navigator_id=%s because Lab Navigator request failed",
+                current_switch.id,
+                ln_switch["id"],
+            )
+            continue
+        for item in wiremap.get("connections", []):
             remote_device = _resolve_wiremap_remote_device(client, item)
             if not remote_device:
                 _log(
@@ -852,6 +874,8 @@ def _discover_lab_navigator_subgraph(
         # Unsupported peer types (other edges, WAN peers) and missing interface
         # data are expected for WAN/SFP ports and are not surfaced as warnings.
         labels.append(f"unresolved interfaces: {', '.join(sorted(unresolved_interfaces, key=_refresh_issue_sort_key))}")
+    if skipped_switch_wiremaps:
+        labels.append("skipped switch wiremaps: " + ", ".join(sorted(skipped_switch_wiremaps)))
     stats.target_statuses.append(
         InventoryRefreshTargetStatus(
             hardware_id=hardware_id,
@@ -861,6 +885,19 @@ def _discover_lab_navigator_subgraph(
         )
     )
     return refreshed_ids, discovered_devices, discovered_connections, stats
+
+
+def _try_get_wiremap(client: LabNavigatorClient, device_id: int, *, required: bool) -> dict[str, Any] | None:
+    try:
+        return client.get_wiremap(device_id)
+    except DiscoveryError:
+        if required:
+            raise
+        return None
+
+
+def _wiremap_device_label(ln_device: dict[str, Any], inventory_device: InventoryDevice | None = None) -> str:
+    return str(ln_device.get("name") or (inventory_device.display_name if inventory_device else "") or ln_device.get("id"))
 
 
 def _wiremap_remote_inventory_device(

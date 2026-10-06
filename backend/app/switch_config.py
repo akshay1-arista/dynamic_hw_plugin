@@ -30,7 +30,8 @@ class SwitchConfigError(GenerationError):
 
 
 SSH_CONNECT_TIMEOUT_SECONDS = 10
-SSH_COMMAND_TIMEOUT_SECONDS = 20
+# OS10 switches such as the 4148 can take ~40s to return one interface lookup.
+SSH_COMMAND_TIMEOUT_SECONDS = 60
 
 
 def configure_switches_for_run(

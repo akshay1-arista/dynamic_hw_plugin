@@ -1148,6 +1148,11 @@ def _find_unrelated_wiremap_endpoint_conflict(
             continue
         if _connection_touches_requested_edges(existing, requested_edge_ids):
             continue
+        # Switch uplinks and hypervisor links are rediscovered from the switch wiremap.
+        # Only another edge's access port is preserved; a current Lab Navigator cable
+        # replaces a stale uplink or hypervisor link on the same switch port.
+        if _connection_role(existing) != "edge-access":
+            continue
         return existing
     return None
 
@@ -1346,6 +1351,12 @@ def _connection_within_inventory_ids(
         }
         endpoint_ids = {endpoint_id for endpoint_id in endpoint_ids if endpoint_id}
     return bool(endpoint_ids) and endpoint_ids <= inventory_device_ids
+
+
+def _connection_role(connection: InventoryConnection | dict[str, Any]) -> str:
+    if isinstance(connection, InventoryConnection):
+        return connection.role or ""
+    return str(connection.get("role") or "")
 
 
 def _connection_touches_requested_edges(

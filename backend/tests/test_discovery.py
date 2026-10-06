@@ -1055,6 +1055,114 @@ def test_inventory_refresh_apply_preserves_unrelated_hardware_when_wiremap_ports
     assert "Preserved existing inventory links where Lab Navigator reported overlapping switch ports." in warning_messages
 
 
+def test_inventory_refresh_replaces_stale_switch_uplink_with_hypervisor_link(tmp_path):
+    class RecabledHypervisorStubClient:
+        def close(self):
+            return None
+
+        def get_wiremap(self, device_id):
+            if device_id == 101:
+                return {
+                    "connections": [
+                        {
+                            "interface_name": "GE1",
+                            "remote_device": {
+                                "id": 11,
+                                "name": "access-sw",
+                                "ip_address": "10.0.0.10",
+                                "device_type": "switch",
+                                "device_model": "Dell-4148",
+                            },
+                            "remote_interface_name": "Gi1/10",
+                        }
+                    ]
+                }
+            if device_id == 11:
+                return {
+                    "connections": [
+                        {
+                            "interface_name": "Eth1/1/43",
+                            "remote_device": {
+                                "id": 865,
+                                "name": "chn-rnd-srv-640-242",
+                                "ip_address": "10.68.137.135",
+                                "device_type": "server",
+                                "device_model": "Dell-R640",
+                            },
+                            "remote_interface_name": "vmnic0",
+                        }
+                    ]
+                }
+            return {"connections": []}
+
+    inventory_path = tmp_path / "inventory.json"
+    inventory_path.write_text(
+        json.dumps(
+            {
+                "devices": {
+                    "edge-1-active": {
+                        "id": "edge-1-active",
+                        "type": "edge",
+                        "display_name": "chn-rnd-edge-3800-12",
+                        "model": "edge3X00",
+                        "serial_number": "16C10Q2",
+                        "lab_navigator_id": 101,
+                        "ha_group_id": "edge-1",
+                        "ha_role": "active",
+                    },
+                    "access_sw": {
+                        "id": "access_sw",
+                        "type": "switch",
+                        "display_name": "access-sw",
+                        "model": "Dell-4148",
+                        "ip_address": "10.0.0.10",
+                        "lab_navigator_id": 11,
+                        "switch_metadata": {
+                            "name": "access-sw",
+                            "model": "Dell-4148",
+                            "connections": {"ip": "10.0.0.10", "port": None},
+                            "credentials": {"username": "velocloud", "password": "N#1sdwan"},
+                        },
+                    },
+                    "other_sw": {
+                        "id": "other_sw",
+                        "type": "switch",
+                        "display_name": "other-sw",
+                        "model": "Dell-3248",
+                        "ip_address": "10.0.0.12",
+                        "lab_navigator_id": 233,
+                    },
+                },
+                "connections": [
+                    {
+                        "id": "stale-uplink",
+                        "a": {"device_id": "other_sw", "interface": "eth1/1/49"},
+                        "b": {"device_id": "access_sw", "interface": "eth1/1/43"},
+                        "role": "switch-uplink",
+                        "notes": "Imported from Lab Navigator wiremap.",
+                    }
+                ],
+            }
+        )
+    )
+
+    result = apply_inventory_refresh(
+        InventoryRefreshRequest(hardware_ids=["edge-1"]),
+        inventory_path=inventory_path,
+        client=RecabledHypervisorStubClient(),
+    )
+
+    roles = {
+        (connection.role, connection.a.device_id, connection.a.interface, connection.b.device_id, connection.b.interface)
+        for connection in result.inventory.connections
+    }
+    hypervisor = next(device for device in result.inventory.devices.values() if device.ip_address == "10.68.137.135")
+    assert ("switch-uplink", "other_sw", "eth1/1/49", "access_sw", "eth1/1/43") not in roles
+    assert ("hypervisor-access", "access_sw", "eth1/1/43", hypervisor.id, "vmnic0") in roles
+    assert result.summary.skipped_conflicting_endpoint_count == 0
+    assert result.summary.status == "success"
+
+
 def test_lab_navigator_client_allows_anonymous_reads():
     client = LabNavigatorClient(api_key="")
     try:

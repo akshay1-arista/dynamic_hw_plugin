@@ -337,7 +337,8 @@ def _apply_path_transport(
             else:
                 next_hop = path.hops[i + 1]
                 next_device = hop_devices[i + 1]
-                vlans = hypervisor_transport_vlans if not is_access else access_transport_vlans
+                # VLANs that start on the upstream switch do not cross this hop.
+                vlans = access_transport_vlans
                 _add_shared_port(
                     hop_state,
                     hop.egress_port,
@@ -345,8 +346,7 @@ def _apply_path_transport(
                 )
                 _add_shared_transport(hop_state, hop.egress_port, vlans)
                 _add_shared_cleanup_vlans(hop_state, hop.egress_port, vlans)
-                if is_access:
-                    _add_access_uplink_vlan_state(hop_state, hop.egress_port, vlans)
+                _add_access_uplink_vlan_state(hop_state, hop.egress_port, vlans)
 
         if hop.ingress_port and not is_access:
             prev_hop = path.hops[i - 1]
@@ -367,6 +367,7 @@ def _apply_path_transport(
             )
             _add_shared_transport(hop_state, hop.ingress_port, vlans)
             _add_shared_cleanup_vlans(hop_state, hop.ingress_port, vlans)
+            _add_access_uplink_vlan_state(hop_state, hop.ingress_port, vlans)
 
 
 def _allocation_switch_names(port: HardwarePortAllocation) -> list[str]:
@@ -536,6 +537,7 @@ def _add_access_uplink_vlan_state(
     interface_name: str,
     transported_vlans: list[int],
 ) -> None:
+    """Record OS9 tagged membership for a transit port. OS10 reads port_configs instead."""
     if state["family"] != "os9":
         return
     for vlan in transported_vlans:

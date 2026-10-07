@@ -246,6 +246,192 @@ interface Vlan 103
     assert " tagged TenGigabitEthernet 1/9,1/43" in upstream_commands
 
 
+def test_configure_switches_tags_access_vlans_on_middle_os9_switch(tmp_path, monkeypatch):
+    inventory = InventoryFile.model_validate(
+        {
+            "devices": {
+                "access_sw": {
+                    "id": "access_sw",
+                    "type": "switch",
+                    "display_name": "chn-rnd-sw-3048-29",
+                    "model": "Dell-3048",
+                    "ip_address": "10.0.0.10",
+                    "switch_metadata": {
+                        "name": "chn-rnd-sw-3048-29",
+                        "model": "Dell-3048",
+                        "os_family": "os9",
+                        "connections": {"ip": "10.0.0.10", "port": None},
+                        "credentials": {"username": "velocloud", "password": "N#1sdwan"},
+                    },
+                },
+                "middle_sw": {
+                    "id": "middle_sw",
+                    "type": "switch",
+                    "display_name": "chn-rnd-sw-4048-12",
+                    "model": "Dell-4048",
+                    "ip_address": "10.0.0.11",
+                    "switch_metadata": {
+                        "name": "chn-rnd-sw-4048-12",
+                        "model": "Dell-4048",
+                        "os_family": "os9",
+                        "connections": {"ip": "10.0.0.11", "port": None},
+                        "credentials": {"username": "velocloud", "password": "N#1sdwan"},
+                    },
+                },
+                "upstream_sw": {
+                    "id": "upstream_sw",
+                    "type": "switch",
+                    "display_name": "chn-rnd-sw-4148-5",
+                    "model": "Dell-4148",
+                    "ip_address": "10.0.0.12",
+                    "switch_metadata": {
+                        "name": "chn-rnd-sw-4148-5",
+                        "model": "Dell-4148",
+                        "os_family": "os10",
+                        "connections": {"ip": "10.0.0.12", "port": None},
+                        "credentials": {"username": "velocloud", "password": "N#1sdwan"},
+                    },
+                },
+                "esxi_01": {
+                    "id": "esxi_01",
+                    "type": "hypervisor",
+                    "display_name": "chn-rnd-srv-640-242",
+                    "ip_address": "10.68.137.135",
+                },
+            },
+            "connections": [],
+            "hardware": [
+                {
+                    "id": "edge-3800",
+                    "display_name": "chn-rnd-edge-3800-11",
+                    "model": "edge3X00",
+                    "model_suffix": "3800",
+                    "ha": False,
+                    "active_serial": "14DQ363",
+                    "switch": {
+                        "name": "chn-rnd-sw-3048-29",
+                        "model": "Dell-3048",
+                        "os_family": "os9",
+                        "connections": {"ip": "10.0.0.10", "port": None},
+                        "credentials": {"username": "velocloud", "password": "N#1sdwan"},
+                    },
+                    "ports": [],
+                    "path": {
+                        "hops": [
+                            {
+                                "switch_id": "access_sw",
+                                "switch_name": "chn-rnd-sw-3048-29",
+                                "egress_port": "tengigabitethernet1/51",
+                            },
+                            {
+                                "switch_id": "middle_sw",
+                                "switch_name": "chn-rnd-sw-4048-12",
+                                "ingress_port": "tengigabitethernet1/43",
+                                "egress_port": "tengigabitethernet1/39",
+                            },
+                            {
+                                "switch_id": "upstream_sw",
+                                "switch_name": "chn-rnd-sw-4148-5",
+                                "ingress_port": "eth1/1/52",
+                                "egress_port": "eth1/1/43",
+                            },
+                        ],
+                        "hypervisor_id": "esxi_01",
+                        "hypervisor_name": "chn-rnd-srv-640-242",
+                        "hypervisor_ip": "10.68.137.135",
+                        "complete": True,
+                    },
+                }
+            ],
+        }
+    )
+    run_root = tmp_path / "outputs" / "run123-abcdef"
+    run_root.mkdir(parents=True)
+    (run_root / "run_metadata.json").write_text(
+        json.dumps(
+            {
+                "run_id": "run123",
+                "topology_name": "topo-1",
+                "reference_topology_id": "3-site/spirent",
+                "mappings": [
+                    {
+                        "hardware_id": "edge-3800",
+                        "branch_name": "branch1",
+                        "edge_name": "edge1",
+                        "path": inventory.hardware[0].path.model_dump(mode="json"),
+                        "allocations": [
+                            {
+                                "reference_interface": "GE4",
+                                "logical_interface": "GE4",
+                                "link": "cr2e1",
+                                "switch_name": "chn-rnd-sw-3048-29",
+                                "switch_active_port": "gigabitethernet1/3",
+                                "switch_vlans": [106],
+                                "tagged_vlans": [],
+                                "untagged_vlan": 106,
+                                "segment_vlans": {},
+                            },
+                            {
+                                "reference_interface": "SFP1",
+                                "logical_interface": "SFP1",
+                                "link": "sfp1",
+                                "switch_name": "chn-rnd-sw-4148-5",
+                                "switch_active_port": "eth1/1/23",
+                                "switch_vlans": [107, 108],
+                                "tagged_vlans": [108],
+                                "untagged_vlan": 107,
+                                "segment_vlans": {},
+                            },
+                        ],
+                    }
+                ],
+            }
+        )
+    )
+
+    monkeypatch.setattr("app.switch_config.load_inventory", lambda _path: inventory)
+    monkeypatch.setattr(
+        "app.switch_config._fetch_running_config",
+        lambda device: (
+            """
+interface Vlan 106
+ tagged TenGigabitEthernet 1/43
+ no shutdown
+"""
+            if device.id == "middle_sw"
+            else ""
+        ),
+    )
+    monkeypatch.setattr("app.switch_config._fetch_os10_interface_config", lambda device, interface_name: "")
+
+    result = configure_switches_for_run(
+        "run123",
+        SwitchConfigureRequest(dry_run=True),
+        inventory_path=tmp_path / "inventory.json",
+        outputs_root=tmp_path / "outputs",
+    )
+
+    middle_commands = next(item.commands for item in result.devices if item.device_id == "middle_sw")
+    vlan106_starts = [index for index, command in enumerate(middle_commands) if command == "interface Vlan 106"]
+    assert vlan106_starts
+    vlan106_block = middle_commands[vlan106_starts[-1]:]
+    assert " tagged TenGigabitEthernet 1/39,1/43" in vlan106_block
+    assert not any("107" in command or "108" in command for command in middle_commands)
+
+    upstream_commands = next(item.commands for item in result.devices if item.device_id == "upstream_sw")
+    ingress_start = upstream_commands.index("interface ethernet1/1/52")
+    next_interface = next(
+        (
+            index
+            for index, command in enumerate(upstream_commands[ingress_start + 1 :], start=ingress_start + 1)
+            if command.startswith("interface ")
+        ),
+        len(upstream_commands),
+    )
+    ingress_block = upstream_commands[ingress_start:next_interface]
+    assert " switchport trunk allowed vlan 106" in ingress_block
+
+
 def test_configure_switches_uses_original_switch_names_when_generated_l2_names_are_suffixed(tmp_path, monkeypatch):
     inventory = InventoryFile.model_validate(
         {

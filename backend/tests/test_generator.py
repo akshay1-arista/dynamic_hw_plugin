@@ -284,6 +284,41 @@ def test_synthetic_ha_keeps_secondary_switch_name_on_standby_ports(tmp_path):
     assert ge1.switch_standby_port == "gigabitethernet1/21"
 
 
+def _reserve_hardware(hardware, actor_name: str, actor_email: str, reason: str) -> None:
+    reservation = HardwareReservation(
+        actor={"name": actor_name, "email": actor_email},
+        reserved_at="2026-01-01T00:00:00Z",
+        reason=reason,
+    )
+    hardware.available = False
+    hardware.reservation = reservation
+    for member in hardware.members:
+        member.available = False
+        member.reservation = reservation
+
+
+def test_reserved_hardware_stays_usable_for_the_reserving_user(tmp_path):
+    inventory = load_inventory(_standalone_ha_candidate_inventory(tmp_path))
+    hardware_by_id = {item.id: item for item in inventory.hardware}
+    primary = hardware_by_id[STANDALONE_PRIMARY_ID]
+    _reserve_hardware(primary, "Test User", "test@example.com", "manual-unavailable")
+
+    request = _base_generate_request(
+        hardware_id=STANDALONE_PRIMARY_ID,
+        edge_ha_mode="single_active",
+    )
+    view = _resolve_mapping_hardware_view(
+        request.mappings[0],
+        primary,
+        hardware_by_id,
+        False,
+        request,
+    )
+
+    assert view.resolved_mode == "single_active"
+    assert view.hardware.id == STANDALONE_PRIMARY_ID
+
+
 def test_synthetic_ha_rejects_secondary_reserved_by_another_user(tmp_path):
     inventory = load_inventory(_standalone_ha_candidate_inventory(tmp_path))
     hardware_by_id = {item.id: item for item in inventory.hardware}

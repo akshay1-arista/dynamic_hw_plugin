@@ -347,6 +347,149 @@ const inventory = {
       notes: 'dynamic internet ports'
     },
     {
+      id: 'mine-680-reserved',
+      short_name: 'mine-680',
+      display_name: 'Mine 680 Reserved',
+      model: 'edge6X0',
+      model_suffix: '680',
+      ha: false,
+      active_serial: 'MINE680',
+      standby_serial: '',
+      available: false,
+      reservation: {
+        actor: { name: 'Test User', email: 'test@example.com' },
+        reserved_at: '2026-07-12T00:00:00+00:00',
+        reason: 'topology-generation',
+        topology_name: 'owned-topology'
+      },
+      members: [
+        {
+          role: 'active',
+          device_id: 'mine-680-reserved',
+          display_name: 'Mine 680 Reserved',
+          serial_number: 'MINE680',
+          available: false,
+          reservation: {
+            actor: { name: 'Test User', email: 'test@example.com' },
+            reserved_at: '2026-07-12T00:00:00+00:00',
+            reason: 'topology-generation',
+            topology_name: 'owned-topology'
+          }
+        }
+      ],
+      switch: { name: 'a01-access-switch', model: 'Dell-3048', connections: { ip: '10.68.136.70' } },
+      ports: [
+        {
+          logical_name: 'LAN1',
+          logical_interface: 'GE1',
+          switch_active_port: 'gigabitethernet1/41',
+          switch_vlans: [1510],
+          tagged_vlans: [],
+          untagged_vlan: 1510
+        }
+      ],
+      notes: 'reserved by the current user'
+    },
+    {
+      id: 'mine-3800-ha-reserved',
+      short_name: 'mine-3800-ha',
+      display_name: 'Mine 3800 HA Reserved',
+      model: 'edge3X00',
+      model_suffix: '3800',
+      ha: true,
+      active_serial: 'MINEHA1',
+      standby_serial: 'MINEHA2',
+      available: false,
+      reservation: {
+        actor: { name: 'Test User', email: 'test@example.com' },
+        reserved_at: '2026-07-12T00:00:00+00:00',
+        reason: 'manual-unavailable'
+      },
+      members: [
+        {
+          role: 'active',
+          device_id: 'mine-3800-ha-active',
+          display_name: 'Mine 3800 active',
+          serial_number: 'MINEHA1',
+          available: false,
+          reservation: {
+            actor: { name: 'Test User', email: 'test@example.com' },
+            reserved_at: '2026-07-12T00:00:00+00:00',
+            reason: 'manual-unavailable'
+          }
+        },
+        {
+          role: 'standby',
+          device_id: 'mine-3800-ha-standby',
+          display_name: 'Mine 3800 standby',
+          serial_number: 'MINEHA2',
+          available: false,
+          reservation: {
+            actor: { name: 'Test User', email: 'test@example.com' },
+            reserved_at: '2026-07-12T00:00:00+00:00',
+            reason: 'manual-unavailable'
+          }
+        }
+      ],
+      switch: { name: 'a01-access-switch', model: 'Dell-3048', connections: { ip: '10.68.136.71' } },
+      ports: [
+        {
+          logical_name: 'LAN1',
+          logical_interface: 'GE1',
+          switch_active_port: 'gigabitethernet1/51',
+          switch_standby_port: 'gigabitethernet1/52',
+          switch_vlans: [1601],
+          tagged_vlans: [],
+          untagged_vlan: 1601
+        }
+      ],
+      notes: 'ha pair reserved by the current user'
+    },
+    {
+      id: 'other-680-reserved',
+      short_name: 'other-680',
+      display_name: 'Other 680 Reserved',
+      model: 'edge6X0',
+      model_suffix: '680',
+      ha: false,
+      active_serial: 'OTHER680',
+      standby_serial: '',
+      available: false,
+      reservation: {
+        actor: { name: 'Other User', email: 'other@example.com' },
+        reserved_at: '2026-07-12T00:00:00+00:00',
+        reason: 'topology-generation',
+        topology_name: 'other-topology'
+      },
+      members: [
+        {
+          role: 'active',
+          device_id: 'other-680-reserved',
+          display_name: 'Other 680 Reserved',
+          serial_number: 'OTHER680',
+          available: false,
+          reservation: {
+            actor: { name: 'Other User', email: 'other@example.com' },
+            reserved_at: '2026-07-12T00:00:00+00:00',
+            reason: 'topology-generation',
+            topology_name: 'other-topology'
+          }
+        }
+      ],
+      switch: { name: 'a01-access-switch', model: 'Dell-3048', connections: { ip: '10.68.136.70' } },
+      ports: [
+        {
+          logical_name: 'LAN1',
+          logical_interface: 'GE1',
+          switch_active_port: 'gigabitethernet1/42',
+          switch_vlans: [1510],
+          tagged_vlans: [],
+          untagged_vlan: 1510
+        }
+      ],
+      notes: 'reserved by another user'
+    },
+    {
       id: 'hidden-ha-pair',
       short_name: 'hidden-ha-pair',
       display_name: 'Hidden HA Pair',
@@ -1117,6 +1260,37 @@ describe('App', () => {
     expect(screen.getByText('chn-3800-ha-8')).toBeInTheDocument();
   });
 
+  test('keeps hardware reserved by the current user selectable', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await screen.findAllByText('Mine 680 Reserved');
+    const hardwareInput = screen.getByRole('combobox', { name: 'Hardware' });
+    await user.click(hardwareInput);
+
+    const ownOption = screen.getByRole('option', { name: /Mine 680 Reserved/i });
+    const ownHaOption = screen.getByRole('option', { name: /Mine 3800 HA Reserved/i });
+    const otherOption = screen.getByRole('option', { name: /Other 680 Reserved/i });
+    expect(ownOption).toBeEnabled();
+    expect(ownHaOption).toBeEnabled();
+    expect(otherOption).toBeDisabled();
+
+    await user.click(ownOption);
+    await user.selectOptions(screen.getByLabelText('Branch'), 'branch1');
+    await user.selectOptions(screen.getByLabelText('Edge'), 'b1-edge1');
+    expect(screen.getByRole('button', { name: 'Active only' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Base single' })).toBeEnabled();
+
+    await user.clear(hardwareInput);
+    await user.type(hardwareInput, 'mine 3800');
+    await user.click(screen.getByRole('option', { name: /Mine 3800 HA Reserved/i }));
+    await user.selectOptions(screen.getByLabelText('Branch'), 'branch2');
+    await user.selectOptions(screen.getByLabelText('Edge'), 'b2-edge1');
+    expect(screen.getByRole('button', { name: 'HA pair' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Active only' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Standby only' })).toBeEnabled();
+  });
+
   test('filters hardware combobox options while typing', async () => {
     const user = userEvent.setup();
     render(<App />);
@@ -1264,6 +1438,9 @@ describe('App', () => {
               'a01-680-standalone-b',
               'a01-3800-asymmetric-ha',
               'internet-dynamic-680',
+              'mine-680-reserved',
+              'mine-3800-ha-reserved',
+              'other-680-reserved',
               'hidden-ha-pair'
             ]
           })
@@ -1271,7 +1448,7 @@ describe('App', () => {
       );
     });
     expect(window.confirm).toHaveBeenCalledWith(
-      expect.stringContaining('Apply Lab Navigator refresh for 6 inventory devices?')
+      expect.stringContaining('Apply Lab Navigator refresh for 9 inventory devices?')
     );
     expect(
       window.confirm.mock.calls.some(([message]) =>
@@ -1290,6 +1467,9 @@ describe('App', () => {
               'a01-680-standalone-b',
               'a01-3800-asymmetric-ha',
               'internet-dynamic-680',
+              'mine-680-reserved',
+              'mine-3800-ha-reserved',
+              'other-680-reserved',
               'hidden-ha-pair'
             ]
           })

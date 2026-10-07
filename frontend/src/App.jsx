@@ -798,7 +798,7 @@ export function App() {
         const secondaryHardware = resolveSecondaryHardware(mapping, inventory.hardware);
         const branch = selectedReference?.branches.find((item) => item.name === mapping.branch_name);
         const edge = branch?.edges.find((item) => item.name === mapping.edge_name);
-        return haModeOptions(hardware, edge, secondaryHardware, inventory.hardware).some(
+        return haModeOptions(hardware, edge, secondaryHardware, inventory.hardware, { currentUser }).some(
           (option) => option.value === (mapping.edge_ha_mode || 'topology_default') && option.disabled
         );
       });
@@ -888,7 +888,10 @@ export function App() {
       const invalidHaMode = mappings.find((mapping) => {
         const hardware = resolvePrimaryHardware(mapping, inventory.hardware);
         const secondaryHardware = resolveSecondaryHardware(mapping, inventory.hardware);
-        return haModeOptions(hardware, null, secondaryHardware, inventory.hardware, { switchConfigOnly: true }).some(
+        return haModeOptions(hardware, null, secondaryHardware, inventory.hardware, {
+          switchConfigOnly: true,
+          currentUser
+        }).some(
           (option) => option.value === (mapping.edge_ha_mode || 'single_active') && option.disabled
         );
       });
@@ -1957,6 +1960,7 @@ export function App() {
               mappings={mappings}
               reference={selectedReference}
               inventory={inventory}
+              currentUser={currentUser}
               switchConfigOnly={isSwitchConfigOnly}
               onChange={updateMapping}
               onRemove={removeMapping}
@@ -2826,19 +2830,51 @@ function hardwareMemberByRole(hardware, role) {
   return (hardware?.members || []).find((member) => member.role === role) || null;
 }
 
-function hardwareSelectableForMapping(hardware) {
+function reservationOwnedByUser(reservation, currentUser) {
+  const owner = reservation?.actor?.email?.trim().toLowerCase();
+  const requester = currentUser?.email?.trim().toLowerCase();
+  return Boolean(owner && requester && owner === requester);
+}
+
+function resourceUsableByUser(available, reservation, currentUser) {
+  return Boolean(available) || reservationOwnedByUser(reservation, currentUser);
+}
+
+function inventoryMemberUsableByUser(hardware, member, currentUser) {
+  if (member.available || reservationOwnedByUser(member.reservation, currentUser)) {
+    return true;
+  }
+  return !member.reservation && reservationOwnedByUser(hardware?.reservation, currentUser);
+}
+
+function hardwareMemberUsableByUser(hardware, role, currentUser) {
+  const member = hardwareMemberByRole(hardware, role);
+  if (member) {
+    return inventoryMemberUsableByUser(hardware, member, currentUser);
+  }
+  return resourceUsableByUser(hardware?.available, hardware?.reservation, currentUser);
+}
+
+function hardwareFullyUsableByUser(hardware, currentUser) {
   if (!hardware) {
     return false;
   }
-  if (hardware.available) {
-    return true;
+  if (hardware.members?.length) {
+    return hardware.members.every((member) => inventoryMemberUsableByUser(hardware, member, currentUser));
   }
-  return (hardware.members || []).some((member) => member.available);
+  return resourceUsableByUser(hardware.available, hardware.reservation, currentUser);
 }
 
-function hardwareMemberAvailable(hardware, role) {
-  const member = hardwareMemberByRole(hardware, role);
-  return member ? member.available : Boolean(hardware?.available);
+function hardwareSelectableForMapping(hardware, currentUser) {
+  if (!hardware) {
+    return false;
+  }
+  if (hardwareFullyUsableByUser(hardware, currentUser)) {
+    return true;
+  }
+  return ['active', 'standby'].some(
+    (role) => hardwareMemberByRole(hardware, role) && hardwareMemberUsableByUser(hardware, role, currentUser)
+  );
 }
 
 function compatibleStandaloneHaCandidates(hardware, hardwareOptions) {
@@ -2855,13 +2891,16 @@ function compatibleStandaloneHaCandidates(hardware, hardwareOptions) {
 
 function haModeOptions(hardware, edge, secondaryHardware = null, hardwareOptions = [], options = {}) {
   const switchConfigOnly = Boolean(options.switchConfigOnly);
+  const currentUser = options.currentUser || null;
   const baseHa = Boolean(edge?.ha_enabled);
   const hasStandby = Boolean(hardware?.standby_serial || hardwareMemberByRole(hardware, 'standby'));
   const compatibleSecondaries = compatibleStandaloneHaCandidates(hardware, hardwareOptions);
   const selectableCompatibleSecondaries = compatibleSecondaries.filter((candidate) =>
-    hardwareSelectableForMapping(candidate)
+    hardwareSelectableForMapping(candidate, currentUser)
   );
   const canSynthesizeHa = !hardware?.ha && Boolean(secondaryHardware || selectableCompatibleSecondaries.length);
+  const primaryHaUsable = hardwareFullyUsableByUser(hardware, currentUser);
+  const secondaryHaUsable = !secondaryHardware || hardwareFullyUsableByUser(secondaryHardware, currentUser);
   const allOptions = [
     {
       value: 'topology_default',
@@ -2872,12 +2911,12 @@ function haModeOptions(hardware, edge, secondaryHardware = null, hardwareOptions
     {
       value: 'ha',
       label: !hardware?.ha && secondaryHardware ? 'HA from standalones' : 'HA pair',
-      disabled: (!hardware?.ha && !canSynthesizeHa) || !hardware?.available || (secondaryHardware && !secondaryHardware.available),
+      disabled: (!hardware?.ha && !canSynthesizeHa) || !primaryHaUsable || !secondaryHaUsable,
       reason: (!hardware?.ha && !canSynthesizeHa)
         ? 'Selected hardware has no standby member and no compatible standalone devices are available.'
-        : !hardware?.available
+        : !primaryHaUsable
           ? 'Both HA members must be available for HA mode.'
-          : secondaryHardware && !secondaryHardware.available
+          : !secondaryHaUsable
             ? 'Selected standby hardware is reserved.'
             : !hardware?.ha && !secondaryHardware
               ? 'Select an additional standalone device to use HA mode.'
@@ -2886,13 +2925,13 @@ function haModeOptions(hardware, edge, secondaryHardware = null, hardwareOptions
     {
       value: 'single_active',
       label: 'Active only',
-      disabled: !hardwareMemberAvailable(hardware, 'active'),
+      disabled: !hardwareMemberUsableByUser(hardware, 'active', currentUser),
       reason: 'Active member is reserved.'
     },
     {
       value: 'single_standby',
       label: 'Standby only',
-      disabled: !hasStandby || !hardwareMemberAvailable(hardware, 'standby'),
+      disabled: !hasStandby || !hardwareMemberUsableByUser(hardware, 'standby', currentUser),
       reason: !hasStandby ? 'Selected hardware has no standby member.' : 'Standby member is reserved.'
     }
   ];
@@ -3789,6 +3828,7 @@ function HardwareCombobox({
   hardwareOptions,
   selectedHardwareId,
   selectedHardwareFallback,
+  currentUser,
   onSelect,
   ariaLabel = 'Hardware',
   placeholder = 'Search and select hardware',
@@ -3827,7 +3867,7 @@ function HardwareCombobox({
   }, [filteredHardwareOptions.length, highlightedIndex]);
 
   function commitSelection(hardware) {
-    if (!hardware || !hardwareSelectableForMapping(hardware)) {
+    if (!hardware || !hardwareSelectableForMapping(hardware, currentUser)) {
       return;
     }
     onSelect(hardware.id);
@@ -3920,7 +3960,7 @@ function HardwareCombobox({
                 role="option"
                 aria-selected={hardware.id === selectedHardwareId}
                 className={`comboboxOption${optionIndex === highlightedIndex ? ' active' : ''}`}
-                disabled={!hardwareSelectableForMapping(hardware)}
+                disabled={!hardwareSelectableForMapping(hardware, currentUser)}
                 onMouseDown={(event) => event.preventDefault()}
                 onMouseEnter={() => setHighlightedIndex(optionIndex)}
                 onClick={() => commitSelection(hardware)}
@@ -3943,6 +3983,7 @@ function MappingRow({
   mappings,
   reference,
   inventory,
+  currentUser,
   switchConfigOnly = false,
   onChange,
   onRemove,
@@ -3964,9 +4005,10 @@ function MappingRow({
   const mappingHaOptions = useMemo(
     () =>
       haModeOptions(currentInventoryHardware, selectedEdge, secondaryHardware, inventory.hardware, {
-        switchConfigOnly
+        switchConfigOnly,
+        currentUser
       }),
-    [currentInventoryHardware, inventory.hardware, secondaryHardware, selectedEdge, switchConfigOnly]
+    [currentInventoryHardware, currentUser, inventory.hardware, secondaryHardware, selectedEdge, switchConfigOnly]
   );
   const secondaryHardwareOptions = useMemo(
     () =>
@@ -4119,6 +4161,7 @@ function MappingRow({
             hardwareOptions={inventory.hardware}
             selectedHardwareId={mapping.hardware_id}
             selectedHardwareFallback={currentInventoryHardware}
+            currentUser={currentUser}
             onSelect={(hardwareId) => onChange(index, 'hardware_id', hardwareId)}
           />
         </label>
@@ -4246,6 +4289,7 @@ function MappingRow({
                 hardwareOptions={secondaryHardwareOptions}
                 selectedHardwareId={mapping.secondary_hardware_id}
                 selectedHardwareFallback={secondaryHardware}
+                currentUser={currentUser}
                 onSelect={(hardwareId) => onChange(index, 'secondary_hardware_id', hardwareId)}
               />
               {mapping.edge_ha_mode === 'ha' && !secondaryHardware && (

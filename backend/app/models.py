@@ -87,7 +87,7 @@ class SwitchMetadata(BaseModel):
     name: str
     device_type: str = "DELL"
     model: str = "Dell-3048"
-    os_family: Optional[Literal["os9", "os10"]] = None
+    os_family: Optional[Literal["os9", "os10", "eos"]] = None
     connections: SwitchConnection
     credentials: SwitchCredentials = Field(default_factory=SwitchCredentials)
 
@@ -301,6 +301,7 @@ class InventoryDevice(BaseModel):
 class InventoryEndpoint(BaseModel):
     device_id: str
     interface: str
+    port_channel: Optional[str] = None
 
 
 class InventoryConnection(BaseModel):

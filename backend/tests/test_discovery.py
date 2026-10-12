@@ -7,12 +7,14 @@ import pytest
 from app.discovery import (
     DiscoveryError,
     LabNavigatorClient,
+    _build_wiremap_connection,
+    _inventory_switch_device,
     apply_inventory_import,
     apply_inventory_refresh,
     preview_inventory_import,
     preview_inventory_refresh,
 )
-from app.models import HardwareImportRequest, InventoryRefreshRequest
+from app.models import HardwareImportRequest, InventoryDevice, InventoryRefreshRequest
 
 
 class StubLabNavigatorClient:
@@ -1233,3 +1235,33 @@ def test_lab_navigator_client_reports_anonymous_auth_rejection():
             client.search("access-sw")
     finally:
         client.close()
+
+
+def test_wiremap_connection_records_port_channel_members():
+    local = InventoryDevice(id="access_sw", type="switch", display_name="access-sw", model="Dell-3048")
+    remote = InventoryDevice(id="agg_sw", type="switch", display_name="agg-sw", model="DCS-7050SX3-48YC8")
+    connection = _build_wiremap_connection(
+        local,
+        remote,
+        {
+            "interface_name": "Te1/49",
+            "remote_interface_name": "Eth13",
+            "interface_role": "port_channel_member",
+            "parent_interface": "Po3",
+            "remote_parent_interface": "Po3",
+        },
+    )
+
+    assert connection is not None
+    endpoints = {connection["a"]["device_id"]: connection["a"], connection["b"]["device_id"]: connection["b"]}
+    assert endpoints["access_sw"]["interface"] == "tengigabitethernet1/49"
+    assert endpoints["access_sw"]["port_channel"] == "port-channel3"
+    assert endpoints["agg_sw"]["interface"] == "eth13"
+    assert endpoints["agg_sw"]["port_channel"] == "port-channel3"
+    assert connection["role"] == "switch-uplink"
+
+
+def test_inventory_switch_device_marks_arista_as_eos():
+    device = _inventory_switch_device("chn-rnd-sw-7050-1", "DCS-7050SX3-48YC8", "10.68.133.67", 912)
+    assert device["switch_metadata"]["device_type"] == "ARISTA"
+    assert device["switch_metadata"]["os_family"] == "eos"

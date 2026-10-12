@@ -414,7 +414,7 @@ def resolve_mapping_path(
         if access_switch.id in terminal_ids and len(normalized_switch_names) > 1:
             continue
         for terminal_id, hypervisor_link in terminal_links:
-            egress = _edge_endpoint(hypervisor_link, terminal_id).interface
+            egress = _configured_switch_interface(_edge_endpoint(hypervisor_link, terminal_id))
             key = (access_switch.id, egress)
             if key in seen:
                 continue
@@ -759,6 +759,55 @@ def _is_edge_access_connection(
     return connection.role in {None, "edge-access"}
 
 
+_ARISTA_MODEL_TOKENS = (
+    "arista",
+    "dcs-",
+    "7010",
+    "7020",
+    "7050",
+    "7060",
+    "7150",
+    "7160",
+    "7170",
+    "720xp",
+    "7250",
+    "7260",
+    "7280",
+    "7300",
+    "7368",
+    "7500",
+    "7800",
+)
+_PORT_CHANNEL_RE = re.compile(r"^(?:po|port-channel)(\d+)$", re.IGNORECASE)
+
+
+def canonical_port_channel(value: str | None) -> str | None:
+    """Return a canonical port-channel name such as port-channel1, or None."""
+    match = _PORT_CHANNEL_RE.fullmatch(re.sub(r"\s+", "", value or ""))
+    if not match:
+        return None
+    return f"port-channel{match.group(1)}"
+
+
+def infer_switch_platform(model: str | None, name: str | None = None) -> tuple[str, str | None]:
+    """Return (device_type, os_family) for a switch model or hostname."""
+    for text in (model or "", name or ""):
+        lowered = text.lower()
+        if not lowered:
+            continue
+        if any(token in lowered for token in _ARISTA_MODEL_TOKENS):
+            return "ARISTA", "eos"
+        if "4148" in lowered or "3248" in lowered:
+            return "DELL", "os10"
+        if "3048" in lowered or "4048" in lowered:
+            return "DELL", "os9"
+    return "DELL", None
+
+
+def _configured_switch_interface(endpoint) -> str:
+    return endpoint.port_channel or endpoint.interface
+
+
 def _edge_endpoint(connection: InventoryConnection, edge_id: str):
     return connection.a if connection.a.device_id == edge_id else connection.b
 
@@ -908,7 +957,7 @@ def _find_switch_path_to_hypervisor(
             link = _hypervisor_access_link(start_switch_id, hypervisor_ip, devices, connections)
             if not link:
                 continue
-            egress = _edge_endpoint(link, start_switch_id).interface
+            egress = _configured_switch_interface(_edge_endpoint(link, start_switch_id))
             all_found_paths.append([SwitchHop(
                 switch_id=start_switch_id,
                 switch_name=start_device.display_name,
@@ -922,7 +971,7 @@ def _find_switch_path_to_hypervisor(
                 continue
             link = _hypervisor_access_link(terminal_id, hypervisor_ip, devices, connections)
             if link:
-                egress = _edge_endpoint(link, terminal_id).interface
+                egress = _configured_switch_interface(_edge_endpoint(link, terminal_id))
                 path[-1] = path[-1].model_copy(update={"egress_port": egress})
             all_found_paths.append(path)
 
@@ -971,8 +1020,8 @@ def _dfs_path(
             remote_endpoint = _other_endpoint(uplink, current_id)
             if remote_endpoint.device_id in seen:
                 continue
-            egress_port = _edge_endpoint(uplink, current_id).interface
-            ingress_port = remote_endpoint.interface
+            egress_port = _configured_switch_interface(_edge_endpoint(uplink, current_id))
+            ingress_port = _configured_switch_interface(remote_endpoint)
 
             updated_last = path[-1].model_copy(update={"egress_port": egress_port})
             remote_device = devices.get(remote_endpoint.device_id)

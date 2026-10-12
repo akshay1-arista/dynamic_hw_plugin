@@ -21,7 +21,7 @@ from .config import (
     LAB_NAVIGATOR_TLS_VERIFY,
 )
 from .edge_models import normalize_edge_model
-from .inventory import build_inventory, load_inventory, save_inventory
+from .inventory import build_inventory, canonical_port_channel, infer_switch_platform, load_inventory, save_inventory
 from .models import (
     HardwareImportRequest,
     InventoryConnection,
@@ -953,6 +953,8 @@ def _build_wiremap_connection(
     if not local_interface or not remote_interface:
         return None
 
+    local_port_channel = canonical_port_channel(str(wiremap_entry.get("parent_interface") or ""))
+    remote_port_channel = canonical_port_channel(str(wiremap_entry.get("remote_parent_interface") or ""))
     endpoints = _orient_wiremap_connection(
         local_device.type,
         local_device.id,
@@ -960,21 +962,30 @@ def _build_wiremap_connection(
         remote_device.type,
         remote_device.id,
         remote_interface,
+        local_port_channel,
+        remote_port_channel,
     )
     if endpoints is None:
         return None
 
-    role, _left_type, _right_type, left_id, left_if, right_id, right_if = endpoints
+    role, _left_type, _right_type, left_id, left_if, right_id, right_if, left_port_channel, right_port_channel = endpoints
     return {
         "id": _build_connection_id(left_id, left_if, right_id, right_if),
-        "a": {"device_id": left_id, "interface": left_if},
-        "b": {"device_id": right_id, "interface": right_if},
+        "a": _wiremap_endpoint(left_id, left_if, left_port_channel),
+        "b": _wiremap_endpoint(right_id, right_if, right_port_channel),
         "vlans": [],
         "tagged_vlans": [],
         "untagged_vlan": None,
         "role": role,
         "notes": "Imported from Lab Navigator wiremap.",
     }
+
+
+def _wiremap_endpoint(device_id: str, interface: str, port_channel: str | None) -> dict[str, str]:
+    endpoint = {"device_id": device_id, "interface": interface}
+    if port_channel:
+        endpoint["port_channel"] = port_channel
+    return endpoint
 
 
 def _resolve_inventory_device(client: LabNavigatorClient, device: InventoryDevice) -> dict[str, Any]:
@@ -1055,6 +1066,17 @@ def _inventory_switch_device(
 ) -> dict[str, Any]:
     existing_metadata = existing.switch_metadata if existing else None
     switch_ip = ip_address or (existing_metadata.connections.ip if existing_metadata else "")
+    resolved_model = model or (existing_metadata.model if existing_metadata else "Dell")
+    inferred_type, inferred_family = infer_switch_platform(resolved_model, name)
+    if inferred_family == "eos":
+        device_type = "ARISTA"
+        os_family = "eos"
+    elif existing_metadata:
+        device_type = existing_metadata.device_type
+        os_family = existing_metadata.os_family or inferred_family
+    else:
+        device_type = inferred_type
+        os_family = inferred_family
     return InventoryDevice(
         id=existing.id if existing else _safe_id(name),  # reuse existing ID to avoid duplicates
         type="switch",
@@ -1064,9 +1086,9 @@ def _inventory_switch_device(
         lab_navigator_id=lab_navigator_id,
         switch_metadata=SwitchMetadata(
             name=name,
-            device_type=existing_metadata.device_type if existing_metadata else "DELL",
-            model=model or (existing_metadata.model if existing_metadata else "Dell"),
-            os_family=existing_metadata.os_family if existing_metadata else None,
+            device_type=device_type,
+            model=resolved_model,
+            os_family=os_family,
             connections={
                 "ip": switch_ip,
                 "port": existing_metadata.connections.port if existing_metadata else None,
@@ -1412,7 +1434,7 @@ def _infer_inventory_type(current_type: str, remote_device: dict[str, Any]) -> s
     model = _device_model(remote_device).lower()
     if current_type == "edge":
         return "switch"
-    if any(token in model for token in ("dell-3048", "dell-4048", "dell-4148", "switch")):
+    if any(token in model for token in ("dell-3048", "dell-4048", "dell-4148", "arista", "dcs-", "7050", "switch")):
         return "switch"
     if any(token in model for token in ("esxi", "server", "r640", "r650", "hypervisor")):
         return "hypervisor"
@@ -1426,21 +1448,23 @@ def _orient_wiremap_connection(
     remote_type: str,
     remote_id: str,
     remote_interface: str,
-) -> tuple[str, str, str, str, str, str, str] | None:
+    local_port_channel: str | None = None,
+    remote_port_channel: str | None = None,
+) -> tuple[str, str, str, str, str, str, str, str | None, str | None] | None:
     if {local_type, remote_type} == {"edge", "switch"}:
         if local_type == "edge":
-            return ("edge-access", local_type, remote_type, local_id, local_interface, remote_id, remote_interface)
-        return ("edge-access", remote_type, local_type, remote_id, remote_interface, local_id, local_interface)
+            return ("edge-access", local_type, remote_type, local_id, local_interface, remote_id, remote_interface, local_port_channel, remote_port_channel)
+        return ("edge-access", remote_type, local_type, remote_id, remote_interface, local_id, local_interface, remote_port_channel, local_port_channel)
     if local_type == "switch" and remote_type == "hypervisor":
-        return ("hypervisor-access", local_type, remote_type, local_id, local_interface, remote_id, remote_interface)
+        return ("hypervisor-access", local_type, remote_type, local_id, local_interface, remote_id, remote_interface, local_port_channel, remote_port_channel)
     if local_type == "hypervisor" and remote_type == "switch":
-        return ("hypervisor-access", remote_type, local_type, remote_id, remote_interface, local_id, local_interface)
+        return ("hypervisor-access", remote_type, local_type, remote_id, remote_interface, local_id, local_interface, remote_port_channel, local_port_channel)
     if local_type == "switch" and remote_type == "switch":
         left = (local_id, local_interface)
         right = (remote_id, remote_interface)
         if right < left:
-            return ("switch-uplink", remote_type, local_type, remote_id, remote_interface, local_id, local_interface)
-        return ("switch-uplink", local_type, remote_type, local_id, local_interface, remote_id, remote_interface)
+            return ("switch-uplink", remote_type, local_type, remote_id, remote_interface, local_id, local_interface, remote_port_channel, local_port_channel)
+        return ("switch-uplink", local_type, remote_type, local_id, local_interface, remote_id, remote_interface, local_port_channel, remote_port_channel)
     return None
 
 
@@ -1448,6 +1472,9 @@ def _normalize_interface_name(value: str, device_type: str) -> str:
     if device_type != "switch":
         return value
     text = (value or "").strip()
+    port_channel = canonical_port_channel(text)
+    if port_channel:
+        return port_channel
     mappings = (
         (r"^gi(\d+/\d+)$", "gigabitethernet"),
         (r"^te(\d+/\d+)$", "tengigabitethernet"),

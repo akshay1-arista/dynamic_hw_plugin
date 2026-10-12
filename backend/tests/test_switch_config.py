@@ -2,6 +2,7 @@ import json
 import subprocess
 
 from app.models import InventoryDevice, InventoryFile, SwitchConfigureRequest
+from app.inventory import canonical_port_channel
 from app.switch_config import _build_ssh_command
 from app.switch_config import _merge_shared_os10_tagged_vlans
 from app.switch_config import _run_ssh_script, configure_switches_for_run
@@ -2084,3 +2085,281 @@ def test_configure_switches_places_standby_ports_on_secondary_switch(tmp_path, m
     assert "interface gigabitethernet 1/11" not in joined_b
     assert "interface tengigabitethernet 1/51" in joined_b
     assert " member gigabitethernet 1/21" in joined_b
+
+
+def _write_switch_run(tmp_path, inventory):
+    run_root = tmp_path / "outputs" / "run-po"
+    run_root.mkdir(parents=True)
+    hardware = inventory.hardware[0]
+    port = hardware.ports[0]
+    (run_root / "run_metadata.json").write_text(
+        json.dumps(
+            {
+                "run_id": "run-po",
+                "topology_name": "topo-1",
+                "reference_topology_id": "3-site",
+                "mappings": [
+                    {
+                        "hardware_id": "edge-1",
+                        "branch_name": "branch1",
+                        "edge_name": "edge1",
+                        "path": hardware.path.model_dump(mode="json"),
+                        "allocations": [
+                            {
+                                "reference_interface": "GE1",
+                                "logical_interface": "GE1",
+                                "link": "lan1",
+                                "switch_name": port.switch_name or hardware.path.hops[0].switch_name,
+                                "switch_active_port": port.switch_active_port,
+                                "switch_vlans": [102, 103],
+                                "tagged_vlans": [103],
+                                "untagged_vlan": 102,
+                                "segment_vlans": {},
+                            }
+                        ],
+                    }
+                ],
+            }
+        )
+    )
+
+
+def test_configure_switches_puts_transit_vlans_on_port_channel(tmp_path, monkeypatch):
+    inventory = InventoryFile.model_validate(
+        {
+            "devices": {
+                "access_sw": {
+                    "id": "access_sw",
+                    "type": "switch",
+                    "display_name": "access-os9",
+                    "model": "Dell-3048",
+                    "ip_address": "10.0.0.10",
+                    "switch_metadata": {
+                        "name": "access-os9",
+                        "model": "Dell-3048",
+                        "os_family": "os9",
+                        "connections": {"ip": "10.0.0.10"},
+                        "credentials": {"username": "velocloud", "password": "secret"},
+                    },
+                },
+                "upstream_sw": {
+                    "id": "upstream_sw",
+                    "type": "switch",
+                    "display_name": "upstream-os10",
+                    "model": "Dell-4148",
+                    "ip_address": "10.0.0.11",
+                    "switch_metadata": {
+                        "name": "upstream-os10",
+                        "model": "Dell-4148",
+                        "os_family": "os10",
+                        "connections": {"ip": "10.0.0.11"},
+                        "credentials": {"username": "velocloud", "password": "secret"},
+                    },
+                },
+                "esxi_01": {"id": "esxi_01", "type": "hypervisor", "display_name": "esxi-01", "ip_address": "10.0.0.20"},
+            },
+            "connections": [
+                {
+                    "id": "uplink",
+                    "a": {"device_id": "access_sw", "interface": "tengigabitethernet1/49", "port_channel": "port-channel1"},
+                    "b": {"device_id": "upstream_sw", "interface": "eth1/1/52", "port_channel": "port-channel1"},
+                    "role": "switch-uplink",
+                },
+                {
+                    "id": "hypervisor",
+                    "a": {"device_id": "upstream_sw", "interface": "eth1/1/1"},
+                    "b": {"device_id": "esxi_01", "interface": "vmnic0"},
+                    "untagged_vlan": 1,
+                    "role": "hypervisor-access",
+                },
+            ],
+            "hardware": [
+                {
+                    "id": "edge-1",
+                    "display_name": "edge-1",
+                    "model": "edge6X0",
+                    "model_suffix": "680",
+                    "active_serial": "SERIAL1",
+                    "switch": {
+                        "name": "access-os9",
+                        "model": "Dell-3048",
+                        "os_family": "os9",
+                        "connections": {"ip": "10.0.0.10"},
+                        "credentials": {"username": "velocloud", "password": "secret"},
+                    },
+                    "ports": [
+                        {
+                            "logical_name": "GE1",
+                            "name": "ge1",
+                            "logical_interface": "GE1",
+                            "link": "lan1",
+                            "switch_active_port": "gigabitethernet1/1",
+                            "switch_vlans": [102, 103],
+                            "tagged_vlans": [103],
+                            "untagged_vlan": 102,
+                        }
+                    ],
+                    "path": {
+                        "hops": [
+                            {"switch_id": "access_sw", "switch_name": "access-os9", "switch_ip": "10.0.0.10", "egress_port": "tengigabitethernet1/49"},
+                            {"switch_id": "upstream_sw", "switch_name": "upstream-os10", "switch_ip": "10.0.0.11", "ingress_port": "eth1/1/52", "egress_port": "eth1/1/1"},
+                        ],
+                        "hypervisor_id": "esxi_01",
+                        "hypervisor_name": "esxi-01",
+                        "hypervisor_ip": "10.0.0.20",
+                        "complete": True,
+                    },
+                }
+            ],
+        }
+    )
+    _write_switch_run(tmp_path, inventory)
+    monkeypatch.setattr("app.switch_config.load_inventory", lambda _path: inventory)
+    monkeypatch.setattr("app.switch_config._fetch_running_config", lambda _device: "")
+    monkeypatch.setattr(
+        "app.switch_config._fetch_os10_interface_config",
+        lambda _device, interface_name: " switchport access vlan 1\n switchport trunk allowed vlan 10\n" if "port-channel" in interface_name else "",
+    )
+
+    result = configure_switches_for_run(
+        "run-po",
+        SwitchConfigureRequest(dry_run=True),
+        inventory_path=tmp_path / "inventory.json",
+        outputs_root=tmp_path / "outputs",
+    )
+    access_commands = "\n".join(next(item.commands for item in result.devices if item.device_id == "access_sw"))
+    upstream_commands = "\n".join(next(item.commands for item in result.devices if item.device_id == "upstream_sw"))
+
+    assert "interface Port-channel 1" in access_commands
+    assert " tagged Port-channel 1" in access_commands
+    assert "TenGigabitEthernet 1/49" not in access_commands
+    assert "interface port-channel1" in upstream_commands
+    assert " switchport trunk allowed vlan 10,102-103" in upstream_commands
+    assert "interface ethernet1/1/52" not in upstream_commands
+
+
+def test_configure_switches_renders_arista_eos_port_channel_trunks(tmp_path, monkeypatch):
+    inventory = InventoryFile.model_validate(
+        {
+            "devices": {
+                "access_sw": {
+                    "id": "access_sw",
+                    "type": "switch",
+                    "display_name": "chn-rnd-sw-7050-1",
+                    "model": "DCS-7050SX3-48YC8",
+                    "ip_address": "10.0.0.10",
+                    "switch_metadata": {
+                        "name": "chn-rnd-sw-7050-1",
+                        "device_type": "ARISTA",
+                        "model": "DCS-7050SX3-48YC8",
+                        "os_family": "eos",
+                        "connections": {"ip": "10.0.0.10"},
+                        "credentials": {"username": "velocloud", "password": "secret"},
+                    },
+                },
+                "upstream_sw": {
+                    "id": "upstream_sw",
+                    "type": "switch",
+                    "display_name": "chn-rnd-sw-7050-2",
+                    "model": "DCS-7050SX3-48YC8",
+                    "ip_address": "10.0.0.11",
+                    "switch_metadata": {
+                        "name": "chn-rnd-sw-7050-2",
+                        "device_type": "ARISTA",
+                        "model": "DCS-7050SX3-48YC8",
+                        "os_family": "eos",
+                        "connections": {"ip": "10.0.0.11"},
+                        "credentials": {"username": "velocloud", "password": "secret"},
+                    },
+                },
+                "esxi_01": {"id": "esxi_01", "type": "hypervisor", "display_name": "esxi-01", "ip_address": "10.0.0.20"},
+            },
+            "connections": [
+                {
+                    "id": "uplink",
+                    "a": {"device_id": "access_sw", "interface": "eth49", "port_channel": "port-channel3"},
+                    "b": {"device_id": "upstream_sw", "interface": "eth13", "port_channel": "port-channel3"},
+                    "role": "switch-uplink",
+                },
+                {
+                    "id": "hypervisor",
+                    "a": {"device_id": "upstream_sw", "interface": "eth1"},
+                    "b": {"device_id": "esxi_01", "interface": "vmnic0"},
+                    "untagged_vlan": 1,
+                    "role": "hypervisor-access",
+                },
+            ],
+            "hardware": [
+                {
+                    "id": "edge-1",
+                    "display_name": "edge-1",
+                    "model": "edge6X0",
+                    "model_suffix": "680",
+                    "active_serial": "SERIAL1",
+                    "switch": {
+                        "name": "chn-rnd-sw-7050-1",
+                        "device_type": "ARISTA",
+                        "model": "DCS-7050SX3-48YC8",
+                        "os_family": "eos",
+                        "connections": {"ip": "10.0.0.10"},
+                        "credentials": {"username": "velocloud", "password": "secret"},
+                    },
+                    "ports": [
+                        {
+                            "logical_name": "GE1",
+                            "name": "ge1",
+                            "logical_interface": "GE1",
+                            "link": "lan1",
+                            "switch_name": "chn-rnd-sw-7050-1",
+                            "switch_active_port": "eth5",
+                            "switch_vlans": [102, 103],
+                            "tagged_vlans": [103],
+                            "untagged_vlan": 102,
+                        }
+                    ],
+                    "path": {
+                        "hops": [
+                            {"switch_id": "access_sw", "switch_name": "chn-rnd-sw-7050-1", "switch_ip": "10.0.0.10", "egress_port": "eth49"},
+                            {"switch_id": "upstream_sw", "switch_name": "chn-rnd-sw-7050-2", "switch_ip": "10.0.0.11", "ingress_port": "eth13", "egress_port": "eth1"},
+                        ],
+                        "hypervisor_id": "esxi_01",
+                        "hypervisor_name": "esxi-01",
+                        "hypervisor_ip": "10.0.0.20",
+                        "complete": True,
+                    },
+                }
+            ],
+        }
+    )
+    _write_switch_run(tmp_path, inventory)
+    monkeypatch.setattr("app.switch_config.load_inventory", lambda _path: inventory)
+    monkeypatch.setattr(
+        "app.switch_config._fetch_eos_interface_config",
+        lambda _device, interface_name: (
+            "interface Port-Channel3\n   switchport trunk native vlan 1\n   switchport trunk allowed vlan 10\n   switchport mode trunk\n"
+            if canonical_port_channel(interface_name)
+            else ""
+        ),
+    )
+
+    result = configure_switches_for_run(
+        "run-po",
+        SwitchConfigureRequest(dry_run=True),
+        inventory_path=tmp_path / "inventory.json",
+        outputs_root=tmp_path / "outputs",
+    )
+    access_commands = "\n".join(next(item.commands for item in result.devices if item.device_id == "access_sw"))
+    upstream_commands = "\n".join(next(item.commands for item in result.devices if item.device_id == "upstream_sw"))
+
+    assert "vlan 102" in access_commands
+    assert "vlan 103" in access_commands
+    assert "interface Ethernet5" in access_commands
+    assert " switchport mode trunk" in access_commands
+    assert " switchport trunk native vlan 102" in access_commands
+    assert " switchport trunk allowed vlan 103" in access_commands
+    assert "interface Port-Channel3" in access_commands
+    assert " switchport trunk allowed vlan 10,102-103" in access_commands
+    assert "interface Ethernet49" not in access_commands
+    assert "interface Port-Channel3" in upstream_commands
+    assert "interface Ethernet13" not in upstream_commands
+    assert "interface Ethernet1" in upstream_commands

@@ -9,7 +9,7 @@ from pathlib import Path
 
 from .config import INVENTORY_PATH, OUTPUTS_ROOT
 from .generator import GenerationError, resolve_run_root
-from .inventory import load_inventory, resolve_mapping_path
+from .inventory import canonical_port_channel, infer_switch_platform, load_inventory, resolve_mapping_path
 from .models import (
     HardwareEdge,
     HardwarePathSummary,
@@ -314,60 +314,64 @@ def _apply_path_transport(
         hop_state = _ensure_device_state(device_states, hop_device)
         is_access = i == 0
         is_upstream = i == len(path.hops) - 1
+        egress_port = _transport_interface(inventory.connections, hop.switch_id, hop.egress_port)
+        ingress_port = _transport_interface(inventory.connections, hop.switch_id, hop.ingress_port)
 
         if hop.egress_port:
             if is_upstream:
                 hypervisor_native = _connection_native_vlan(
                     inventory.connections,
                     hop.switch_id,
-                    hop.egress_port,
+                    egress_port,
                     path.hypervisor_id,
                     None,
                 )
                 _add_shared_port(
                     hop_state,
-                    hop.egress_port,
+                    egress_port,
                     description=_hypervisor_link_description(path),
                     native_vlan=hypervisor_native,
                 )
-                _add_shared_transport(hop_state, hop.egress_port, hypervisor_transport_vlans)
-                _add_shared_cleanup_vlans(hop_state, hop.egress_port, hypervisor_transport_vlans)
-                _add_upstream_vlan_state(hop_state, path, access_transport_vlans)
-                _add_hypervisor_vlan_state(hop_state, hop.egress_port, hypervisor_transport_vlans)
+                _add_shared_transport(hop_state, egress_port, hypervisor_transport_vlans)
+                _add_shared_cleanup_vlans(hop_state, egress_port, hypervisor_transport_vlans)
+                _add_upstream_vlan_state(hop_state, ingress_port, egress_port, access_transport_vlans)
+                _add_hypervisor_vlan_state(hop_state, egress_port, hypervisor_transport_vlans)
             else:
                 next_hop = path.hops[i + 1]
                 next_device = hop_devices[i + 1]
+                next_ingress = _transport_interface(inventory.connections, next_hop.switch_id, next_hop.ingress_port)
                 # VLANs that start on the upstream switch do not cross this hop.
                 vlans = access_transport_vlans
                 _add_shared_port(
                     hop_state,
-                    hop.egress_port,
-                    description=_switch_link_description(next_device, next_hop.ingress_port),
+                    egress_port,
+                    description=_switch_link_description(next_device, next_ingress),
                 )
-                _add_shared_transport(hop_state, hop.egress_port, vlans)
-                _add_shared_cleanup_vlans(hop_state, hop.egress_port, vlans)
-                _add_access_uplink_vlan_state(hop_state, hop.egress_port, vlans)
+                _add_shared_transport(hop_state, egress_port, vlans)
+                _add_shared_cleanup_vlans(hop_state, egress_port, vlans)
+                _add_access_uplink_vlan_state(hop_state, egress_port, vlans)
 
         if hop.ingress_port and not is_access:
             prev_hop = path.hops[i - 1]
             prev_device = hop_devices[i - 1]
+            prev_egress = _transport_interface(inventory.connections, prev_hop.switch_id, prev_hop.egress_port)
             vlans = access_transport_vlans
             uplink_native = _connection_native_vlan(
                 inventory.connections,
                 prev_hop.switch_id,
-                prev_hop.egress_port,
+                prev_egress,
                 hop.switch_id,
-                hop.ingress_port,
+                ingress_port,
             )
             _add_shared_port(
                 hop_state,
-                hop.ingress_port,
-                description=_switch_link_description(prev_device, prev_hop.egress_port),
+                ingress_port,
+                description=_switch_link_description(prev_device, prev_egress),
                 native_vlan=uplink_native,
             )
-            _add_shared_transport(hop_state, hop.ingress_port, vlans)
-            _add_shared_cleanup_vlans(hop_state, hop.ingress_port, vlans)
-            _add_access_uplink_vlan_state(hop_state, hop.ingress_port, vlans)
+            _add_shared_transport(hop_state, ingress_port, vlans)
+            _add_shared_cleanup_vlans(hop_state, ingress_port, vlans)
+            _add_access_uplink_vlan_state(hop_state, ingress_port, vlans)
 
 
 def _allocation_switch_names(port: HardwarePortAllocation) -> list[str]:
@@ -546,17 +550,18 @@ def _add_access_uplink_vlan_state(
 
 def _add_upstream_vlan_state(
     state: dict[str, object],
-    path: HardwarePathSummary,
+    access_port: str | None,
+    hypervisor_port: str | None,
     transported_vlans: list[int],
 ) -> None:
     if state["family"] != "os9":
         return
-    if not path.upstream_access_port or not path.upstream_hypervisor_port:
+    if not access_port or not hypervisor_port:
         return
     for vlan in transported_vlans:
         vlan_state = state["os9_vlans"][vlan]
-        vlan_state["tagged"].add(path.upstream_access_port)
-        vlan_state["tagged"].add(path.upstream_hypervisor_port)
+        vlan_state["tagged"].add(access_port)
+        vlan_state["tagged"].add(hypervisor_port)
 
 
 def _add_hypervisor_vlan_state(
@@ -592,6 +597,8 @@ def _render_commands(state: dict[str, object]) -> list[str]:
         return _render_os9_commands(state)
     if family == "os10":
         return _render_os10_commands(state)
+    if family == "eos":
+        return _render_eos_commands(state)
     raise SwitchConfigError(f"Unsupported switch OS family: {family}")
 
 
@@ -693,6 +700,60 @@ def _render_os10_commands(state: dict[str, object]) -> list[str]:
     return commands
 
 
+def _render_eos_commands(state: dict[str, object]) -> list[str]:
+    device = state["device"]
+    prepared: list[tuple[str, dict[str, object], int | None, set[int]]] = []
+    vlans: set[int] = set()
+    for interface_name in sorted(state["port_configs"], key=_interface_sort_key):
+        config = state["port_configs"][interface_name]
+        existing = _fetch_eos_interface_config(device, interface_name) if config["shared"] else None
+        native_vlan = config["native_vlan"]
+        tagged_vlans = set(config["tagged_vlans"])
+        if config["shared"]:
+            existing_native, existing_tagged = _parse_eos_interface_config(existing)
+            native_vlan = existing_native if existing_native is not None else native_vlan
+            if native_vlan is None:
+                native_vlan = 1
+            tagged_vlans = _merge_shared_os10_tagged_vlans(
+                existing_tagged,
+                tagged_vlans,
+                state["shared_cleanup_vlans"].get(interface_name, set()),
+            )
+        if native_vlan in tagged_vlans:
+            tagged_vlans.discard(native_vlan)
+        if native_vlan not in (None, 1):
+            vlans.add(native_vlan)
+        vlans.update(tagged_vlans)
+        prepared.append((interface_name, config, native_vlan, tagged_vlans))
+
+    commands: list[str] = []
+    for vlan in sorted(vlans):
+        commands.extend([f"vlan {vlan}", " exit"])
+    for interface_name, config, native_vlan, tagged_vlans in prepared:
+        commands.append(f"interface {_format_eos_interface(interface_name)}")
+        if config["description"]:
+            commands.append(f' description "{config["description"]}"')
+        commands.append(" no shutdown")
+        if config["shared"] or tagged_vlans:
+            commands.append(" switchport mode trunk")
+            commands.append(f" switchport trunk native vlan {native_vlan or 1}")
+            if tagged_vlans:
+                commands.append(f" switchport trunk allowed vlan {_collapse_vlan_ranges(sorted(tagged_vlans))}")
+        elif config["vlan_stack_access"] and native_vlan is not None:
+            commands.append(" switchport mode dot1q-tunnel")
+            commands.append(f" switchport access vlan {native_vlan}")
+        elif native_vlan is not None:
+            commands.append(" switchport mode access")
+            commands.append(f" switchport access vlan {native_vlan}")
+        else:
+            commands.append(" switchport mode trunk")
+            commands.append(" switchport trunk native vlan 1")
+        if config["flowcontrol_receive_on"]:
+            commands.append(" flowcontrol receive on")
+        commands.append(" exit")
+    return commands
+
+
 def _apply_command_overrides(
     plans: list[tuple[SwitchCommandPlan, InventoryDevice]],
     request: SwitchConfigureRequest,
@@ -724,7 +785,11 @@ def _apply_command_overrides(
 def _assert_supported_switch(device: InventoryDevice) -> None:
     metadata_model = device.switch_metadata.model if device.switch_metadata else ""
     model = str(device.model or metadata_model)
-    if not any(token in model for token in ("3048", "4048", "4148", "3248")):
+    try:
+        family = _switch_family(device)
+    except SwitchConfigError as error:
+        raise SwitchConfigError(f"Unsupported switch model for auto-config: {device.display_name} ({model})") from error
+    if family not in {"os9", "os10", "eos"}:
         raise SwitchConfigError(f"Unsupported switch model for auto-config: {device.display_name} ({model})")
     metadata = device.switch_metadata
     if not metadata or not metadata.credentials.username or not metadata.credentials.password or not metadata.connections.ip:
@@ -735,11 +800,10 @@ def _switch_family(device: InventoryDevice) -> str:
     metadata = device.switch_metadata
     if metadata and getattr(metadata, "os_family", None):
         return str(metadata.os_family)
-    model = str(device.model or (metadata.model if metadata else "")).lower()
-    if "3048" in model or "4048" in model:
-        return "os9"
-    if "4148" in model or "3248" in model:
-        return "os10"
+    model = str(device.model or (metadata.model if metadata else ""))
+    _device_type, family = infer_switch_platform(model, device.display_name)
+    if family:
+        return family
     raise SwitchConfigError(f"Cannot infer switch OS family for {device.display_name} ({model})")
 
 
@@ -762,6 +826,30 @@ def _edge_port_description(hardware: HardwareEdge, port: HardwarePortAllocation,
     return f"Edge {hardware.model_suffix}_{serial}_{port.logical_interface}"
 
 
+def _transport_interface(
+    connections: list[InventoryConnection],
+    device_id: str | None,
+    interface_name: str | None,
+) -> str | None:
+    """Use the port-channel when this physical interface is a channel member."""
+    if not device_id or not interface_name:
+        return interface_name
+    if canonical_port_channel(interface_name):
+        return canonical_port_channel(interface_name)
+    for connection in connections:
+        for endpoint in (connection.a, connection.b):
+            if endpoint.device_id == device_id and endpoint.interface == interface_name and endpoint.port_channel:
+                return endpoint.port_channel
+    return interface_name
+
+
+def _endpoint_names(endpoint) -> set[str]:
+    names = {endpoint.interface}
+    if endpoint.port_channel:
+        names.add(endpoint.port_channel)
+    return names
+
+
 def _connection_native_vlan(
     connections: list[InventoryConnection],
     left_device_id: str | None,
@@ -771,8 +859,11 @@ def _connection_native_vlan(
 ) -> int | None:
     for connection in connections:
         endpoints = {
-            (connection.a.device_id, connection.a.interface),
-            (connection.b.device_id, connection.b.interface),
+            (connection.a.device_id, name)
+            for name in _endpoint_names(connection.a)
+        } | {
+            (connection.b.device_id, name)
+            for name in _endpoint_names(connection.b)
         }
         if left_device_id and left_interface and (left_device_id, left_interface) not in endpoints:
             continue
@@ -873,9 +964,9 @@ def _expand_os9_interface_expression(expression: str) -> list[str]:
     expanded: list[str] = []
     current_prefix: str | None = None
     for part in parts:
-        match = re.match(r"([A-Za-z]+Ethernet)\s+(.+)$", part)
+        match = re.match(r"((?:[A-Za-z]+Ethernet)|(?:Port-channel))\s+(.+)$", part, re.IGNORECASE)
         if match:
-            current_prefix = match.group(1)
+            current_prefix = "Port-channel" if match.group(1).lower() == "port-channel" else match.group(1)
             expanded.append(f"{current_prefix} {match.group(2).strip()}")
             continue
         if current_prefix:
@@ -975,6 +1066,9 @@ def _expand_vlan_ranges(value: str) -> set[int]:
 
 def _format_os9_interface(interface_name: str) -> str:
     normalized = interface_name.replace(" ", "").lower()
+    port_channel = canonical_port_channel(normalized)
+    if port_channel:
+        return f"Port-channel {port_channel.removeprefix('port-channel')}"
     for raw_prefix, display_prefix in (
         ("fortygigabitethernet", "FortyGigabitEthernet "),
         ("tengigabitethernet", "TenGigabitEthernet "),
@@ -988,9 +1082,63 @@ def _format_os9_interface(interface_name: str) -> str:
 
 def _format_os10_interface(interface_name: str) -> str:
     normalized = interface_name.replace(" ", "").lower()
+    port_channel = canonical_port_channel(normalized)
+    if port_channel:
+        return port_channel
+    if normalized.startswith("ethernet"):
+        return normalized
     if normalized.startswith("eth"):
         return f"ethernet{normalized[3:]}"
     return normalized
+
+
+def _format_eos_interface(interface_name: str) -> str:
+    normalized = interface_name.replace(" ", "").lower()
+    port_channel = canonical_port_channel(normalized)
+    if port_channel:
+        return f"Port-Channel{port_channel.removeprefix('port-channel')}"
+    if normalized.startswith("ethernet"):
+        return f"Ethernet{normalized[len('ethernet'):]}"
+    if normalized.startswith("eth"):
+        return f"Ethernet{normalized[3:]}"
+    return interface_name
+
+
+def _fetch_eos_interface_config(device: InventoryDevice, interface_name: str) -> str:
+    formatted = _format_eos_interface(interface_name)
+    return _run_ssh_script(
+        device,
+        [
+            "terminal length 0",
+            f"show running-config interfaces {formatted}",
+            "exit",
+        ],
+        f"interface config lookup failed for {device.display_name} {formatted}",
+    )
+
+
+def _parse_eos_interface_config(running_config: str | None) -> tuple[int | None, set[int]]:
+    if not running_config:
+        return None, set()
+    native_vlan: int | None = None
+    tagged_vlans: set[int] = set()
+    for line in running_config.splitlines():
+        native_match = re.match(r"\s*switchport trunk native vlan\s+(\d+)\s*$", line, re.IGNORECASE)
+        if native_match:
+            native_vlan = int(native_match.group(1))
+            continue
+        access_match = re.match(r"\s*switchport access vlan\s+(\d+)\s*$", line, re.IGNORECASE)
+        if access_match and native_vlan is None:
+            native_vlan = int(access_match.group(1))
+            continue
+        trunk_match = re.match(r"\s*switchport trunk allowed vlan\s+(.+)$", line, re.IGNORECASE)
+        if not trunk_match:
+            continue
+        value = re.sub(r"^(?:add|remove|except)\s+", "", trunk_match.group(1).strip(), flags=re.IGNORECASE)
+        if not value or value.lower() in {"all", "none"}:
+            continue
+        tagged_vlans.update(_expand_vlan_ranges(value))
+    return native_vlan, tagged_vlans
 
 
 def _interface_terminal_label(interface_name: str | None) -> str:

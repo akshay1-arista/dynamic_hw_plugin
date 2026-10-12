@@ -1,6 +1,7 @@
 import json
 
 from app.inventory import (
+    _dfs_path,
     build_inventory,
     load_inventory,
     reserve_generated_hardware,
@@ -8,7 +9,7 @@ from app.inventory import (
     save_inventory_hardware_edits,
     update_hardware_availability,
 )
-from app.models import HardwarePathSummary, VlanRange
+from app.models import HardwarePathSummary, InventoryConnection, InventoryDevice, VlanRange
 
 
 def test_build_inventory_sanitizes_conflicting_remote_interface_connections():
@@ -622,3 +623,30 @@ def test_hardware_path_summary_single_switch_legacy():
     assert path.access_switch_id == "only_sw"
     assert path.upstream_switch_id == "only_sw"  # hops[-1] == hops[0] for single hop
     assert path.complete is False
+
+
+def test_switch_path_uses_port_channel_instead_of_one_member():
+    devices = {
+        "access_sw": InventoryDevice(id="access_sw", type="switch", display_name="access-sw", model="Dell-3048"),
+        "agg_sw": InventoryDevice(id="agg_sw", type="switch", display_name="agg-sw", model="DCS-7050SX3-48YC8"),
+    }
+    connections = [
+        InventoryConnection.model_validate({
+            "id": "member-49",
+            "a": {"device_id": "access_sw", "interface": "tengigabitethernet1/49", "port_channel": "port-channel3"},
+            "b": {"device_id": "agg_sw", "interface": "eth13", "port_channel": "port-channel3"},
+            "role": "switch-uplink",
+        }),
+        InventoryConnection.model_validate({
+            "id": "member-50",
+            "a": {"device_id": "access_sw", "interface": "tengigabitethernet1/50", "port_channel": "port-channel3"},
+            "b": {"device_id": "agg_sw", "interface": "eth14", "port_channel": "port-channel3"},
+            "role": "switch-uplink",
+        }),
+    ]
+
+    path = _dfs_path("access_sw", "agg_sw", devices, connections, visited=set())
+
+    assert path is not None
+    assert path[0].egress_port == "port-channel3"
+    assert path[1].ingress_port == "port-channel3"

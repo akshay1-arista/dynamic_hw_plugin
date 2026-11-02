@@ -612,12 +612,28 @@ class HardwareImportRequest(BaseModel):
         return value
 
 
-BaseBranchName = Literal["release_5.2", "release_6.1", "release_6.4", "release_7.0", "master"]
+def normalize_hapy_base_branch(value: str) -> str:
+    cleaned = value.strip()
+    if not cleaned:
+        raise ValueError("base_branch is required")
+    if any(character.isspace() for character in cleaned):
+        raise ValueError("base_branch cannot contain whitespace")
+    if cleaned.startswith("-") or cleaned.startswith("."):
+        raise ValueError("invalid base_branch")
+    invalid_characters = ("..", "~", "^", ":", "?", "*", "[", "\\")
+    if any(token in cleaned for token in invalid_characters):
+        raise ValueError("invalid base_branch")
+    return cleaned
 
 
 class HapyCommitRequest(BaseModel):
-    base_branch: BaseBranchName = "master"
+    base_branch: str = "master"
     requested_by: Optional[ActorIdentity] = None
+
+    @field_validator("base_branch")
+    @classmethod
+    def validate_base_branch(cls, value: str) -> str:
+        return normalize_hapy_base_branch(value)
 
 
 class HapyPublishMetadata(BaseModel):
@@ -627,7 +643,7 @@ class HapyPublishMetadata(BaseModel):
     repo_path: str
     destination_path: str
     destination_relative_path: str
-    base_branch: BaseBranchName
+    base_branch: str
     private_branch_name: str
     commit_sha: str
     commit_message: str
@@ -649,7 +665,7 @@ class HapyCommitResult(BaseModel):
     repo_path: str
     destination_path: str
     destination_relative_path: str
-    base_branch: BaseBranchName
+    base_branch: str
     private_branch_name: str
     commit_sha: str
     commit_message: str
@@ -671,7 +687,7 @@ class HapyPrivateBranchRecord(BaseModel):
     repo_path: str
     destination_path: str
     destination_relative_path: str
-    base_branch: BaseBranchName
+    base_branch: str
     private_branch_name: str
     commit_sha: str
     commit_message: str

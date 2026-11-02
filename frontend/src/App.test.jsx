@@ -1776,6 +1776,36 @@ describe('App', () => {
     expect(await screen.findByText('Copied')).toBeInTheDocument();
   });
 
+  test('publishes generated topology from a custom base branch', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await screen.findAllByText('CHN 3800 HA Pair 8');
+    await chooseHardware(user, 'a01 680', /A01 680 Standalone/i);
+    await user.selectOptions(screen.getByLabelText('Branch'), 'branch1');
+    await user.type(screen.getByRole('combobox', { name: 'Hypervisor IP' }), '10.68.136.50');
+    await user.type(screen.getByRole('combobox', { name: 'Hypervisor interface' }), 'vmnic0');
+    await user.click(screen.getByRole('button', { name: /generate zip/i }));
+
+    await waitFor(() => expect(screen.getByText(/path resolved/i)).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText('Base branch for Gerrit private branch'), 'Custom…');
+    await user.type(
+      screen.getByLabelText('Custom base branch for Gerrit private branch'),
+      'release_6.3_hotfix'
+    );
+    await user.click(screen.getByRole('button', { name: /commit and push gerrit private branch/i }));
+
+    await waitFor(() =>
+      expect(screen.getByText(/Private branch: hw_topo_gen_private_abc123/)).toBeInTheDocument()
+    );
+
+    const publishCall = global.fetch.mock.calls.find(([url]) => url === '/api/runs/abc123/publish-private-branch');
+    expect(JSON.parse(publishCall[1].body)).toEqual({
+      base_branch: 'release_6.3_hotfix',
+      requested_by: defaultUser
+    });
+  });
+
   test('falls back to execCommand when copying topology name without the Clipboard API', async () => {
     const user = userEvent.setup();
     Object.defineProperty(navigator, 'clipboard', {

@@ -12,7 +12,6 @@ from pathlib import Path
 
 from .audit import append_audit_event
 from .config import (
-    HAPY_BASE_BRANCHES,
     HAPY_GERRIT_REMOTE_NAME,
     HAPY_GIT_USER_EMAIL,
     HAPY_GIT_USER_NAME,
@@ -58,8 +57,6 @@ def commit_run_to_hapy_repo(
         raise HapyRepoError(f"Generated topology folder not found for run {run_id}")
 
     base_branch = request.base_branch
-    if base_branch not in HAPY_BASE_BRANCHES:
-        raise HapyRepoError(f"Unsupported base branch: {base_branch}")
 
     existing_publish = _find_publish(metadata)
     if existing_publish is not None:

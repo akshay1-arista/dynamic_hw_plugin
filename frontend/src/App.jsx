@@ -52,6 +52,23 @@ const emptyMapping = {
 };
 
 const hapyBaseBranches = ['release_5.2', 'release_6.1', 'release_6.4', 'release_7.0', 'master'];
+const hapyBaseBranchCustomOption = '__custom__';
+
+function resolvePublishBaseBranch(selection, customText) {
+  if (selection === hapyBaseBranchCustomOption) {
+    return customText.trim();
+  }
+  return selection;
+}
+
+function publishBaseBranchToEditorState(baseBranch) {
+  const normalized = (baseBranch || 'master').trim() || 'master';
+  if (hapyBaseBranches.includes(normalized)) {
+    return { selection: normalized, custom: '' };
+  }
+  return { selection: hapyBaseBranchCustomOption, custom: normalized };
+}
+
 const userStorageKey = 'dynamic-topology-user';
 const SWITCH_CONFIG_ONLY_ID = '__switch_config_only__';
 
@@ -97,7 +114,8 @@ export function App() {
   const [mappings, setMappings] = useState([{ ...emptyMapping }]);
   const [result, setResult] = useState(null);
   const [publishResult, setPublishResult] = useState(null);
-  const [publishBaseBranch, setPublishBaseBranch] = useState('master');
+  const [publishBaseBranchSelection, setPublishBaseBranchSelection] = useState('master');
+  const [publishBaseBranchCustom, setPublishBaseBranchCustom] = useState('');
   const [publishingAction, setPublishingAction] = useState('');
   const [deletingPrivateBranchNames, setDeletingPrivateBranchNames] = useState([]);
   const [privateBranchFeedback, setPrivateBranchFeedback] = useState(null);
@@ -431,7 +449,9 @@ export function App() {
       );
       setResult(savedRun.result);
       setPublishResult(savedRun.publish_result);
-      setPublishBaseBranch(savedRun.publish_result?.base_branch || 'master');
+      const baseBranchEditor = publishBaseBranchToEditorState(savedRun.publish_result?.base_branch);
+      setPublishBaseBranchSelection(baseBranchEditor.selection);
+      setPublishBaseBranchCustom(baseBranchEditor.custom);
       setCopyState({});
     } catch (loadError) {
       setError(loadError.message);
@@ -970,11 +990,16 @@ export function App() {
     if (!result?.run_id) {
       return;
     }
+    const baseBranch = resolvePublishBaseBranch(publishBaseBranchSelection, publishBaseBranchCustom);
+    if (!baseBranch) {
+      setError('Enter a base branch name for the Gerrit private branch.');
+      return;
+    }
     setPublishingAction('publish');
     setError('');
     try {
       const response = await publishPrivateBranch(result.run_id, {
-        base_branch: publishBaseBranch,
+        base_branch: baseBranch,
         requested_by: currentUser
       });
       setPublishResult(response);
@@ -2073,8 +2098,8 @@ export function App() {
                   Base branch for Gerrit private branch
                   <select
                     aria-label="Base branch for Gerrit private branch"
-                    value={publishBaseBranch}
-                    onChange={(event) => setPublishBaseBranch(event.target.value)}
+                    value={publishBaseBranchSelection}
+                    onChange={(event) => setPublishBaseBranchSelection(event.target.value)}
                     disabled={publishingAction !== ''}
                   >
                     {hapyBaseBranches.map((branchName) => (
@@ -2082,8 +2107,22 @@ export function App() {
                         {branchName}
                       </option>
                     ))}
+                    <option value={hapyBaseBranchCustomOption}>Custom…</option>
                   </select>
                 </label>
+                {publishBaseBranchSelection === hapyBaseBranchCustomOption && (
+                  <label className="publishField">
+                    Custom base branch
+                    <input
+                      aria-label="Custom base branch for Gerrit private branch"
+                      disabled={publishingAction !== ''}
+                      onChange={(event) => setPublishBaseBranchCustom(event.target.value)}
+                      placeholder="e.g. release_6.3_hotfix"
+                      type="text"
+                      value={publishBaseBranchCustom}
+                    />
+                  </label>
+                )}
                 <small className="muted">
                   This publishes one Gerrit private branch for the generated run using the selected base branch.
                 </small>
@@ -2131,7 +2170,12 @@ export function App() {
                 <button
                   className="secondary"
                   onClick={submitPublishPrivateBranch}
-                  disabled={publishingAction !== '' || generating}
+                  disabled={
+                    publishingAction !== '' ||
+                    generating ||
+                    (publishBaseBranchSelection === hapyBaseBranchCustomOption &&
+                      !publishBaseBranchCustom.trim())
+                  }
                 >
                   {publishingAction === 'publish' ? <Loader2 className="spin" size={16} /> : <GitBranch size={16} />}
                   Commit And Push Gerrit Private Branch

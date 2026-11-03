@@ -654,7 +654,8 @@ def _render_os9_vlan_block(vlan: int, vlan_state: dict[str, set[str]]) -> list[s
 
 def _render_os10_commands(state: dict[str, object]) -> list[str]:
     device = state["device"]
-    commands: list[str] = []
+    prepared: list[tuple[str, dict[str, object], int | None, set[int]]] = []
+    vlans: set[int] = set()
     for interface_name in sorted(state["port_configs"], key=_interface_sort_key):
         config = state["port_configs"][interface_name]
         existing = _fetch_os10_interface_config(device, interface_name) if config["shared"] else None
@@ -672,7 +673,16 @@ def _render_os10_commands(state: dict[str, object]) -> list[str]:
             )
         if native_vlan in tagged_vlans:
             tagged_vlans.discard(native_vlan)
+        if native_vlan not in (None, 1):
+            vlans.add(native_vlan)
+        vlans.update(tagged_vlans)
+        prepared.append((interface_name, config, native_vlan, tagged_vlans))
 
+    commands: list[str] = []
+    for vlan in sorted(vlans):
+        commands.extend([f"interface vlan {vlan}", " exit"])
+
+    for interface_name, config, native_vlan, tagged_vlans in prepared:
         commands.append(f"interface {_format_os10_interface(interface_name)}")
         if config["description"]:
             commands.append(f' description "{config["description"]}"')

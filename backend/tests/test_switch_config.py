@@ -963,6 +963,9 @@ interface ethernet1/1/54
     access_commands = next(item.commands for item in result.devices if item.device_id == "access_sw")
     upstream_commands = next(item.commands for item in result.devices if item.device_id == "upstream_sw")
 
+    assert "interface vlan 214" in access_commands
+    assert "interface vlan 215" in access_commands
+    assert "interface vlan 216" in access_commands
     assert "interface ethernet1/1/3" in access_commands
     assert " switchport access vlan 214" in access_commands
     assert " switchport trunk allowed vlan 215-216" in access_commands

@@ -1260,7 +1260,7 @@ describe('App', () => {
     expect(screen.getByText('chn-3800-ha-8')).toBeInTheDocument();
   });
 
-  test('keeps hardware reserved by the current user selectable', async () => {
+  test('keeps reserved hardware selectable regardless of reservation owner', async () => {
     const user = userEvent.setup();
     render(<App />);
 
@@ -1273,7 +1273,7 @@ describe('App', () => {
     const otherOption = screen.getByRole('option', { name: /Other 680 Reserved/i });
     expect(ownOption).toBeEnabled();
     expect(ownHaOption).toBeEnabled();
-    expect(otherOption).toBeDisabled();
+    expect(otherOption).toBeEnabled();
 
     await user.click(ownOption);
     await user.selectOptions(screen.getByLabelText('Branch'), 'branch1');

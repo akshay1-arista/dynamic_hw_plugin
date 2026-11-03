@@ -397,7 +397,7 @@ def test_switch_config_only_run_can_preview_switch_commands(tmp_path, monkeypatc
     assert "200" in command_text
 
 
-def test_switch_config_only_ha_rejects_secondary_reserved_by_another_user(tmp_path, monkeypatch):
+def test_switch_config_only_ha_allows_secondary_reserved_by_another_user(tmp_path, monkeypatch):
     inventory_path = _switch_config_inventory(tmp_path)
     outputs_root = tmp_path / "outputs"
     outputs_root.mkdir()
@@ -421,15 +421,17 @@ def test_switch_config_only_ha_rejects_secondary_reserved_by_another_user(tmp_pa
     )
     monkeypatch.setattr("app.switch_config_only.load_inventory", lambda _path: inventory)
 
-    with pytest.raises(GenerationError, match="Reserved by Other User"):
-        create_switch_config_run(
-            _base_request(
-                secondary_hardware_id=STANDALONE_SECONDARY_ID,
-                edge_ha_mode="ha",
-            ),
-            inventory_path=inventory_path,
-            outputs_root=outputs_root,
-        )
+    result = create_switch_config_run(
+        _base_request(
+            secondary_hardware_id=STANDALONE_SECONDARY_ID,
+            edge_ha_mode="ha",
+        ),
+        inventory_path=inventory_path,
+        outputs_root=outputs_root,
+    )
+
+    assert result.run_id
+    assert result.mapping_statuses
 
 
 def test_switch_config_only_ha_from_standalones_keeps_standby_switch(tmp_path, monkeypatch):

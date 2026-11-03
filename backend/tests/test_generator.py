@@ -319,7 +319,7 @@ def test_reserved_hardware_stays_usable_for_the_reserving_user(tmp_path):
     assert view.hardware.id == STANDALONE_PRIMARY_ID
 
 
-def test_synthetic_ha_rejects_secondary_reserved_by_another_user(tmp_path):
+def test_synthetic_ha_allows_secondary_reserved_by_another_user(tmp_path):
     inventory = load_inventory(_standalone_ha_candidate_inventory(tmp_path))
     hardware_by_id = {item.id: item for item in inventory.hardware}
     primary = hardware_by_id[STANDALONE_PRIMARY_ID]
@@ -350,11 +350,13 @@ def test_synthetic_ha_rejects_secondary_reserved_by_another_user(tmp_path):
         secondary_hardware_id=STANDALONE_SECONDARY_ID,
         edge_ha_mode="ha",
     )
-    with pytest.raises(GenerationError, match="Reserved by Other User"):
-        _resolve_mapping_hardware_view(
-            request.mappings[0],
-            primary,
-            hardware_by_id,
-            True,
-            request,
-        )
+    view = _resolve_mapping_hardware_view(
+        request.mappings[0],
+        primary,
+        hardware_by_id,
+        True,
+        request,
+    )
+
+    assert view.resolved_mode == "ha"
+    assert view.hardware.ha is True

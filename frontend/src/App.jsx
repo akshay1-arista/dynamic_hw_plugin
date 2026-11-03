@@ -2874,51 +2874,8 @@ function hardwareMemberByRole(hardware, role) {
   return (hardware?.members || []).find((member) => member.role === role) || null;
 }
 
-function reservationOwnedByUser(reservation, currentUser) {
-  const owner = reservation?.actor?.email?.trim().toLowerCase();
-  const requester = currentUser?.email?.trim().toLowerCase();
-  return Boolean(owner && requester && owner === requester);
-}
-
-function resourceUsableByUser(available, reservation, currentUser) {
-  return Boolean(available) || reservationOwnedByUser(reservation, currentUser);
-}
-
-function inventoryMemberUsableByUser(hardware, member, currentUser) {
-  if (member.available || reservationOwnedByUser(member.reservation, currentUser)) {
-    return true;
-  }
-  return !member.reservation && reservationOwnedByUser(hardware?.reservation, currentUser);
-}
-
-function hardwareMemberUsableByUser(hardware, role, currentUser) {
-  const member = hardwareMemberByRole(hardware, role);
-  if (member) {
-    return inventoryMemberUsableByUser(hardware, member, currentUser);
-  }
-  return resourceUsableByUser(hardware?.available, hardware?.reservation, currentUser);
-}
-
-function hardwareFullyUsableByUser(hardware, currentUser) {
-  if (!hardware) {
-    return false;
-  }
-  if (hardware.members?.length) {
-    return hardware.members.every((member) => inventoryMemberUsableByUser(hardware, member, currentUser));
-  }
-  return resourceUsableByUser(hardware.available, hardware.reservation, currentUser);
-}
-
-function hardwareSelectableForMapping(hardware, currentUser) {
-  if (!hardware) {
-    return false;
-  }
-  if (hardwareFullyUsableByUser(hardware, currentUser)) {
-    return true;
-  }
-  return ['active', 'standby'].some(
-    (role) => hardwareMemberByRole(hardware, role) && hardwareMemberUsableByUser(hardware, role, currentUser)
-  );
+function hardwareSelectableForMapping(hardware) {
+  return Boolean(hardware);
 }
 
 function compatibleStandaloneHaCandidates(hardware, hardwareOptions) {
@@ -2935,16 +2892,10 @@ function compatibleStandaloneHaCandidates(hardware, hardwareOptions) {
 
 function haModeOptions(hardware, edge, secondaryHardware = null, hardwareOptions = [], options = {}) {
   const switchConfigOnly = Boolean(options.switchConfigOnly);
-  const currentUser = options.currentUser || null;
   const baseHa = Boolean(edge?.ha_enabled);
   const hasStandby = Boolean(hardware?.standby_serial || hardwareMemberByRole(hardware, 'standby'));
   const compatibleSecondaries = compatibleStandaloneHaCandidates(hardware, hardwareOptions);
-  const selectableCompatibleSecondaries = compatibleSecondaries.filter((candidate) =>
-    hardwareSelectableForMapping(candidate, currentUser)
-  );
-  const canSynthesizeHa = !hardware?.ha && Boolean(secondaryHardware || selectableCompatibleSecondaries.length);
-  const primaryHaUsable = hardwareFullyUsableByUser(hardware, currentUser);
-  const secondaryHaUsable = !secondaryHardware || hardwareFullyUsableByUser(secondaryHardware, currentUser);
+  const canSynthesizeHa = !hardware?.ha && Boolean(secondaryHardware || compatibleSecondaries.length);
   const allOptions = [
     {
       value: 'topology_default',
@@ -2955,28 +2906,24 @@ function haModeOptions(hardware, edge, secondaryHardware = null, hardwareOptions
     {
       value: 'ha',
       label: !hardware?.ha && secondaryHardware ? 'HA from standalones' : 'HA pair',
-      disabled: (!hardware?.ha && !canSynthesizeHa) || !primaryHaUsable || !secondaryHaUsable,
-      reason: (!hardware?.ha && !canSynthesizeHa)
+      disabled: !hardware?.ha && !canSynthesizeHa,
+      reason: !hardware?.ha && !canSynthesizeHa
         ? 'Selected hardware has no standby member and no compatible standalone devices are available.'
-        : !primaryHaUsable
-          ? 'Both HA members must be available for HA mode.'
-          : !secondaryHaUsable
-            ? 'Selected standby hardware is reserved.'
-            : !hardware?.ha && !secondaryHardware
-              ? 'Select an additional standalone device to use HA mode.'
+        : !hardware?.ha && !secondaryHardware
+          ? 'Select an additional standalone device to use HA mode.'
           : ''
     },
     {
       value: 'single_active',
       label: 'Active only',
-      disabled: !hardwareMemberUsableByUser(hardware, 'active', currentUser),
-      reason: 'Active member is reserved.'
+      disabled: false,
+      reason: ''
     },
     {
       value: 'single_standby',
       label: 'Standby only',
-      disabled: !hasStandby || !hardwareMemberUsableByUser(hardware, 'standby', currentUser),
-      reason: !hasStandby ? 'Selected hardware has no standby member.' : 'Standby member is reserved.'
+      disabled: !hasStandby,
+      reason: !hasStandby ? 'Selected hardware has no standby member.' : ''
     }
   ];
   return switchConfigOnly ? allOptions.filter((option) => option.value !== 'topology_default') : allOptions;
@@ -3911,7 +3858,7 @@ function HardwareCombobox({
   }, [filteredHardwareOptions.length, highlightedIndex]);
 
   function commitSelection(hardware) {
-    if (!hardware || !hardwareSelectableForMapping(hardware, currentUser)) {
+    if (!hardwareSelectableForMapping(hardware)) {
       return;
     }
     onSelect(hardware.id);
@@ -4004,7 +3951,7 @@ function HardwareCombobox({
                 role="option"
                 aria-selected={hardware.id === selectedHardwareId}
                 className={`comboboxOption${optionIndex === highlightedIndex ? ' active' : ''}`}
-                disabled={!hardwareSelectableForMapping(hardware, currentUser)}
+                disabled={!hardwareSelectableForMapping(hardware)}
                 onMouseDown={(event) => event.preventDefault()}
                 onMouseEnter={() => setHighlightedIndex(optionIndex)}
                 onClick={() => commitSelection(hardware)}

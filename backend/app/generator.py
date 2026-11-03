@@ -28,7 +28,6 @@ from .models import (
     HardwareEdge,
     HardwareMemberInfo,
     HardwarePortAllocation,
-    HardwareReservation,
     InterfaceOverride,
     InventoryDevice,
     InventoryFile,
@@ -386,19 +385,6 @@ def _resolve_mapping_hardware_view(
     elif resolved_mode == "single_standby":
         view = _single_member_hardware_view(base_hardware, "standby")
 
-    if not _mapping_view_is_available(base_hardware, resolved_mode, request):
-        display_name, reservation = _unavailable_mapping_target(base_hardware, resolved_mode, request)
-        reservation_actor = reservation.actor if reservation else None
-        reserved_by = (
-            f"{reservation_actor.name} ({reservation_actor.email})"
-            if reservation_actor
-            else "another user"
-        )
-        raise GenerationError(
-            f"{display_name} is currently reserved for the selected HA mode. "
-            f"Mark it available before generating again. Reserved by {reserved_by}."
-        )
-
     ports = _topology_ports(view)
     if not ports:
         raise GenerationError(f"No connected switch ports found for {base_hardware.id} in {resolved_mode} mode")
@@ -623,35 +609,6 @@ def _single_member_hardware_view(hardware: HardwareEdge, role: str) -> HardwareE
     )
 
 
-def _mapping_view_is_available(hardware: HardwareEdge, resolved_mode: str, request: GenerateRequest) -> bool:
-    if resolved_mode == "ha":
-        if hardware.members:
-            return all(_member_is_available_for_request(member, request) for member in hardware.members)
-        return _hardware_is_available_for_request(hardware, request)
-    role = "standby" if resolved_mode == "single_standby" else "active"
-    member = _member_info(hardware, role)
-    if not member:
-        return _hardware_is_available_for_request(hardware, request)
-    return _member_is_available_for_request(member, request)
-
-
-def _unavailable_mapping_target(
-    hardware: HardwareEdge,
-    resolved_mode: str,
-    request: GenerateRequest,
-) -> tuple[str, HardwareReservation | None]:
-    if resolved_mode == "ha" and hardware.members:
-        for member in hardware.members:
-            if not _member_is_available_for_request(member, request):
-                return member.display_name, member.reservation
-    elif resolved_mode != "ha":
-        role = "standby" if resolved_mode == "single_standby" else "active"
-        member = _member_info(hardware, role)
-        if member and not _member_is_available_for_request(member, request):
-            return member.display_name, member.reservation
-    return hardware.display_name, hardware.reservation
-
-
 def _reserved_device_ids_for_mode(hardware: HardwareEdge, resolved_mode: str) -> list[str]:
     if not hardware.members:
         return []
@@ -664,25 +621,6 @@ def _reserved_device_ids_for_mode(hardware: HardwareEdge, resolved_mode: str) ->
 
 def _member_info(hardware: HardwareEdge, role: str):
     return next((member for member in hardware.members if member.role == role), None)
-
-
-def _member_is_available_for_request(member: HardwareMemberInfo, request: GenerateRequest) -> bool:
-    if member.available:
-        return True
-    return _reservation_usable_by_request(member.reservation, request)
-
-
-def _hardware_is_available_for_request(hardware: HardwareEdge, request: GenerateRequest) -> bool:
-    if hardware.available:
-        return True
-    return _reservation_usable_by_request(hardware.reservation, request)
-
-
-def _reservation_usable_by_request(reservation, request: GenerateRequest) -> bool:
-    if reservation is None:
-        return False
-    requester = request.requested_by.email if request.requested_by else None
-    return bool(requester) and reservation.actor.email == requester
 
 
 def _merge_saved_hardware_snapshots(

@@ -652,9 +652,26 @@ def _render_os9_vlan_block(vlan: int, vlan_state: dict[str, set[str]]) -> list[s
     return commands
 
 
+def _os10_port_layout(
+    config: dict[str, object],
+    native_vlan: int | None,
+    tagged_vlans: set[int],
+) -> str:
+    """Return OS10 port layout: access, edge_trunk, or transit_trunk."""
+    if native_vlan is not None and not config["shared"] and not tagged_vlans:
+        return "access"
+    if config["shared"] or (tagged_vlans and native_vlan is None):
+        return "transit_trunk"
+    if tagged_vlans and native_vlan is not None and not config["shared"]:
+        return "edge_trunk"
+    if native_vlan is not None:
+        return "access"
+    return "transit_trunk"
+
+
 def _render_os10_commands(state: dict[str, object]) -> list[str]:
     device = state["device"]
-    prepared: list[tuple[str, dict[str, object], int | None, set[int]]] = []
+    prepared: list[tuple[str, dict[str, object], int | None, set[int], str]] = []
     vlans: set[int] = set()
     for interface_name in sorted(state["port_configs"], key=_interface_sort_key):
         config = state["port_configs"][interface_name]
@@ -662,48 +679,42 @@ def _render_os10_commands(state: dict[str, object]) -> list[str]:
         native_vlan = config["native_vlan"]
         tagged_vlans = set(config["tagged_vlans"])
         if config["shared"]:
-            existing_native, existing_tagged = _parse_os10_interface_config(existing)
-            native_vlan = existing_native if existing_native is not None else native_vlan
-            if native_vlan is None:
-                native_vlan = 1
+            _existing_native, existing_tagged = _parse_os10_interface_config(existing)
             tagged_vlans = _merge_shared_os10_tagged_vlans(
                 existing_tagged,
                 tagged_vlans,
                 state["shared_cleanup_vlans"].get(interface_name, set()),
             )
-        if native_vlan in tagged_vlans:
+        layout = _os10_port_layout(config, native_vlan, tagged_vlans)
+        if layout == "edge_trunk" and native_vlan in tagged_vlans:
             tagged_vlans.discard(native_vlan)
         if native_vlan not in (None, 1):
             vlans.add(native_vlan)
         vlans.update(tagged_vlans)
-        prepared.append((interface_name, config, native_vlan, tagged_vlans))
+        prepared.append((interface_name, config, native_vlan, tagged_vlans, layout))
 
     commands: list[str] = []
     for vlan in sorted(vlans):
         commands.extend([f"interface vlan {vlan}", " exit"])
 
-    for interface_name, config, native_vlan, tagged_vlans in prepared:
+    for interface_name, config, native_vlan, tagged_vlans, layout in prepared:
         commands.append(f"interface {_format_os10_interface(interface_name)}")
         if config["description"]:
             commands.append(f' description "{config["description"]}"')
         commands.append(" no shutdown")
-        if config["shared"]:
-            commands.append(" switchport mode trunk")
-            commands.append(f" switchport access vlan {native_vlan or 1}")
-            if tagged_vlans:
-                commands.append(" no switchport trunk allowed vlan")
-                commands.append(f" switchport trunk allowed vlan {_collapse_vlan_ranges(sorted(tagged_vlans))}")
-        elif tagged_vlans:
-            commands.append(" switchport mode trunk")
-            commands.append(f" switchport access vlan {native_vlan or 1}")
-            commands.append(" no switchport trunk allowed vlan")
-            commands.append(f" switchport trunk allowed vlan {_collapse_vlan_ranges(sorted(tagged_vlans))}")
-        elif native_vlan is not None:
+        if layout == "access":
             commands.append(" switchport mode access")
             commands.append(f" switchport access vlan {native_vlan}")
         else:
             commands.append(" switchport mode trunk")
-            commands.append(" switchport access vlan 1")
+            if layout == "transit_trunk":
+                # Lab uplinks/hypervisor trunks: tagged VLANs only.
+                commands.append(" no switchport access vlan")
+            else:
+                commands.append(f" switchport access vlan {native_vlan}")
+            if tagged_vlans:
+                commands.append(" no switchport trunk allowed vlan")
+                commands.append(f" switchport trunk allowed vlan {_collapse_vlan_ranges(sorted(tagged_vlans))}")
         if config["flowcontrol_receive_on"]:
             commands.append(" flowcontrol receive on")
         commands.append(" exit")

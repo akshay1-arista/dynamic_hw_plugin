@@ -430,6 +430,7 @@ interface Vlan 106
         len(upstream_commands),
     )
     ingress_block = upstream_commands[ingress_start:next_interface]
+    assert " no switchport access vlan" in ingress_block
     assert " switchport trunk allowed vlan 106" in ingress_block
 
 
@@ -970,9 +971,13 @@ interface ethernet1/1/54
     assert " switchport access vlan 214" in access_commands
     assert " switchport trunk allowed vlan 215-216" in access_commands
     assert "interface ethernet1/1/49" in access_commands
+    assert " no switchport access vlan" in access_commands
     assert " switchport trunk allowed vlan 202-203,214-216" in access_commands
     assert "interface ethernet1/1/54" in upstream_commands
+    assert " no switchport access vlan" in upstream_commands
     assert " switchport trunk allowed vlan 202-216,402-416" in upstream_commands
+    assert " switchport access vlan 1" not in access_commands
+    assert " switchport access vlan 1" not in upstream_commands
 
 
 def test_merge_shared_os10_tagged_vlans_replaces_only_targeted_shared_vlans():
@@ -2237,6 +2242,7 @@ def test_configure_switches_puts_transit_vlans_on_port_channel(tmp_path, monkeyp
     assert " tagged Port-channel 1" in access_commands
     assert "TenGigabitEthernet 1/49" not in access_commands
     assert "interface port-channel1" in upstream_commands
+    assert " no switchport access vlan" in upstream_commands
     assert " switchport trunk allowed vlan 10,102-103" in upstream_commands
     assert "interface ethernet1/1/52" not in upstream_commands
 

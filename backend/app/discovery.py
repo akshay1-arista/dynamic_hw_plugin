@@ -126,6 +126,7 @@ class LabNavigatorClient:
             headers=headers,
             verify=verify,
         )
+        self._inventory_devices: dict[int, dict[str, Any]] = {}
 
     def close(self) -> None:
         self.client.close()
@@ -164,13 +165,17 @@ class LabNavigatorClient:
         return self._get_json(f"/api/server/device-nics/{device_id}")
 
     def get_inventory_device(self, device_id: int) -> dict[str, Any]:
+        if device_id in self._inventory_devices:
+            return self._inventory_devices[device_id]
         matches = self.list_inventory([{"field": "id", "operator": "equals", "value": str(device_id)}])
         exact = [item for item in matches if item.get("id") == device_id]
         if len(exact) == 1:
+            self._inventory_devices[device_id] = exact[0]
             return exact[0]
         wiremap = self.get_wiremap(device_id)
         device = wiremap.get("device")
         if isinstance(device, dict):
+            self._inventory_devices[device_id] = device
             return device
         raise DiscoveryError(f"Could not resolve Lab Navigator device id {device_id}")
 
@@ -1044,16 +1049,32 @@ def _resolve_wiremap_remote_device(
     wiremap_entry: dict[str, Any],
 ) -> dict[str, Any] | None:
     remote_device = wiremap_entry.get("remote_device")
-    if isinstance(remote_device, dict):
-        return remote_device
+    if not isinstance(remote_device, dict):
+        remote_name = str(remote_device or "").strip()
+        if not remote_name:
+            return None
+        matches = [item for item in client.search(remote_name) if item.get("name") == remote_name]
+        if len(matches) != 1:
+            return None
+        remote_device = matches[0]
 
-    remote_name = str(remote_device or "").strip()
-    if not remote_name:
-        return None
-    matches = [item for item in client.search(remote_name) if item.get("name") == remote_name]
-    if len(matches) == 1:
-        return matches[0]
-    return None
+    # Wiremap peer summaries can omit both model fields even when inventory has them.
+    if not _device_model(remote_device) and remote_device.get("id") is not None:
+        try:
+            full_device = client.get_inventory_device(remote_device["id"])
+        except DiscoveryError as error:
+            _log(
+                logging.WARNING,
+                "Could not fetch model for wiremap peer lab_navigator_id=%s: %s; preserving known device data",
+                remote_device["id"],
+                error,
+            )
+        else:
+            remote_device = {
+                **remote_device,
+                **{key: value for key, value in full_device.items() if value not in (None, "")},
+            }
+    return remote_device
 
 
 def _inventory_switch_device(
@@ -1066,7 +1087,11 @@ def _inventory_switch_device(
 ) -> dict[str, Any]:
     existing_metadata = existing.switch_metadata if existing else None
     switch_ip = ip_address or (existing_metadata.connections.ip if existing_metadata else "")
-    resolved_model = model or (existing_metadata.model if existing_metadata else "Dell")
+    resolved_model = (
+        model
+        or (existing.model if existing else None)
+        or (existing_metadata.model if existing_metadata else "")
+    )
     inferred_type, inferred_family = infer_switch_platform(resolved_model, name)
     if inferred_family == "eos":
         device_type = "ARISTA"
@@ -1081,7 +1106,7 @@ def _inventory_switch_device(
         id=existing.id if existing else _safe_id(name),  # reuse existing ID to avoid duplicates
         type="switch",
         display_name=name,
-        model=model,
+        model=resolved_model,
         ip_address=switch_ip,
         lab_navigator_id=lab_navigator_id,
         switch_metadata=SwitchMetadata(

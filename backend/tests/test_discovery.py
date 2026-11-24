@@ -9,6 +9,7 @@ from app.discovery import (
     LabNavigatorClient,
     _build_wiremap_connection,
     _inventory_switch_device,
+    _resolve_wiremap_remote_device,
     apply_inventory_import,
     apply_inventory_refresh,
     preview_inventory_import,
@@ -1265,3 +1266,114 @@ def test_inventory_switch_device_marks_arista_as_eos():
     device = _inventory_switch_device("chn-rnd-sw-7050-1", "DCS-7050SX3-48YC8", "10.68.133.67", 912)
     assert device["switch_metadata"]["device_type"] == "ARISTA"
     assert device["switch_metadata"]["os_family"] == "eos"
+
+
+@pytest.mark.parametrize("named_peer", [False, True])
+def test_refresh_repairs_arista_model_from_sparse_wiremap_peer(tmp_path, named_peer):
+    full_switch = {
+        "id": 925,
+        "name": "chn-rnd-sw-720-4",
+        "device_type": "switch",
+        "device_model": "Arista-CCS-720DP-24ZS-2F",
+        "ip_address": "10.68.137.34",
+    }
+    peer = {key: value for key, value in full_switch.items() if key != "device_model"}
+    old_switch = _inventory_switch_device(peer["name"], "", peer["ip_address"], 925)
+    old_switch["switch_metadata"]["model"] = "Dell"
+    old_switch["switch_metadata"]["credentials"] = {"username": "custom-user", "password": "custom-password"}
+    inventory_path = tmp_path / "inventory.json"
+    inventory_path.write_text(json.dumps({
+        "devices": {
+            "edge_722": {
+                "id": "edge_722", "type": "edge", "display_name": "chn-rnd-edge-722-1",
+                "model": "edge7X0", "model_suffix": "722", "serial_number": "SERIAL722",
+                "lab_navigator_id": 887,
+            },
+            old_switch["id"]: old_switch,
+        },
+        "connections": [],
+    }))
+    inventory_lookups = []
+
+    def handle(request):
+        if request.url.path == "/api/search":
+            assert request.url.params["q"] == peer["name"]
+            return httpx.Response(200, json={"devices": [peer]})
+        if request.url.path == "/api/inventory":
+            inventory_lookups.append(json.loads(request.url.params["filters"]))
+            return httpx.Response(200, json={"devices": [full_switch]})
+        if request.url.path == "/api/device/887/wiremap":
+            return httpx.Response(200, json={"connections": [
+                {
+                    "interface_name": f"GE{port + 1}",
+                    "remote_device": peer["name"] if named_peer else peer,
+                    "remote_interface_name": f"Eth{port}",
+                }
+                for port in (1, 2)
+            ]})
+        if request.url.path == "/api/device/925/wiremap":
+            return httpx.Response(200, json={"device": full_switch, "connections": []})
+        raise AssertionError(f"Unexpected request: {request.url}")
+
+    client = LabNavigatorClient(api_key="", base_url="https://lab-navigator.example.com")
+    client.client.close()
+    client.client = httpx.Client(base_url=client.base_url, transport=httpx.MockTransport(handle))
+    try:
+        result = apply_inventory_refresh(
+            InventoryRefreshRequest(hardware_ids=["edge_722"]),
+            inventory_path=inventory_path,
+            client=client,
+        )
+    finally:
+        client.close()
+
+    switch = result.inventory.devices[old_switch["id"]]
+    assert switch.model == full_switch["device_model"]
+    assert switch.switch_metadata.model == full_switch["device_model"]
+    assert switch.switch_metadata.device_type == "ARISTA"
+    assert switch.switch_metadata.os_family == "eos"
+    assert switch.switch_metadata.credentials.username == "custom-user"
+    assert switch.switch_metadata.credentials.password == "custom-password"
+    assert len(result.inventory.connections) == 2
+    assert inventory_lookups == [[{"field": "id", "operator": "equals", "value": "925"}]]
+    saved = json.loads(inventory_path.read_text())["devices"][old_switch["id"]]
+    assert saved["model"] == full_switch["device_model"]
+    assert saved["switch_metadata"]["os_family"] == "eos"
+
+    from app.switch_config import _assert_supported_switch
+
+    _assert_supported_switch(switch)
+
+
+@pytest.mark.parametrize("model_key", ["device_model", "display_model"])
+def test_wiremap_peer_with_model_does_not_need_inventory_lookup(model_key):
+    peer = {"id": 925, "name": "chn-rnd-sw-720-4", model_key: "Arista-CCS-720DP-24ZS-2F"}
+    assert _resolve_wiremap_remote_device(object(), {"remote_device": peer}) == peer
+
+
+@pytest.mark.parametrize("metadata_only", [False, True])
+def test_failed_peer_lookup_preserves_known_switch_model(metadata_only, caplog):
+    class UnavailableInventoryClient:
+        def get_inventory_device(self, device_id):
+            raise DiscoveryError("Inventory unavailable")
+
+    peer = {"id": 925, "name": "chn-rnd-sw-720-4", "ip_address": "10.68.137.34"}
+    existing = InventoryDevice.model_validate(
+        _inventory_switch_device(peer["name"], "Arista-CCS-720DP-24ZS-2F", peer["ip_address"], 925)
+    )
+    if metadata_only:
+        existing.model = ""
+    else:
+        existing.switch_metadata.model = "Dell"
+        existing.switch_metadata.device_type = "DELL"
+        existing.switch_metadata.os_family = None
+    resolved = _resolve_wiremap_remote_device(UnavailableInventoryClient(), {"remote_device": peer})
+    assert resolved == peer
+    device = _inventory_switch_device(
+        resolved["name"], "", resolved["ip_address"], resolved["id"], existing=existing,
+    )
+    assert device["model"] == "Arista-CCS-720DP-24ZS-2F"
+    assert device["switch_metadata"]["model"] == device["model"]
+    assert device["switch_metadata"]["device_type"] == "ARISTA"
+    assert device["switch_metadata"]["os_family"] == "eos"
+    assert "Could not fetch model for wiremap peer lab_navigator_id=925" in caplog.text

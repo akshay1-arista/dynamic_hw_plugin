@@ -6,6 +6,7 @@ from pathlib import Path
 from .audit import append_audit_events
 from .config import INVENTORY_PATH, OUTPUTS_ROOT
 from .discovery import DiscoveryError, sync_inventory_for_generate
+from .discovery_runtime import discovery_operation, progress
 from .generator import (
     GenerationError,
     _resolve_mapping_hardware_view,
@@ -35,6 +36,7 @@ from .models import (
 )
 
 
+@discovery_operation("switch-config-generation")
 def create_switch_config_run(
     request: SwitchConfigOnlyRequest,
     *,
@@ -53,6 +55,8 @@ def create_switch_config_run(
         sync_inventory_for_generate(selected_hardware_ids, inventory_path=inventory_path)
     except (DiscoveryError, ValueError, FileNotFoundError, OSError):
         pass
+
+    progress("generating", "Generating switch configuration from discovered inventory")
 
     inventory = load_inventory(inventory_path)
     hardware_by_id = {item.id: item for item in inventory.hardware}

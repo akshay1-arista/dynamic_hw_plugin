@@ -67,6 +67,39 @@ Optional persistent overrides and secrets can be supplied with `/etc/default/dyn
 
 Switch auto-config uses `sshpass` to open non-interactive SSH sessions to access and upstream switches. If you deploy with `AUTO_INSTALL_SYSTEM_DEPS=0`, install the OS package manually before using the "Configure switches" flow.
 
+## Discovery and Refresh
+
+Only one Lab Navigator operation runs at a time across users, including searches,
+refresh/import requests, and discovery during generation. Overlapping requests return
+HTTP 409 with `code: discovery_busy` and the active request ID; requests are not queued.
+Inventory reads and progress remain available. The backend must run with one worker,
+as configured in the systemd template; admission, progress, and previews are held in memory.
+
+The UI displays the request ID, current stage, counts, and progress logs. It polls every
+two seconds during discovery and every five seconds while idle. API clients can supply a
+UUID in `X-Request-ID` and query:
+
+- `GET /api/discovery/active`
+- `GET /api/discovery/requests/{request_id}?after_seq=0`
+
+Progress uses increasing log sequence numbers; pass the last sequence to retrieve only
+new events. Completed requests remain available for 15 minutes (up to 100 requests,
+500 events each). The same request ID appears in backend systemd journal messages.
+
+Each operation reads bulk device metadata once and fetches each shared wiremap once,
+using up to four concurrent upstream requests. The operation deadline is 90 seconds;
+timeouts return HTTP 504 with the request ID. A disconnected browser does not release
+the discovery slot while work is still running.
+
+Refresh preview returns `preview_id`; pass it with `hardware_ids` to refresh Apply to
+save the reviewed result without another discovery. Previews expire after five minutes
+(up to 32 stored). An expired/consumed preview returns 410; changed inventory returns 409.
+Bulk refresh preserves unavailable devices and reports their IDs as partial results while
+refreshing the remaining groups. A single-group request for a missing device reports an error.
+Reservations and availability are taken from current local state when applying. Clients
+omitting `preview_id` retain the discover-and-apply behavior. Restarting the backend clears
+preview and progress records. Deploy the backend and rebuilt frontend assets together.
+
 ## Data And Outputs
 
 - Hardware inventory: `backend/data/hardware_inventory.json`

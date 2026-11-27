@@ -1,5 +1,6 @@
 import { useEffect, useId, useMemo, useState } from 'react';
 import headerLogo from './assets/header-logo.png';
+import { DiscoveryProgress } from './DiscoveryProgress.jsx';
 import {
   Archive,
   CheckCircle2,
@@ -124,6 +125,7 @@ export function App() {
   const [loading, setLoading] = useState(Boolean(loadStoredUser()));
   const [loadingSavedRunId, setLoadingSavedRunId] = useState('');
   const [generating, setGenerating] = useState(false);
+  const [discoveryBusy, setDiscoveryBusy] = useState(false);
   const [savingInventory, setSavingInventory] = useState(false);
   const [refreshingHardwareIds, setRefreshingHardwareIds] = useState([]);
   const [inventoryRefreshFeedback, setInventoryRefreshFeedback] = useState(null);
@@ -645,7 +647,7 @@ export function App() {
       if (!window.confirm(prompt)) {
         return;
       }
-      const applied = await applyInventoryRefresh(targets);
+      const applied = await applyInventoryRefresh(targets, preview.preview_id);
       setInventory(applied.inventory);
       setInventoryRefreshFeedback(applied);
     } catch (refreshError) {
@@ -1306,6 +1308,7 @@ export function App() {
         </div>
       </header>
 
+      <DiscoveryProgress onBusyChange={setDiscoveryBusy} />
       {error && <div className="alert">{error}</div>}
 
       {labNavigatorImportOpen && (
@@ -1365,7 +1368,7 @@ export function App() {
                         placeholder="name, IP, hostname, serial"
                       />
                     </span>
-                    <button className="secondary compactButton" disabled={labNavigatorImporting} type="submit">
+                    <button className="secondary compactButton" disabled={discoveryBusy || labNavigatorImporting} type="submit">
                       {labNavigatorImporting ? <Loader2 className="spin" size={16} /> : <Search size={16} />}
                       Search
                     </button>
@@ -1395,7 +1398,7 @@ export function App() {
                                 placeholder="name, IP, hostname, serial"
                               />
                             </span>
-                            <button className="secondary compactButton" disabled={labNavigatorImporting} type="submit">
+                            <button className="secondary compactButton" disabled={discoveryBusy || labNavigatorImporting} type="submit">
                               {labNavigatorImporting ? <Loader2 className="spin" size={16} /> : <Search size={16} />}
                               Search
                             </button>
@@ -1463,7 +1466,7 @@ export function App() {
               <button
                 className="secondary compactButton"
                 disabled={
-                  labNavigatorImporting ||
+                  discoveryBusy || labNavigatorImporting ||
                   (importMode === 'ha'
                     ? !haImportSelections.active || !haImportSelections.standby
                     : selectedImportDeviceIds.length !== 1)
@@ -1501,14 +1504,14 @@ export function App() {
               </span>
             </label>
             <div className="inventoryActionRow">
-              <button className="secondary compactButton" onClick={openLabNavigatorImport} type="button">
+              <button className="secondary compactButton" onClick={openLabNavigatorImport} disabled={discoveryBusy} type="button">
                 <Plus size={16} />
                 Add from Lab Navigator
               </button>
               <button
                 className="secondary compactButton"
                 onClick={() => refreshHardwareFromLabNavigator(refreshTargets)}
-                disabled={refreshingInventory || refreshTargets.length === 0}
+                disabled={discoveryBusy || refreshingInventory || refreshTargets.length === 0}
                 type="button"
               >
                 {refreshingInventory ? <Loader2 className="spin" size={16} /> : <RefreshCw size={16} />}
@@ -1637,6 +1640,7 @@ export function App() {
                         hardware={hardware}
                         refreshStatus={refreshStatus}
                         refreshing={refreshingHardwareIds.includes(hardware.id)}
+                        discoveryBusy={discoveryBusy}
                         onVlanRangeChange={(boundary, value) => updateHardwareVlanRange(hardware.id, boundary, value)}
                         onRefresh={() => refreshHardwareFromLabNavigator(hardware.id)}
                       />
@@ -1761,7 +1765,7 @@ export function App() {
                 </div>
               )}
               {privateBranchFeedback && (
-                <div className="messageList branchFeedback" role="status" aria-live="polite">
+                <div className="messageList branchFeedback" role="status" aria-label="Gerrit branch status" aria-live="polite">
                   <small className={`message ${privateBranchFeedback.level}`}>{privateBranchFeedback.message}</small>
                 </div>
               )}
@@ -1997,7 +2001,7 @@ export function App() {
               <Plus size={16} />
               Add mapping
             </button>
-            <button className="primary" onClick={submitGenerate} disabled={generating}>
+            <button className="primary" onClick={submitGenerate} disabled={discoveryBusy || generating}>
               {generating ? <Loader2 className="spin" size={16} /> : isSwitchConfigOnly ? <Server size={16} /> : <Archive size={16} />}
               {isSwitchConfigOnly ? 'Map path & preview switch config' : 'Generate zip'}
             </button>
@@ -3471,7 +3475,7 @@ function interfaceAssignmentsEqual(left, right) {
   );
 }
 
-function HardwareDetails({ hardware, refreshStatus, refreshing, onVlanRangeChange, onRefresh }) {
+function HardwareDetails({ hardware, refreshStatus, refreshing, discoveryBusy, onVlanRangeChange, onRefresh }) {
   const switches = hardware.switches?.length ? hardware.switches : hardware.switch ? [hardware.switch] : [];
   const connectionWarning = hardwareConnectionWarning(hardware);
   const asymmetricHaSummary = hardwareAsymmetricHaSummary(hardware);
@@ -3600,7 +3604,7 @@ function HardwareDetails({ hardware, refreshStatus, refreshing, onVlanRangeChang
         </div>
       )}
 
-      <button className="secondary" onClick={onRefresh} disabled={refreshing}>
+      <button className="secondary" onClick={onRefresh} disabled={discoveryBusy || refreshing}>
         {refreshing ? <Loader2 className="spin" size={16} /> : <RefreshCw size={16} />}
         Refresh from Lab Navigator
       </button>

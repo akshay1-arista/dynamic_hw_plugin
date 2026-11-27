@@ -3,9 +3,9 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 
 from .audit import AuditTrailError, append_audit_event, list_audit_events
 from .discovery import (
@@ -17,6 +17,9 @@ from .discovery import (
     search_lab_navigator_devices,
 )
 from .config import OUTPUTS_ROOT
+from .discovery_runtime import (
+    DiscoveryOperationError, active_status, incoming_request_id, operation_status, request_id,
+)
 from .generator import GenerationError, generate_topology, resolve_run_root
 from .hapy_repo import HapyRepoError, delete_private_branches, list_private_branches, publish_run_private_branch
 from .inventory import load_inventory, save_inventory_hardware_edits, update_hardware_availability
@@ -68,7 +71,42 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-Request-ID"],
 )
+
+
+@app.middleware("http")
+async def correlate_request(request: Request, call_next):
+    identifier = request_id(request.headers.get("X-Request-ID"))
+    token = incoming_request_id.set(identifier)
+    try:
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = identifier
+        return response
+    finally:
+        incoming_request_id.reset(token)
+
+
+@app.exception_handler(DiscoveryOperationError)
+async def discovery_operation_error(request: Request, error: DiscoveryOperationError):
+    identifier = incoming_request_id.get()
+    return JSONResponse(status_code=error.status_code, content={"detail": {
+        "message": str(error), "code": error.code, "request_id": identifier,
+        "active_request_id": error.active_request_id,
+    }})
+
+
+@app.get("/api/discovery/active")
+def get_discovery_active():
+    return active_status()
+
+
+@app.get("/api/discovery/requests/{identifier}")
+def get_discovery_request(identifier: str, after_seq: int = Query(default=0, ge=0)):
+    result = operation_status(identifier, after_seq)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Discovery request is not available or has expired.")
+    return result
 
 
 @app.get("/api/reference-topologies")

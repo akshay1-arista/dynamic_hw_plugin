@@ -13,6 +13,7 @@ from typing import Any
 from .audit import append_audit_events
 from .config import INVENTORY_PATH, OUTPUTS_ROOT, REFERENCE_CONFIG_ROOT
 from .discovery import sync_inventory_for_generate
+from .discovery_runtime import discovery_operation, progress
 from .inventory import (
     load_inventory,
     path_has_credentials,
@@ -52,6 +53,7 @@ class MappingHardwareView:
     reserved_device_ids: list[str]
 
 
+@discovery_operation("generation")
 def generate_topology(
     request: GenerateRequest,
     *,
@@ -75,6 +77,7 @@ def generate_topology(
         selected_hardware_ids,
         inventory_path=inventory_path,
     )
+    progress("generating", "Generating topology from discovered inventory")
     inventory = load_inventory(inventory_path)
     hardware_by_id = {item.id: item for item in inventory.hardware}
     recovered_hardware_ids = _merge_saved_hardware_snapshots(request.mappings, hardware_by_id)

@@ -4,10 +4,12 @@ import json
 import logging
 import re
 from collections import deque
-from contextvars import ContextVar
+from concurrent.futures import ThreadPoolExecutor
+from contextvars import ContextVar, copy_context
 from dataclasses import dataclass, field
 from pathlib import Path
 import ssl
+from threading import Lock
 from typing import Any
 from uuid import uuid4
 
@@ -21,6 +23,10 @@ from .config import (
     LAB_NAVIGATOR_TLS_VERIFY,
 )
 from .edge_models import normalize_edge_model
+from .discovery_runtime import (
+    check_deadline, consume_preview, current_operation, discovery_operation, get_preview,
+    inventory_revision, inventory_write_lock, progress, store_preview,
+)
 from .inventory import build_inventory, canonical_port_channel, infer_switch_platform, load_inventory, save_inventory
 from .models import (
     HardwareImportRequest,
@@ -44,6 +50,10 @@ class DiscoveryError(ValueError):
     pass
 
 
+class DiscoveryDeviceNotFound(DiscoveryError):
+    pass
+
+
 logger = logging.getLogger(__name__)
 _refresh_log_id: ContextVar[str | None] = ContextVar("refresh_log_id", default=None)
 
@@ -53,10 +63,13 @@ def _new_refresh_log_id() -> str:
 
 
 def _current_refresh_log_id() -> str:
-    return _refresh_log_id.get() or "-"
+    operation = current_operation()
+    return operation.request_id if operation else (_refresh_log_id.get() or "-")
 
 
 def _log(level: int, message: str, *args: Any) -> None:
+    if level == logging.INFO:
+        level = logging.DEBUG
     logger.log(level, "[refresh_id=%s] " + message, _current_refresh_log_id(), *args)
 
 
@@ -127,16 +140,50 @@ class LabNavigatorClient:
             verify=verify,
         )
         self._inventory_devices: dict[int, dict[str, Any]] = {}
+        self._cache: dict[tuple, Any] = {}
+        self._cache_lock = Lock()
+        self._key_locks: dict[tuple, Lock] = {}
+        self._bulk_loaded = False
+        self._metadata_index: dict[str, list[dict[str, Any]]] = {}
+        self._timeout = min(timeout, 10.0)
+        self._scope_id: str | None = None
 
     def close(self) -> None:
         self.client.close()
 
     def _get_json(self, path: str, *, params: dict[str, Any] | None = None) -> dict[str, Any]:
+        check_deadline()
+        key = (path, json.dumps(params, sort_keys=True))
+        with self._cache_lock:
+            lock = self._key_locks.setdefault(key, Lock())
+        with lock:
+            if key in self._cache:
+                if operation := current_operation():
+                    operation.increment("cache_hits")
+                result = self._cache[key]
+                if isinstance(result, DiscoveryError):
+                    raise result
+                return result
+            try:
+                result = self._fetch_json(path, params=params)
+            except DiscoveryError as error:
+                self._cache[key] = error
+                raise
+            self._cache[key] = result
+            return result
+
+    def _fetch_json(self, path: str, *, params=None):
         try:
-            response = self.client.get(path, params=params)
+            operation = current_operation()
+            timeout = min(self._timeout, operation.remaining()) if operation else self._timeout
+            if operation:
+                operation.increment("upstream_calls")
+            response = self.client.get(path, params=params, timeout=timeout)
             response.raise_for_status()
         except httpx.HTTPStatusError as error:
             status = error.response.status_code
+            if status == 404 and path.endswith("/wiremap"):
+                raise DiscoveryDeviceNotFound(f"Lab Navigator device is unavailable (HTTP 404 for {path})") from error
             if status in (401, 403) and "Authorization" not in self.client.headers:
                 raise DiscoveryError(
                     "Lab Navigator rejected anonymous discovery; configure LN_PROD_API_KEY for this deployment"
@@ -150,7 +197,49 @@ class LabNavigatorClient:
             raise DiscoveryError(f"Lab Navigator returned invalid JSON for {path}") from error
 
     def search(self, query: str) -> list[dict[str, Any]]:
+        if query in self._metadata_index:
+            return self._metadata_index[query]
         return self._get_json("/api/search", params={"q": query}).get("devices", [])
+
+    def prepare_discovery(self):
+        operation = current_operation()
+        scope = operation.request_id if operation else None
+        if self._scope_id is not None and self._scope_id != scope:
+            self._cache.clear()
+            self._key_locks.clear()
+            self._inventory_devices.clear()
+            self._metadata_index.clear()
+            self._bulk_loaded = False
+        self._scope_id = scope
+        if self._bulk_loaded:
+            return
+        self._bulk_loaded = True
+        progress("metadata", "Loading Lab Navigator device metadata")
+        try:
+            devices = self.list_inventory([])
+        except DiscoveryError:
+            progress(message="Bulk metadata unavailable; using cached individual lookups", level="warning")
+            return
+        for device in devices:
+            if isinstance(device.get("id"), int):
+                self._inventory_devices[device["id"]] = device
+            for value in {device.get("name"), device.get("serial_number"), device.get("ip_address")} - {None, ""}:
+                self._metadata_index.setdefault(value, []).append(device)
+
+    def prefetch_wiremaps(self, device_ids):
+        pending = [identifier for identifier in dict.fromkeys(device_ids)
+                   if (f"/api/device/{identifier}/wiremap", "null") not in self._cache]
+        if not pending:
+            return
+        def fetch(identifier):
+            try:
+                self.get_wiremap(identifier)
+            except DiscoveryError:
+                pass  # Required/optional handling remains with the graph walker.
+        with ThreadPoolExecutor(max_workers=4, thread_name_prefix="discovery") as executor:
+            futures = [executor.submit(copy_context().run, fetch, identifier) for identifier in pending]
+            for future in futures:
+                future.result()
 
     def list_inventory(self, filters: list[dict[str, Any]]) -> list[dict[str, Any]]:
         return self._get_json("/api/inventory", params={"filters": json.dumps(filters)}).get("devices", [])
@@ -180,6 +269,7 @@ class LabNavigatorClient:
         raise DiscoveryError(f"Could not resolve Lab Navigator device id {device_id}")
 
 
+@discovery_operation("search")
 def search_lab_navigator_devices(
     query: str,
     *,
@@ -202,6 +292,7 @@ def search_lab_navigator_devices(
             client.close()
 
 
+@discovery_operation("import-preview")
 def preview_inventory_import(
     request: HardwareImportRequest,
     *,
@@ -212,6 +303,7 @@ def preview_inventory_import(
     owns_client = client is None
     client = client or LabNavigatorClient()
     try:
+        _prepare_discovery(client)
         proposed, target_ids, stats = _build_imported_inventory(inventory, request, client)
         changes = _diff_inventory(inventory, proposed)
         summary = _build_refresh_summary(target_ids, changes, stats)
@@ -228,6 +320,7 @@ def preview_inventory_import(
             client.close()
 
 
+@discovery_operation("import-apply")
 def apply_inventory_import(
     request: HardwareImportRequest,
     *,
@@ -267,6 +360,7 @@ def apply_inventory_import(
             client.close()
 
 
+@discovery_operation("refresh-preview")
 def preview_inventory_refresh(
     request: InventoryRefreshRequest,
     *,
@@ -275,11 +369,15 @@ def preview_inventory_refresh(
 ) -> InventoryRefreshResult:
     token = _refresh_log_id.set(_refresh_log_id.get() or _new_refresh_log_id())
     _log(logging.INFO, "Inventory refresh preview requested for hardware_ids=%s", request.hardware_ids)
-    inventory = load_inventory(inventory_path)
+    with inventory_write_lock:
+        revision = inventory_revision(inventory_path)
+        inventory = load_inventory(inventory_path)
     owns_client = client is None
     client = client or LabNavigatorClient()
     try:
+        _prepare_discovery(client)
         proposed, stats = _build_refreshed_inventory(inventory, request.hardware_ids, client)
+        progress("diff", "Calculating inventory changes")
         changes = _diff_inventory(inventory, proposed)
         summary = _build_refresh_summary(request.hardware_ids, changes, stats)
         messages = _build_refresh_messages(summary, preview=True)
@@ -300,19 +398,22 @@ def preview_inventory_refresh(
             summary.skipped_unsupported_peer_count,
             summary.skipped_missing_interface_count,
         )
-        return InventoryRefreshResult(
+        result = InventoryRefreshResult(
             hardware_ids=request.hardware_ids,
             summary=summary,
             changes=changes,
             inventory=proposed,
             messages=messages,
         )
+        store_preview(result, inventory_path, revision)
+        return result
     finally:
         if owns_client:
             client.close()
         _refresh_log_id.reset(token)
 
 
+@discovery_operation("refresh-apply")
 def apply_inventory_refresh(
     request: InventoryRefreshRequest,
     *,
@@ -322,14 +423,21 @@ def apply_inventory_refresh(
     token = _refresh_log_id.set(_refresh_log_id.get() or _new_refresh_log_id())
     try:
         _log(logging.INFO, "Inventory refresh apply requested for hardware_ids=%s", request.hardware_ids)
-        preview = preview_inventory_refresh(request, inventory_path=inventory_path, client=client)
-        saved = save_inventory(
-            preview.inventory,
-            inventory_path,
-            preserve_local_state=True,
-            write_source="refresh-apply",
-            write_context={"hardware_ids": request.hardware_ids},
-        )
+        if request.preview_id:
+            with inventory_write_lock:
+                preview = get_preview(request.preview_id, inventory_path, request.hardware_ids)
+                progress("saving", "Saving the reviewed discovery result")
+                saved = save_inventory(preview.inventory, inventory_path, preserve_local_state=True,
+                                       write_source="refresh-apply", write_context={"hardware_ids": request.hardware_ids})
+                consume_preview(request.preview_id)
+        else:
+            preview = preview_inventory_refresh(request, inventory_path=inventory_path, client=client)
+            with inventory_write_lock:
+                get_preview(preview.preview_id, inventory_path, request.hardware_ids)
+                progress("saving", "Saving discovered inventory")
+                saved = save_inventory(preview.inventory, inventory_path, preserve_local_state=True,
+                                       write_source="refresh-apply", write_context={"hardware_ids": request.hardware_ids})
+                consume_preview(preview.preview_id)
         _log(
             logging.INFO,
             "Inventory refresh apply completed for hardware_ids=%s changes=%d saved_devices=%d saved_connections=%d partial=%s",
@@ -360,6 +468,7 @@ def apply_inventory_refresh(
         _refresh_log_id.reset(token)
 
 
+@discovery_operation("generation-sync")
 def sync_inventory_for_generate(
     hardware_ids: list[str],
     *,
@@ -377,7 +486,16 @@ def sync_inventory_for_generate(
         )
         return result.inventory, RefreshBuildStats()
     except (DiscoveryError, ValueError, FileNotFoundError, OSError):
+        if operation := current_operation():
+            operation.partial = True
+        progress("fallback", "Live discovery unavailable; using saved inventory", level="warning")
         return load_inventory(inventory_path), RefreshBuildStats()
+
+
+def _prepare_discovery(client):
+    prepare = getattr(client, "prepare_discovery", None)
+    if prepare:
+        prepare()
 
 
 def _build_imported_inventory(
@@ -410,22 +528,32 @@ def _build_imported_inventory(
     else:
         target_ids.extend(root.ha_group_id or root.id for root in imported_roots)
 
-    for root in imported_roots:
-        refreshed_ids, refreshed_devices, refreshed_connections, import_stats = _discover_import_root_subgraph(
-            root,
-            devices,
-            client,
-            target_id=root.ha_group_id or root.id,
+    if all(root.type == "edge" for root in imported_roots):
+        groups = {}
+        for root in imported_roots:
+            group = root.ha_group_id or root.id
+            groups.setdefault(group, (root.display_name, set()))[1].add(root.id)
+        discovered_graphs = [_discover_lab_navigator_subgraph(
+            imported_roots, devices, client, hardware_id=target_ids[0],
+            hardware_display_name=imported_roots[0].display_name, groups=groups,
+        )]
+    else:
+        discovered_graphs = [_discover_import_root_subgraph(
+            root, devices, client, target_id=root.ha_group_id or root.id,
             target_display_name=root.display_name,
-        )
+        ) for root in imported_roots]
+    merged_connections = {connection["id"]: connection for connection in connections}
+    for refreshed_ids, refreshed_devices, refreshed_connections, import_stats in discovered_graphs:
         stats.merge(import_stats)
         stats.refreshed_device_ids.update(refreshed_ids)
         for device in refreshed_devices.values():
             _merge_device(devices, device)
         for connection in refreshed_connections:
-            _merge_connection(connections, connection)
+            _merge_connection(merged_connections, connection)
             if _is_lab_navigator_wiremap_connection(connection):
                 stats.discovered_connection_signatures.add(_connection_signature(connection))
+    connections = list(merged_connections.values())
+    progress("deriving", "Deriving imported hardware paths")
 
     proposed = build_inventory(devices, connections)
     return proposed, list(dict.fromkeys(target_ids)), stats
@@ -534,17 +662,24 @@ def _discover_import_root_subgraph(
 
     refreshed_ids = {root.id}
     discovered_devices: dict[str, dict[str, Any]] = {}
-    discovered_connections: list[dict[str, Any]] = []
+    discovered_connections: dict[str, dict[str, Any]] = {}
     stats = RefreshBuildStats()
     queue: deque[tuple[InventoryDevice, dict[str, Any]]] = deque([(root, _resolve_inventory_device(client, root))])
     visited_lab_navigator_ids: set[int] = set()
     skipped_switch_wiremaps: list[str] = []
 
+    progress("switches", "Discovering imported device topology", total_roots=1)
     while queue:
+        check_deadline()
+        prefetch = getattr(client, "prefetch_wiremaps", lambda ids: None)
+        prefetch([item[1]["id"] for item in queue])
         current_device, ln_device = queue.popleft()
         if ln_device["id"] in visited_lab_navigator_ids:
             continue
         visited_lab_navigator_ids.add(ln_device["id"])
+        progress(completed_roots=int(root.lab_navigator_id in visited_lab_navigator_ids),
+                 completed_switches=len(visited_lab_navigator_ids) - 1,
+                 discovered_switches=len(visited_lab_navigator_ids) - 1 + len({item[1]["id"] for item in queue}))
         required = current_device.id == root.id
         wiremap = _try_get_wiremap(client, ln_device["id"], required=required)
         if wiremap is None:
@@ -583,7 +718,7 @@ def _discover_import_root_subgraph(
             labels=labels,
         )
     )
-    return refreshed_ids, discovered_devices, discovered_connections, stats
+    return refreshed_ids, discovered_devices, list(discovered_connections.values()), stats
 
 
 def _build_refreshed_inventory(
@@ -591,100 +726,72 @@ def _build_refreshed_inventory(
     hardware_ids: list[str],
     client: LabNavigatorClient,
 ) -> tuple[InventoryFile, RefreshBuildStats]:
-    devices = {device_id: device.model_dump(mode="json") for device_id, device in inventory.devices.items()}
-    connections = [connection.model_dump(mode="json") for connection in inventory.connections]
+    devices = {key: device.model_dump(mode="json") for key, device in inventory.devices.items()}
     hardware_by_id = {item.id: item for item in inventory.hardware}
-    stats = RefreshBuildStats()
-
+    groups = {}
+    roots = []
     for hardware_id in hardware_ids:
         members = _hardware_members(devices, hardware_id)
         if not members:
             raise DiscoveryError(f"{hardware_id} is missing edge devices in inventory")
-        requested_edge_ids = {member.id for member in members}
-        stats.requested_edge_ids.update(member.id for member in members)
-        hardware_display_name = (
-            hardware_by_id[hardware_id].display_name
-            if hardware_id in hardware_by_id
-            else ", ".join(member.display_name for member in members)
-        )
-        if hardware_id not in hardware_by_id:
-            _log(
-                logging.INFO,
-                "Refreshing hidden inventory group hardware_id=%s from edge members because it is not currently derived in hardware",
-                hardware_id,
-            )
-        _log(
-            logging.INFO,
-            "Refreshing inventory graph for hardware_id=%s member_edges=%s",
-            hardware_id,
-            [member.id for member in members],
-        )
-        refreshed_ids, refreshed_devices, refreshed_connections, refresh_stats = _discover_lab_navigator_subgraph(
-            members,
-            devices,
-            client,
-            hardware_id=hardware_id,
-            hardware_display_name=hardware_display_name,
-        )
-        stats.merge(refresh_stats)
-        stats.refreshed_device_ids.update(refreshed_ids)
-        _log(
-            logging.INFO,
-            "Discovered Lab Navigator subgraph for hardware_id=%s inventory_devices=%d connections=%d refreshed_ids=%s "
-            "target_status=%s skipped_unresolved=%d skipped_unsupported=%d skipped_missing_interface=%d",
-            hardware_id,
-            len(refreshed_devices),
-            len(refreshed_connections),
-            sorted(refreshed_ids),
-            refresh_stats.target_statuses[0].status if refresh_stats.target_statuses else "success",
-            refresh_stats.skipped_unresolved_remote_count,
-            refresh_stats.skipped_unsupported_peer_count,
-            refresh_stats.skipped_missing_interface_count,
-        )
-        target_status = next(
-            (target for target in refresh_stats.target_statuses if target.hardware_id == hardware_id),
-            None,
-        )
-        conflicting_interfaces: set[str] = set()
-        for device in refreshed_devices.values():
-            _merge_device(devices, device)
-        for connection in refreshed_connections:
-            if _is_lab_navigator_wiremap_connection(connection):
-                if _find_unrelated_wiremap_endpoint_conflict(
-                    connections,
-                    connection,
-                    requested_edge_ids=requested_edge_ids,
-                ):
-                    stats.skipped_conflicting_endpoint_count += 1
-                    conflict_interface = _requested_edge_interface(connection, requested_edge_ids)
-                    if conflict_interface:
-                        conflicting_interfaces.add(conflict_interface)
-                    continue
-                _prune_conflicting_wiremap_connections(connections, connection)
-            _merge_connection(connections, connection)
-            if _is_lab_navigator_wiremap_connection(connection):
-                stats.discovered_connection_signatures.add(_connection_signature(connection))
-        if target_status and conflicting_interfaces:
-            target_status.status = "partial"
-            target_status.labels.append(
-                "conflicting switch ports preserved for other inventory hardware: "
-                + ", ".join(sorted(conflicting_interfaces, key=_refresh_issue_sort_key))
-            )
-
-    proposed = build_inventory(devices, connections)
-    stats.preserved_connection_count = _count_preserved_wiremap_connections(
-        inventory,
-        proposed,
-        stats.requested_edge_ids,
-        stats.discovered_connection_signatures,
+        name = (hardware_by_id[hardware_id].display_name if hardware_id in hardware_by_id
+                else ", ".join(member.display_name for member in members))
+        groups[hardware_id] = (name, {member.id for member in members})
+        roots.extend(members)
+    refreshed_ids, discovered, connections, stats = _discover_lab_navigator_subgraph(
+        roots, devices, client, hardware_id=hardware_ids[0],
+        hardware_display_name=groups[hardware_ids[0]][0], groups=groups,
     )
-    if stats.preserved_connection_count:
-        _log(
-            logging.WARNING,
-            "Preserved %d existing Lab Navigator wiremap connection(s) because discovery did not rediscover them",
-            stats.preserved_connection_count,
-        )
+    stats.refreshed_device_ids.update(refreshed_ids)
+    progress("merging", "Merging the discovered topology")
+    for device in discovered.values():
+        _merge_device(devices, device)
+    merged = _merge_discovered_connections(inventory, connections, stats, groups)
+    progress("deriving", "Deriving hardware paths from the merged topology")
+    proposed = build_inventory(devices, merged)
+    stats.preserved_connection_count = _count_preserved_wiremap_connections(
+        inventory, proposed, stats.requested_edge_ids, stats.discovered_connection_signatures,
+    )
     return proposed, stats
+
+
+def _merge_discovered_connections(inventory, discovered, stats, groups):
+    # Keep insertion order and update endpoint indexes as stale connections are removed.
+    connections = {item.id: item.model_dump(mode="json") for item in inventory.connections}
+    endpoints: dict[tuple[str, str], set[str]] = {}
+    for key, item in connections.items():
+        if _is_lab_navigator_wiremap_connection(item):
+            for endpoint in _connection_endpoint_set(item):
+                endpoints.setdefault(endpoint, set()).add(key)
+    conflicts = {key: set() for key in groups}
+    for connection in discovered:
+        check_deadline()
+        touched = _connection_endpoint_set(connection)
+        overlapping = set().union(*(endpoints.get(endpoint, set()) for endpoint in touched))
+        protected = [connections[key] for key in overlapping if key != connection["id"]
+                     and _connection_role(connections[key]) == "edge-access"
+                     and not _connection_touches_requested_edges(connections[key], stats.requested_edge_ids)]
+        if protected:
+            stats.skipped_conflicting_endpoint_count += 1
+            for group, (_, edges) in groups.items():
+                interface = _requested_edge_interface(connection, edges)
+                if interface:
+                    conflicts[group].add(interface)
+            continue
+        for key in overlapping:
+            old = connections.pop(key)
+            for endpoint in _connection_endpoint_set(old):
+                endpoints[endpoint].discard(key)
+        existing = connections.get(connection["id"], {})
+        connections[connection["id"]] = {**existing, **connection}
+        for endpoint in touched:
+            endpoints.setdefault(endpoint, set()).add(connection["id"])
+    for target in stats.target_statuses:
+        if conflicts[target.hardware_id]:
+            target.status = "partial"
+            target.labels.append("conflicting switch ports preserved for other inventory hardware: "
+                                 + ", ".join(sorted(conflicts[target.hardware_id], key=_refresh_issue_sort_key)))
+    return list(connections.values())
 
 
 def _hardware_members(
@@ -709,187 +816,122 @@ def _discover_lab_navigator_subgraph(
     *,
     hardware_id: str,
     hardware_display_name: str,
+    groups: dict | None = None,
 ) -> tuple[set[str], dict[str, dict[str, Any]], list[dict[str, Any]], RefreshBuildStats]:
+    groups = groups or {hardware_id: (hardware_display_name, {edge.id for edge in root_edges})}
     refreshed_ids = {edge.id for edge in root_edges}
-    discovered_devices: dict[str, dict[str, Any]] = {}
-    discovered_connections: list[dict[str, Any]] = []
+    discovered_devices = {}
+    discovered_connections = {}
     stats = RefreshBuildStats()
-    unresolved_interfaces: set[str] = set()
+    unresolved = {edge.id: set() for edge in root_edges}
+    root_switches = {edge.id: set() for edge in root_edges}
+    adjacency: dict[int, set[int]] = {}
+    failed_switches = {}
+    missing_roots = {}
+    scheduled: set[int] = set()
+    switch_queue = deque()
+    prefetch = getattr(client, "prefetch_wiremaps", lambda ids: None)
+    resolved_roots = [(edge, _resolve_inventory_device(client, edge)) for edge in root_edges]
+    progress("roots", "Discovering selected edge connections", total_roots=len(root_edges))
+    prefetch([ln_edge["id"] for _, ln_edge in resolved_roots])
 
-    # Phase 1: walk each root edge's wiremap to find edge-access connections and
-    # the set of directly connected switches. Issues here are reported as partial failures.
-    switch_queue: deque[tuple[InventoryDevice, dict[str, Any]]] = deque()
-    visited_lab_navigator_ids: set[int] = set()
-    skipped_switch_wiremaps: list[str] = []
-    for edge in root_edges:
-        ln_edge = _resolve_inventory_device(client, edge)
-        _log(
-            logging.INFO,
-            "Resolved root edge inventory_device=%s to_lab_navigator_id=%s name=%s",
-            edge.id,
-            ln_edge["id"],
-            ln_edge.get("name"),
-        )
-        visited_lab_navigator_ids.add(ln_edge["id"])
-        _log(logging.INFO, "Walking edge wiremap for inventory_device=%s lab_navigator_id=%s", edge.id, ln_edge["id"])
-        wiremap = _try_get_wiremap(client, ln_edge["id"], required=True)
-        for item in wiremap.get("connections", []):
-            interface_name = _edge_interface_name(item)
-            remote_name = _wiremap_remote_name(item)
-            remote_device = _resolve_wiremap_remote_device(client, item)
-            if not remote_device:
-                if remote_name:
-                    # LN returned a device name but couldn't resolve it — genuine discovery gap.
-                    if interface_name:
-                        unresolved_interfaces.add(interface_name)
-                        stats.skipped_unresolved_remote_count += 1
-                    _log(
-                        logging.WARNING,
-                        "Skipping wiremap entry for inventory_device=%s because remote device %r could not be resolved",
-                        edge.id,
-                        remote_name,
-                    )
-                else:
-                    # No remote device name — LN is saying the port has no connection.
-                    _log(
-                        logging.INFO,
-                        "Skipping unconnected wiremap entry for inventory_device=%s interface=%s",
-                        edge.id,
-                        interface_name or item.get("interface_name"),
-                    )
-                continue
+    def record(local, remote, item):
+        refreshed_ids.add(remote.id)
+        discovered_devices[remote.id] = remote.model_dump(mode="json")
+        connection = _build_wiremap_connection(local, remote, item)
+        if connection:
+            _merge_connection(discovered_connections, connection)
+            stats.discovered_connection_signatures.add(_connection_signature(connection))
 
-            remote_inventory_device = _wiremap_remote_inventory_device(edge, remote_device, devices, discovered_devices)
-            if remote_inventory_device is None:
-                _log(
-                    logging.INFO,
-                    "Skipping unsupported wiremap peer for inventory_device=%s interface=%s remote_name=%s remote_device_type=%s remote_model=%s",
-                    edge.id,
-                    interface_name or item.get("interface_name"),
-                    remote_device.get("name"),
-                    remote_device.get("device_type"),
-                    _device_model(remote_device),
-                )
-                continue
+    def schedule(remote, ln_remote):
+        identifier = ln_remote["id"]
+        if remote.type == "switch" and identifier not in scheduled:
+            scheduled.add(identifier)
+            switch_queue.append((remote, ln_remote))
 
-            refreshed_ids.add(remote_inventory_device.id)
-            discovered_devices[remote_inventory_device.id] = remote_inventory_device.model_dump(mode="json")
-            connection = _build_wiremap_connection(edge, remote_inventory_device, item)
-            if connection:
-                _merge_connection(discovered_connections, connection)
-                if _is_lab_navigator_wiremap_connection(connection):
-                    stats.discovered_connection_signatures.add(_connection_signature(connection))
-                _log(
-                    logging.INFO,
-                    "Imported wiremap connection role=%s local=%s:%s remote=%s:%s",
-                    connection["role"],
-                    connection["a"]["device_id"],
-                    connection["a"]["interface"],
-                    connection["b"]["device_id"],
-                    connection["b"]["interface"],
-                )
-            else:
-                _log(
-                    logging.INFO,
-                    "Skipped wiremap connection for local_device=%s remote_device=%s due to missing or unsupported interface data",
-                    edge.id,
-                    remote_inventory_device.id,
-                )
-
-            if remote_inventory_device.type == "switch" and remote_device["id"] not in visited_lab_navigator_ids:
-                switch_queue.append((remote_inventory_device, remote_device))
-                visited_lab_navigator_ids.add(remote_device["id"])
-
-    # Phase 2: BFS through the switch subgraph to find switch-uplink and hypervisor-access
-    # connections. Issues here (unresolved/unsupported ports on switches) are not counted as
-    # partial failures for the hardware group — they are noise from the switch's full port list.
-    # A missing switch wiremap is different: skip that switch instead of aborting the import.
-    while switch_queue:
-        current_switch, ln_switch = switch_queue.popleft()
-        _log(
-            logging.INFO,
-            "Walking switch wiremap for inventory_device=%s lab_navigator_id=%s",
-            current_switch.id,
-            ln_switch["id"],
-        )
-        wiremap = _try_get_wiremap(client, ln_switch["id"], required=False)
-        if wiremap is None:
-            skipped_switch_wiremaps.append(_wiremap_device_label(ln_switch, current_switch))
-            _log(
-                logging.WARNING,
-                "Skipping switch wiremap for inventory_device=%s lab_navigator_id=%s because Lab Navigator request failed",
-                current_switch.id,
-                ln_switch["id"],
-            )
+    for completed, (edge, ln_edge) in enumerate(resolved_roots, 1):
+        check_deadline()
+        try:
+            wiremap = _try_get_wiremap(client, ln_edge["id"], required=True)
+        except DiscoveryDeviceNotFound:
+            # A removed device must not prevent other groups from refreshing, or lose its old wiring.
+            if len(groups) == 1:
+                raise
+            missing_roots[edge.id] = f"{edge.display_name} (Lab Navigator ID {ln_edge['id']})"
+            progress(message=f"Preserving unavailable device {missing_roots[edge.id]}", level="warning",
+                     completed_roots=completed, discovered_switches=len(scheduled))
             continue
+        stats.requested_edge_ids.add(edge.id)
         for item in wiremap.get("connections", []):
-            remote_device = _resolve_wiremap_remote_device(client, item)
-            if not remote_device:
-                _log(
-                    logging.INFO,
-                    "Skipping unresolved wiremap entry on switch inventory_device=%s: %s",
-                    current_switch.id,
-                    item,
-                )
+            remote = _resolve_wiremap_remote_device(client, item)
+            if not remote:
+                interface = _edge_interface_name(item)
+                if _wiremap_remote_name(item) and interface:
+                    unresolved[edge.id].add(interface)
+                    stats.skipped_unresolved_remote_count += 1
                 continue
-
-            remote_inventory_device = _wiremap_remote_inventory_device(
-                current_switch, remote_device, devices, discovered_devices
-            )
-            if remote_inventory_device is None:
-                _log(
-                    logging.INFO,
-                    "Skipping unsupported wiremap peer on switch inventory_device=%s remote_name=%s",
-                    current_switch.id,
-                    remote_device.get("name"),
-                )
+            peer = _wiremap_remote_inventory_device(edge, remote, devices, discovered_devices)
+            if peer is None:
                 continue
+            record(edge, peer, item)
+            if peer.type == "switch":
+                root_switches[edge.id].add(remote["id"])
+                schedule(peer, remote)
+        progress(completed_roots=completed, discovered_switches=len(scheduled))
 
-            refreshed_ids.add(remote_inventory_device.id)
-            discovered_devices[remote_inventory_device.id] = remote_inventory_device.model_dump(mode="json")
-            connection = _build_wiremap_connection(current_switch, remote_inventory_device, item)
-            if connection:
-                _merge_connection(discovered_connections, connection)
-                if _is_lab_navigator_wiremap_connection(connection):
-                    stats.discovered_connection_signatures.add(_connection_signature(connection))
-                _log(
-                    logging.INFO,
-                    "Imported wiremap connection role=%s local=%s:%s remote=%s:%s",
-                    connection["role"],
-                    connection["a"]["device_id"],
-                    connection["a"]["interface"],
-                    connection["b"]["device_id"],
-                    connection["b"]["interface"],
-                )
+    completed_switches = 0
+    progress("switches", "Discovering shared switches")
+    while switch_queue:
+        check_deadline()
+        batch = list(switch_queue)
+        switch_queue.clear()
+        prefetch([ln_switch["id"] for _, ln_switch in batch])
+        for switch, ln_switch in batch:
+            check_deadline()
+            identifier = ln_switch["id"]
+            wiremap = _try_get_wiremap(client, identifier, required=False)
+            if wiremap is None:
+                failed_switches[identifier] = _wiremap_device_label(ln_switch, switch)
             else:
-                _log(
-                    logging.INFO,
-                    "Skipped wiremap connection on switch local_device=%s remote_device=%s due to missing or unsupported interface data",
-                    current_switch.id,
-                    remote_inventory_device.id,
-                )
+                for item in wiremap.get("connections", []):
+                    remote = _resolve_wiremap_remote_device(client, item)
+                    if not remote:
+                        continue
+                    peer = _wiremap_remote_inventory_device(switch, remote, devices, discovered_devices)
+                    if peer is None:
+                        continue
+                    record(switch, peer, item)
+                    if peer.type == "switch":
+                        # Directed reachability preserves each group's original wiremap walk.
+                        adjacency.setdefault(identifier, set()).add(remote["id"])
+                        schedule(peer, remote)
+            completed_switches += 1
+            progress(completed_switches=completed_switches, discovered_switches=len(scheduled))
 
-            if remote_inventory_device.type == "switch" and remote_device["id"] not in visited_lab_navigator_ids:
-                switch_queue.append((remote_inventory_device, remote_device))
-                visited_lab_navigator_ids.add(remote_device["id"])
-
-    labels: list[str] = []
-    if unresolved_interfaces:
-        # Only named devices that LN couldn't find at all are a real gap.
-        # Unsupported peer types (other edges, WAN peers) and missing interface
-        # data are expected for WAN/SFP ports and are not surfaced as warnings.
-        labels.append(f"unresolved interfaces: {', '.join(sorted(unresolved_interfaces, key=_refresh_issue_sort_key))}")
-    if skipped_switch_wiremaps:
-        labels.append("skipped switch wiremaps: " + ", ".join(sorted(skipped_switch_wiremaps)))
-    stats.target_statuses.append(
-        InventoryRefreshTargetStatus(
-            hardware_id=hardware_id,
-            hardware_display_name=hardware_display_name,
-            status="partial" if labels else "success",
-            labels=labels,
-        )
-    )
-    return refreshed_ids, discovered_devices, discovered_connections, stats
+    for group_id, (name, edge_ids) in groups.items():
+        interfaces = set().union(*(unresolved[edge_id] for edge_id in edge_ids))
+        reachable = set().union(*(root_switches[edge_id] for edge_id in edge_ids))
+        queue = deque(reachable)
+        while queue:
+            identifier = queue.popleft()
+            for remote in adjacency.get(identifier, set()) - reachable:
+                reachable.add(remote)
+                queue.append(remote)
+        labels = []
+        missing = [missing_roots[edge_id] for edge_id in sorted(edge_ids) if edge_id in missing_roots]
+        if missing:
+            labels.append("unavailable devices preserved: " + ", ".join(missing))
+        if interfaces:
+            labels.append("unresolved interfaces: " + ", ".join(sorted(interfaces, key=_refresh_issue_sort_key)))
+        failures = sorted(failed_switches[key] for key in reachable if key in failed_switches)
+        if failures:
+            labels.append("skipped switch wiremaps: " + ", ".join(failures))
+            progress(message=f"Skipped {len(failures)} unavailable switch wiremap(s) for {name}", level="warning")
+        stats.target_statuses.append(InventoryRefreshTargetStatus(
+            hardware_id=group_id, hardware_display_name=name,
+            status="partial" if labels else "success", labels=labels,
+        ))
+    return refreshed_ids, discovered_devices, list(discovered_connections.values()), stats
 
 
 def _try_get_wiremap(client: LabNavigatorClient, device_id: int, *, required: bool) -> dict[str, Any] | None:
@@ -1147,61 +1189,8 @@ def _merge_device(devices: dict[str, dict[str, Any]], device: dict[str, Any]) ->
     devices[device["id"]] = merged
 
 
-def _merge_connection(connections: list[dict[str, Any]], connection: dict[str, Any]) -> None:
-    for index, existing in enumerate(connections):
-        if existing["id"] == connection["id"]:
-            connections[index] = {**existing, **connection}
-            return
-    connections.append(connection)
-
-
-def _prune_conflicting_wiremap_connections(
-    connections: list[dict[str, Any]],
-    discovered_connection: dict[str, Any],
-) -> None:
-    discovered_endpoints = _connection_endpoint_set(discovered_connection)
-    if not discovered_endpoints:
-        return
-
-    retained: list[dict[str, Any]] = []
-    for existing in connections:
-        if not _is_lab_navigator_wiremap_connection(existing):
-            retained.append(existing)
-            continue
-        if existing.get("id") == discovered_connection.get("id"):
-            continue
-        if discovered_endpoints & _connection_endpoint_set(existing):
-            continue
-        retained.append(existing)
-    connections[:] = retained
-
-
-def _find_unrelated_wiremap_endpoint_conflict(
-    connections: list[dict[str, Any]],
-    discovered_connection: dict[str, Any],
-    *,
-    requested_edge_ids: set[str],
-) -> dict[str, Any] | None:
-    discovered_endpoints = _connection_endpoint_set(discovered_connection)
-    if not discovered_endpoints:
-        return None
-
-    for existing in connections:
-        if not _is_lab_navigator_wiremap_connection(existing):
-            continue
-        if existing.get("id") == discovered_connection.get("id"):
-            continue
-        if not discovered_endpoints & _connection_endpoint_set(existing):
-            continue
-        if _connection_touches_requested_edges(existing, requested_edge_ids):
-            continue
-        # Switch uplinks and hypervisor links are rediscovered from the switch wiremap.
-        # Only another edge's access port is preserved; a current Lab Navigator cable
-        # replaces a stale uplink or hypervisor link on the same switch port.
-        if _connection_role(existing) != "edge-access":
-            continue
-        return existing
-    return None
+def _merge_connection(connections: dict[str, dict[str, Any]], connection: dict[str, Any]) -> None:
+    connections[connection["id"]] = {**connections.get(connection["id"], {}), **connection}
 
 
 def _requested_edge_interface(connection: dict[str, Any], requested_edge_ids: set[str]) -> str | None:

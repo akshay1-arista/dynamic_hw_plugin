@@ -516,6 +516,7 @@ class SavedGenerateRequest(BaseModel):
 
 class InventoryRefreshRequest(BaseModel):
     hardware_ids: list[str] = Field(default_factory=list)
+    preview_id: Optional[str] = None
 
     @field_validator("hardware_ids")
     @classmethod
@@ -523,7 +524,7 @@ class InventoryRefreshRequest(BaseModel):
         cleaned = [item.strip() for item in value if item and item.strip()]
         if not cleaned:
             raise ValueError("hardware_ids is required")
-        return cleaned
+        return list(dict.fromkeys(cleaned))
 
 
 class InventoryRefreshChange(BaseModel):
@@ -553,6 +554,8 @@ class InventoryRefreshSummary(BaseModel):
 
 
 class InventoryRefreshResult(BaseModel):
+    request_id: Optional[str] = None
+    preview_id: Optional[str] = None
     hardware_ids: list[str]
     summary: InventoryRefreshSummary
     changes: list[InventoryRefreshChange] = Field(default_factory=list)

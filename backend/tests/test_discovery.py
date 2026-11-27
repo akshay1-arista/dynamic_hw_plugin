@@ -1335,7 +1335,7 @@ def test_refresh_repairs_arista_model_from_sparse_wiremap_peer(tmp_path, named_p
     assert switch.switch_metadata.credentials.username == "custom-user"
     assert switch.switch_metadata.credentials.password == "custom-password"
     assert len(result.inventory.connections) == 2
-    assert inventory_lookups == [[{"field": "id", "operator": "equals", "value": "925"}]]
+    assert inventory_lookups == [[]]
     saved = json.loads(inventory_path.read_text())["devices"][old_switch["id"]]
     assert saved["model"] == full_switch["device_model"]
     assert saved["switch_metadata"]["os_family"] == "eos"

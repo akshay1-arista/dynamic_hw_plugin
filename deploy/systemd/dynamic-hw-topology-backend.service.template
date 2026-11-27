@@ -15,7 +15,7 @@ Environment="FRONTEND_PORT=__FRONTEND_PORT__"
 Environment="PUBLIC_HOST=__PUBLIC_HOST__"
 Environment="CORS_ALLOWED_ORIGINS=__CORS_ALLOWED_ORIGINS__"
 EnvironmentFile=-__ENV_FILE__
-ExecStart=/bin/bash -lc 'cd "$APP_ROOT/backend" && export PYTHONPATH=. && exec "$VENV_DIR/bin/python" -m uvicorn app.main:app --host "$BACKEND_HOST" --port "$BACKEND_PORT"'
+ExecStart=/bin/bash -lc 'cd "$APP_ROOT/backend" && export PYTHONPATH=. && exec "$VENV_DIR/bin/python" -m uvicorn app.main:app --host "$BACKEND_HOST" --port "$BACKEND_PORT" --workers 1'
 Restart=always
 RestartSec=5
 TimeoutStopSec=30

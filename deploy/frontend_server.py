@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import json
 import shutil
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -91,8 +92,23 @@ class FrontendRequestHandler(SimpleHTTPRequestHandler):
                 self._write_proxy_response(response.status, response.headers.items(), response)
         except HTTPError as error:
             self._write_proxy_response(error.code, error.headers.items(), error)
+        except TimeoutError:
+            self._proxy_error(504, "Backend request timed out. Check discovery progress before retrying.")
         except URLError as error:
-            self.send_error(502, f"Backend proxy error: {error.reason}")
+            status = 504 if isinstance(error.reason, TimeoutError) else 502
+            self._proxy_error(status, "Backend request timed out." if status == 504 else "Backend is unavailable.")
+
+    def _proxy_error(self, status, message):
+        identifier = self.headers.get("X-Request-ID")
+        body = json.dumps({"detail": {"message": message, "request_id": identifier,
+                                      "code": "proxy_timeout" if status == 504 else "proxy_unavailable"}}).encode()
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        if identifier:
+            self.send_header("X-Request-ID", identifier)
+        self.end_headers()
+        self.wfile.write(body)
 
     def _write_proxy_response(self, status: int, headers, response) -> None:
         self.send_response(status)

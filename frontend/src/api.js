@@ -1,26 +1,66 @@
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
 
 async function request(path, options = {}) {
-  const response = await fetch(`${API_BASE}${path}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options.headers || {})
-    },
-    ...options
-  });
+  const discovery = /^\/api\/(hardware\/(refresh|import)-(preview|apply)|lab-navigator\/search|generate$|switch-config-runs$)/.test(path);
+  const requestId = discovery ? newRequestId() : null;
+  const signalProgress = (phase, detail = {}) => {
+    if (discovery) window.dispatchEvent(new CustomEvent('discovery-request', {
+      detail: { phase, request_id: requestId, ...detail }
+    }));
+  };
+  signalProgress('start');
+  try {
+    const response = await fetch(`${API_BASE}${path}`, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(options.headers || {}),
+        ...(requestId ? { 'X-Request-ID': requestId } : {})
+      }
+    });
 
-  if (!response.ok) {
-    let message = response.statusText;
-    try {
-      const body = await response.json();
-      message = formatErrorDetail(body.detail) || message;
-    } catch {
-      // Keep status text when the server does not return JSON.
+    if (!response.ok) {
+      let message = response.statusText;
+      let detail;
+      try {
+        const body = await response.json();
+        detail = body.detail;
+        message = formatErrorDetail(body.detail) || message;
+      } catch {
+        // Keep status text when the server does not return JSON.
+      }
+      const identifier = detail?.request_id || requestId;
+      const error = new Error(`${message || 'Request failed'}${identifier ? ` (Request ID: ${identifier})` : ''}`);
+      error.status = response.status;
+      error.detail = detail;
+      throw error;
     }
-    throw new Error(message);
-  }
 
-  return response.json();
+    const result = await response.json();
+    signalProgress('end', { state: result.summary?.status === 'partial' ? 'partial' : 'succeeded' });
+    return result;
+  } catch (error) {
+    signalProgress('end', { state: 'failed', active_request_id: error.detail?.active_request_id });
+    if (requestId && !error.message.includes(requestId)) error.message += ` (Request ID: ${requestId})`;
+    throw error;
+  }
+}
+
+function newRequestId() {
+  if (globalThis.crypto.randomUUID) return globalThis.crypto.randomUUID();
+  const bytes = globalThis.crypto.getRandomValues(new Uint8Array(16));
+  bytes[6] = (bytes[6] & 15) | 64;
+  bytes[8] = (bytes[8] & 63) | 128;
+  const hex = Array.from(bytes, (value) => value.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+export function fetchDiscoveryActive() {
+  return request('/api/discovery/active');
+}
+
+export function fetchDiscoveryRequest(requestId, afterSeq = 0) {
+  return request(`/api/discovery/requests/${encodeURIComponent(requestId)}?after_seq=${afterSeq}`);
 }
 
 function formatErrorDetail(detail) {
@@ -89,10 +129,10 @@ export function previewInventoryRefresh(hardwareIds) {
   });
 }
 
-export function applyInventoryRefresh(hardwareIds) {
+export function applyInventoryRefresh(hardwareIds, previewId) {
   return request('/api/hardware/refresh-apply', {
     method: 'POST',
-    body: JSON.stringify({ hardware_ids: hardwareIds })
+    body: JSON.stringify({ hardware_ids: hardwareIds, ...(previewId ? { preview_id: previewId } : {}) })
   });
 }
 

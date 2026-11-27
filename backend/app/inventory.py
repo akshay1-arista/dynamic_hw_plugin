@@ -9,6 +9,7 @@ from typing import Any
 from .audit import build_audit_event
 from .config import INVENTORY_PATH, INVENTORY_STATE_PATH
 from .edge_models import normalize_edge_model
+from .discovery_runtime import check_deadline, inventory_transaction
 from .models import (
     ActorIdentity,
     AuditEvent,
@@ -29,6 +30,7 @@ from .models import (
 logger = logging.getLogger(__name__)
 
 
+@inventory_transaction
 def load_inventory(path: Path = INVENTORY_PATH, *, state_path: Path | None = None) -> InventoryFile:
     with path.open() as fh:
         raw = json.load(fh)
@@ -71,6 +73,7 @@ def build_inventory(
     )
 
 
+@inventory_transaction
 def save_inventory(
     inventory: InventoryFile,
     path: Path = INVENTORY_PATH,
@@ -83,6 +86,9 @@ def save_inventory(
     path.parent.mkdir(parents=True, exist_ok=True)
     resolved_state_path = _resolve_inventory_state_path(path, state_path)
     existing_local_state = _load_inventory_state(resolved_state_path)
+    if preserve_local_state:
+        # Missing overlay entries mean released/available, even if a preview is older.
+        _apply_local_inventory_state(inventory, existing_local_state, clear_missing=True)
     requested_devices = len(inventory.devices)
     requested_connections = len(inventory.connections)
     requested_hardware = len(inventory.hardware)
@@ -125,6 +131,7 @@ def save_inventory(
     return saved
 
 
+@inventory_transaction
 def save_inventory_hardware_edits(
     inventory: InventoryFile,
     path: Path = INVENTORY_PATH,
@@ -162,6 +169,7 @@ def _reservation_summary(display_name: str, topology_name: str, reason: str) -> 
     return f"Reserved {display_name} for generated topology {topology_name}."
 
 
+@inventory_transaction
 def reserve_generated_hardware(
     hardware_ids: list[str],
     actor: ActorIdentity,
@@ -243,6 +251,7 @@ def reserve_generated_hardware(
     return saved, events
 
 
+@inventory_transaction
 def update_hardware_availability(
     hardware_id: str,
     available: bool,
@@ -499,6 +508,7 @@ def _derive_hardware(
 
     hardware: list[dict[str, Any]] = []
     for group_id, members in sorted(groups.items()):
+        check_deadline()
         active = _pick_edge_member(members, "active") or sorted(members, key=lambda item: item.id)[0]
         standby = _pick_edge_member(members, "standby")
         if standby and standby.id == active.id:
@@ -1007,8 +1017,10 @@ def _dfs_path(
     # Each queue entry: (current_device_id, path_so_far_as_SwitchHop_list, visited_set)
     queue: deque[tuple[str, list[SwitchHop], set[str]]] = deque()
     queue.append((start_id, [start_hop], visited | {start_id}))
+    reached = visited | {start_id}
 
     while queue:
+        check_deadline()
         current_id, path, seen = queue.popleft()
 
         if current_id == target_id:
@@ -1018,7 +1030,7 @@ def _dfs_path(
 
         for uplink in _switch_links(current_id, devices, connections):
             remote_endpoint = _other_endpoint(uplink, current_id)
-            if remote_endpoint.device_id in seen:
+            if remote_endpoint.device_id in reached:
                 continue
             egress_port = _configured_switch_interface(_edge_endpoint(uplink, current_id))
             ingress_port = _configured_switch_interface(remote_endpoint)
@@ -1035,6 +1047,7 @@ def _dfs_path(
                 ingress_port=ingress_port,
             )
             new_path = path[:-1] + [updated_last, next_hop]
+            reached.add(remote_endpoint.device_id)
             queue.append((remote_endpoint.device_id, new_path, seen | {remote_endpoint.device_id}))
 
     return None

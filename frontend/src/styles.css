@@ -1830,3 +1830,24 @@ button:disabled {
     font-size: 26px;
   }
 }
+
+.discoveryProgress {
+  margin: 0 0 18px;
+  padding: 16px 20px;
+  border: 1px solid var(--border, #d4dce5);
+  border-radius: 12px;
+  background: var(--surface);
+  overflow-wrap: anywhere;
+}
+.discoveryProgressHeading, .discoveryCounts {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 24px;
+  margin-bottom: 8px;
+}
+.discoveryProgress p, .discoveryCounts { font-size: 13px; }
+.discoveryCounts { margin-top: 12px; }
+.discoveryLogs { max-height: 220px; overflow: auto; padding-left: 24px; font-size: 12px; }
+.discoveryLogs li { margin: 5px 0; }
+.discoveryLogs time { color: #596678; }

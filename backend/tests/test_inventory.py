@@ -650,3 +650,28 @@ def test_switch_path_uses_port_channel_instead_of_one_member():
     assert path is not None
     assert path[0].egress_port == "port-channel3"
     assert path[1].ingress_port == "port-channel3"
+
+
+def test_unreachable_switch_path_does_not_enumerate_every_route(monkeypatch):
+    from app import inventory
+    devices = {key: InventoryDevice(id=key, type="switch", display_name=key)
+               for key in ["start", "isolated"] + [f"{level}-{side}" for level in range(10) for side in (0, 1)]}
+    connections = []
+    previous = ["start"]
+    for level in range(10):
+        current = [f"{level}-{side}" for side in (0, 1)]
+        for left in previous:
+            for right in current:
+                connections.append(InventoryConnection.model_validate({
+                    "id": f"{left}-{right}", "a": {"device_id": left, "interface": right},
+                    "b": {"device_id": right, "interface": left}, "role": "switch-uplink",
+                }))
+        previous = current
+    expanded = []
+    original = inventory._switch_links
+    def counted(identifier, *args):
+        expanded.append(identifier)
+        return original(identifier, *args)
+    monkeypatch.setattr(inventory, "_switch_links", counted)
+    assert _dfs_path("start", "isolated", devices, connections, visited=set()) is None
+    assert len(expanded) == len(set(expanded)) == len(devices) - 1

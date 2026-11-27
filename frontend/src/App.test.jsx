@@ -788,6 +788,7 @@ beforeEach(() => {
       const payload = JSON.parse(options.body);
       const partial = payload.hardware_ids.length > 1;
       return Response.json({
+        preview_id: 'reviewed-preview-123',
         hardware_ids: payload.hardware_ids,
         summary: {
           status: partial ? 'partial' : 'success',
@@ -1471,7 +1472,8 @@ describe('App', () => {
               'mine-3800-ha-reserved',
               'other-680-reserved',
               'hidden-ha-pair'
-            ]
+            ],
+            preview_id: 'reviewed-preview-123'
           })
         })
       );
@@ -1886,7 +1888,7 @@ describe('App', () => {
     releaseDelete();
 
     expect(
-      await within(screen.getByRole('status')).findByText(
+      await within(screen.getByRole('status', { name: 'Gerrit branch status' })).findByText(
         'Deleted Gerrit private branch hw_topo_gen_private_abc123.'
       )
     ).toBeInTheDocument();

@@ -83,6 +83,7 @@ class RefreshBuildStats:
     skipped_unresolved_remote_count: int = 0
     skipped_unsupported_peer_count: int = 0
     skipped_missing_interface_count: int = 0
+    reconciled_connection_count: int = 0
     target_statuses: list[InventoryRefreshTargetStatus] = field(default_factory=list)
 
     def merge(self, other: "RefreshBuildStats") -> None:
@@ -94,6 +95,7 @@ class RefreshBuildStats:
         self.skipped_unresolved_remote_count += other.skipped_unresolved_remote_count
         self.skipped_unsupported_peer_count += other.skipped_unsupported_peer_count
         self.skipped_missing_interface_count += other.skipped_missing_interface_count
+        self.reconciled_connection_count += other.reconciled_connection_count
         self.target_statuses.extend(other.target_statuses)
 
     @property
@@ -746,7 +748,7 @@ def _build_refreshed_inventory(
     progress("merging", "Merging the discovered topology")
     for device in discovered.values():
         _merge_device(devices, device)
-    merged = _merge_discovered_connections(inventory, connections, stats, groups)
+    merged = _merge_discovered_connections(inventory, connections, stats, groups, devices, client)
     progress("deriving", "Deriving hardware paths from the merged topology")
     proposed = build_inventory(devices, merged)
     stats.preserved_connection_count = _count_preserved_wiremap_connections(
@@ -755,29 +757,126 @@ def _build_refreshed_inventory(
     return proposed, stats
 
 
-def _merge_discovered_connections(inventory, discovered, stats, groups):
+class _StaleLinkVerifier:
+    """Require agreement on the new cable and explicit evidence against the old cable."""
+
+    def __init__(self, devices, client):
+        self.devices = devices
+        self.client = client
+        self.identities = {}
+        self.wiremaps = {}
+
+    def _identity(self, device_id):
+        if device_id not in self.identities:
+            device = InventoryDevice.model_validate(self.devices[device_id])
+            self.identities[device_id] = _resolve_inventory_device(self.client, device)["id"]
+        return self.identities[device_id]
+
+    def _port(self, device_id, interface):
+        return _normalize_interface_name(interface or "", self.devices[device_id]["type"]).strip().casefold()
+
+    def _entry(self, device_id, interface):
+        if device_id not in self.wiremaps:
+            self.wiremaps[device_id] = {}
+            identifier = self._identity(device_id)
+            response = self.client.get_wiremap(identifier)
+            entries = response.get("connections")
+            header = response.get("device")
+            valid = (isinstance(entries, list) and all(isinstance(item, dict) for item in entries)
+                     and (not isinstance(header, dict) or header.get("id", identifier) == identifier))
+            indexed = {}
+            if valid:
+                for item in entries:
+                    indexed.setdefault(self._port(device_id, item.get("interface_name")), []).append(item)
+            self.wiremaps[device_id] = indexed
+        entries = self.wiremaps[device_id].get(self._port(device_id, interface), [])
+        return entries[0] if len(entries) == 1 else None
+
+    @staticmethod
+    def _remote_port(entry):
+        return entry.get("remote_interface_name") or entry.get("remote_interface") or ""
+
+    def _points_to(self, entry, remote_id, remote_port):
+        if entry is None:
+            return False
+        peer = _resolve_wiremap_remote_device(self.client, entry)
+        return (bool(peer) and peer.get("id") == self._identity(remote_id)
+                and self._port(remote_id, self._remote_port(entry)) == self._port(remote_id, remote_port))
+
+    def _endpoints(self, connection):
+        endpoints = {self.devices[connection[side]["device_id"]]["type"]: connection[side] for side in ("a", "b")}
+        return endpoints["edge"], endpoints["switch"]
+
+    def can_replace(self, old, new):
+        check_deadline()
+        if not _is_lab_navigator_wiremap_connection(old) or _connection_role(new) != "edge-access":
+            return False
+        try:
+            old_edge, old_switch = self._endpoints(old)
+            new_edge, switch = self._endpoints(new)
+            old_id, new_id, switch_id = old_edge["device_id"], new_edge["device_id"], switch["device_id"]
+            if (old_switch["device_id"] != switch_id
+                    or self._port(switch_id, old_switch["interface"]) != self._port(switch_id, switch["interface"])
+                    or self._identity(old_id) == self._identity(new_id)):
+                return False
+            if not self._points_to(self._entry(new_id, new_edge["interface"]), switch_id, switch["interface"]):
+                return False
+            if not self._points_to(self._entry(switch_id, switch["interface"]), new_id, new_edge["interface"]):
+                return False
+            previous = self._entry(old_id, old_edge["interface"])
+            if previous is None or "remote_device" not in previous:
+                return False
+            peer = previous["remote_device"]
+            if peer is None or isinstance(peer, str) and not peer.strip():
+                return not self._remote_port(previous)
+            peer = _resolve_wiremap_remote_device(self.client, previous)
+            remote_port = self._remote_port(previous)
+            if not peer or peer.get("id") is None or not remote_port:
+                return False
+            # The old edge may be disconnected or recabled to a different endpoint.
+            return (peer["id"] != self._identity(switch_id)
+                    or self._port(switch_id, remote_port) != self._port(switch_id, old_switch["interface"]))
+        except (DiscoveryError, KeyError, TypeError, ValueError, AttributeError):
+            # Failed, missing, malformed, or ambiguous evidence never authorizes deletion.
+            return False
+
+
+def _merge_discovered_connections(inventory, discovered, stats, groups, devices, client):
     # Keep insertion order and update endpoint indexes as stale connections are removed.
     connections = {item.id: item.model_dump(mode="json") for item in inventory.connections}
     endpoints: dict[tuple[str, str], set[str]] = {}
     for key, item in connections.items():
-        if _is_lab_navigator_wiremap_connection(item):
-            for endpoint in _connection_endpoint_set(item):
-                endpoints.setdefault(endpoint, set()).add(key)
+        for endpoint in _connection_endpoint_set(item):
+            endpoints.setdefault(endpoint, set()).add(key)
     conflicts = {key: set() for key in groups}
+    verifier = _StaleLinkVerifier(devices, client)
     for connection in discovered:
         check_deadline()
         touched = _connection_endpoint_set(connection)
         overlapping = set().union(*(endpoints.get(endpoint, set()) for endpoint in touched))
-        protected = [connections[key] for key in overlapping if key != connection["id"]
-                     and _connection_role(connections[key]) == "edge-access"
+        protected = [connections[key] for key in sorted(overlapping) if key != connection["id"]
+                     and (_connection_role(connections[key]) in {"", "edge-access"}
+                          or not _is_lab_navigator_wiremap_connection(connections[key]))
                      and not _connection_touches_requested_edges(connections[key], stats.requested_edge_ids)]
         if protected:
-            stats.skipped_conflicting_endpoint_count += 1
-            for group, (_, edges) in groups.items():
-                interface = _requested_edge_interface(connection, edges)
-                if interface:
-                    conflicts[group].add(interface)
-            continue
+            requested = _connection_touches_requested_edges(connection, stats.requested_edge_ids)
+            if not requested or not all(verifier.can_replace(old, connection) for old in protected):
+                # Conflicts elsewhere on a shared switch do not make this target partial.
+                if requested:
+                    stats.skipped_conflicting_endpoint_count += 1
+                    for group, (_, edges) in groups.items():
+                        interface = _requested_edge_interface(connection, edges)
+                        if interface:
+                            conflicts[group].add(interface)
+                continue
+            for old in protected:
+                old_edge, switch = verifier._endpoints(old)
+                new_edge, _ = verifier._endpoints(connection)
+                stats.reconciled_connection_count += 1
+                progress(message=(f"Reconciled stale link on {devices[switch['device_id']]['display_name']} "
+                                  f"{switch['interface']}: {devices[old_edge['device_id']]['display_name']} "
+                                  f"{old_edge['interface']} -> {devices[new_edge['device_id']]['display_name']} "
+                                  f"{new_edge['interface']}"))
         for key in overlapping:
             old = connections.pop(key)
             for endpoint in _connection_endpoint_set(old):
@@ -1245,6 +1344,15 @@ def _diff_inventory(current: InventoryFile, proposed: InventoryFile) -> list[Inv
                 )
             )
     current_connections = {item.id: item for item in current.connections}
+    proposed_ids = {item.id for item in proposed.connections}
+    for connection in current.connections:
+        if connection.id not in proposed_ids:
+            ends = [f"{current.devices[end.device_id].display_name}:{end.interface}"
+                    for end in (connection.a, connection.b)]
+            changes.append(InventoryRefreshChange(
+                change_type="remove-connection", target=connection.id,
+                summary=f"Remove stale {connection.role or 'graph'} connection {' - '.join(ends)}",
+            ))
     for proposed_connection in proposed.connections:
         current_connection = current_connections.get(proposed_connection.id)
         if not current_connection:
@@ -1264,7 +1372,8 @@ def _diff_inventory(current: InventoryFile, proposed: InventoryFile) -> list[Inv
                     summary=f"Update {proposed_connection.role or 'graph'} connection {proposed_connection.id}",
                 )
             )
-    return changes
+    # Put deletions first so the confirmation's truncated change list shows them.
+    return sorted(changes, key=lambda change: change.change_type != "remove-connection")
 
 
 def _safe_id(value: str) -> str:
@@ -1307,6 +1416,7 @@ def _build_refresh_summary(
         skipped_unresolved_remote_count=stats.skipped_unresolved_remote_count,
         skipped_unsupported_peer_count=stats.skipped_unsupported_peer_count,
         skipped_missing_interface_count=stats.skipped_missing_interface_count,
+        reconciled_connection_count=stats.reconciled_connection_count,
         targets=stats.target_statuses,
     )
 
@@ -1326,6 +1436,11 @@ def _build_refresh_messages(
             ),
         )
     ]
+    if summary.reconciled_connection_count:
+        messages.append(ValidationMessage(
+            level="info",
+            message=f"Reconciled {summary.reconciled_connection_count} stale wiremap link(s) confirmed by Lab Navigator.",
+        ))
     if summary.preserved_connection_count:
         messages.append(
             ValidationMessage(

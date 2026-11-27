@@ -1485,6 +1485,31 @@ describe('App', () => {
     expect(screen.getByRole('button', { name: 'Discovery issue' })).toBeInTheDocument();
   });
 
+  test('shows stale-link removals and reconciliation details in refresh confirmation', async () => {
+    const originalFetch = global.fetch.getMockImplementation();
+    global.fetch.mockImplementation(async (url, options = {}) => {
+      const response = await originalFetch(url, options);
+      if (url !== '/api/hardware/refresh-preview') return response;
+      const result = await response.json();
+      return Response.json({
+        ...result,
+        summary: { ...result.summary, reconciled_connection_count: 1 },
+        changes: [{ change_type: 'remove-connection', target: 'old-link',
+          summary: 'Remove stale edge-access connection old-edge:GE1 - switch:Gi1/19' }],
+        messages: [{ level: 'info', message: 'Reconciled 1 stale wiremap link(s) confirmed by Lab Navigator.' }]
+      });
+    });
+    render(<App />);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Refresh all' }));
+    await waitFor(() => expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining(
+      'Remove stale edge-access connection old-edge:GE1 - switch:Gi1/19'
+    )));
+    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining(
+      'Reconciled 1 stale wiremap link(s) confirmed by Lab Navigator.'
+    ));
+  });
+
   test('loads a previously generated run into the editor and delivery panel', async () => {
     const user = userEvent.setup();
     render(<App />);

@@ -100,6 +100,15 @@ Reservations and availability are taken from current local state when applying. 
 omitting `preview_id` retain the discover-and-apply behavior. Restarting the backend clears
 preview and progress records. Deploy the backend and rebuilt frontend assets together.
 
+Refresh reconciles conflicting imported edge links only for the selected hardware.
+It checks that the selected edge and switch agree on the new cable, and that the old
+edge explicitly reports the old port disconnected or connected elsewhere. Failed,
+missing, incomplete, or contradictory wiremaps keep the existing link protected.
+Manual links on other hardware are also protected. Preview lists removed links first,
+includes `remove-connection` changes and `reconciled_connection_count`, and logs each
+confirmed move under the request ID. Conflicts elsewhere in a shared switch graph are
+preserved without marking the selected hardware's refresh as partial.
+
 ## Data And Outputs
 
 - Hardware inventory: `backend/data/hardware_inventory.json`

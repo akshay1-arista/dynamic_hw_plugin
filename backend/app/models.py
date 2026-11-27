@@ -528,7 +528,7 @@ class InventoryRefreshRequest(BaseModel):
 
 
 class InventoryRefreshChange(BaseModel):
-    change_type: Literal["add-device", "update-device", "add-connection", "update-connection"]
+    change_type: Literal["add-device", "update-device", "add-connection", "update-connection", "remove-connection"]
     target: str
     summary: str
 
@@ -550,6 +550,7 @@ class InventoryRefreshSummary(BaseModel):
     skipped_unresolved_remote_count: int = 0
     skipped_unsupported_peer_count: int = 0
     skipped_missing_interface_count: int = 0
+    reconciled_connection_count: int = 0
     targets: list[InventoryRefreshTargetStatus] = Field(default_factory=list)
 
 
